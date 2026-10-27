@@ -2,6 +2,8 @@ package manager
 
 import (
 	"crypto/subtle"
+	"io/fs"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -21,25 +23,102 @@ func fail(w http.ResponseWriter, code int, msg string) {
 	writeJSON(w, code, map[string]string{"error": msg})
 }
 
-// guard enforces basic auth when a password is configured.
-func (m *Manager) guard(user, pass string, next http.HandlerFunc) http.Handler {
-	return m.guardUI(user, pass, next)
+const sessionCookie = "lumo_session"
+
+// guard enforces console authentication. With no password configured the
+// console is open (local tool default).
+func (m *Manager) guard(next http.Handler) http.Handler {
+	return m.guardUI(next)
 }
 
-func (m *Manager) guardUI(user, pass string, next http.Handler) http.Handler {
+func (m *Manager) guardUI(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if pass != "" {
-			u, p, ok := r.BasicAuth()
-			if !ok ||
-				subtle.ConstantTimeCompare([]byte(u), []byte(user)) != 1 ||
-				subtle.ConstantTimeCompare([]byte(p), []byte(pass)) != 1 {
-				w.Header().Set("WWW-Authenticate", `Basic realm="LUMO"`)
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				return
-			}
+		if m.authed(r) {
+			next.ServeHTTP(w, r)
+			return
 		}
-		next.ServeHTTP(w, r)
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = jsonEncode(w, map[string]string{"error": "未登录或会话已过期"})
+			return
+		}
+		http.Redirect(w, r, "/login", http.StatusFound)
 	})
+}
+
+// authed checks the session cookie, then basic auth credentials.
+func (m *Manager) authed(r *http.Request) bool {
+	if m.consolePass == "" {
+		return true
+	}
+	if c, err := r.Cookie(sessionCookie); err == nil && m.sessions.Valid(c.Value) {
+		return true
+	}
+	u, p, ok := r.BasicAuth()
+	return ok &&
+		subtle.ConstantTimeCompare([]byte(u), []byte(m.consoleUser)) == 1 &&
+		subtle.ConstantTimeCompare([]byte(p), []byte(m.consolePass)) == 1
+}
+
+// loginPage serves the login form when a password is configured.
+func (m *Manager) loginPage(w http.ResponseWriter, r *http.Request) {
+	if m.consolePass == "" || m.authed(r) {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	b, err := fs.ReadFile(dash.Client, "client/login.html")
+	if err != nil {
+		http.Error(w, "login page unavailable", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write(b)
+}
+
+// apiLogin validates console credentials and issues a session cookie.
+func (m *Manager) apiLogin(w http.ResponseWriter, r *http.Request) {
+	origin, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if m.limiter.Locked(origin) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_ = jsonEncode(w, map[string]string{"error": "尝试次数过多，请 10 分钟后再试"})
+		return
+	}
+	var req struct {
+		Account  string `json:"account"`
+		Password string `json:"password"`
+	}
+	if err := jsonDecode(r.Body, &req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = jsonEncode(w, map[string]string{"error": "bad request body"})
+		return
+	}
+	okU := subtle.ConstantTimeCompare([]byte(req.Account), []byte(m.consoleUser)) == 1
+	okP := subtle.ConstantTimeCompare([]byte(req.Password), []byte(m.consolePass)) == 1
+	if !okU || !okP {
+		m.limiter.Fail(origin)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = jsonEncode(w, map[string]string{"error": "账号或密码不正确"})
+		return
+	}
+	m.limiter.Reset(origin)
+	http.SetCookie(w, &http.Cookie{
+		Name: sessionCookie, Value: m.sessions.Issue(), Path: "/",
+		HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 7 * 24 * 3600,
+	})
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// apiLogout revokes the session.
+func (m *Manager) apiLogout(w http.ResponseWriter, r *http.Request) {
+	if c, err := r.Cookie(sessionCookie); err == nil {
+		m.sessions.Revoke(c.Value)
+	}
+	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Path: "/", MaxAge: -1})
+	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
 // consoleFS exposes the embedded client console assets.

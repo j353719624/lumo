@@ -7,6 +7,7 @@ import (
 	"crypto/hmac"
 	"encoding/hex"
 	"fmt"
+	"lumo/internal/auth"
 	"net"
 	"net/http"
 	"sync"
@@ -39,6 +40,9 @@ type Server struct {
 	pendMu   sync.Mutex
 	pending  map[string]pendEntry
 	connsNow atomic.Int64
+
+	webSessions *auth.Sessions
+	limiter     *auth.Limiter
 }
 
 type pendEntry struct {
@@ -81,14 +85,16 @@ type proxyEnt struct {
 // New creates a Server from validated configuration.
 func New(cfg *config.ServerConfig) *Server {
 	return &Server{
-		cfg:      cfg,
-		start:    time.Now(),
-		sessions: map[string]*session{},
-		proxies:  map[string]*proxyEnt{},
-		usedPort: map[int]bool{},
-		httpDom:  map[string]*proxyEnt{},
-		httpsDom: map[string]*proxyEnt{},
-		pending:  map[string]pendEntry{},
+		cfg:         cfg,
+		start:       time.Now(),
+		sessions:    map[string]*session{},
+		proxies:     map[string]*proxyEnt{},
+		usedPort:    map[int]bool{},
+		httpDom:     map[string]*proxyEnt{},
+		httpsDom:    map[string]*proxyEnt{},
+		pending:     map[string]pendEntry{},
+		webSessions: auth.NewSessions(7 * 24 * time.Hour),
+		limiter:     auth.NewLimiter(10 * time.Minute),
 	}
 }
 

@@ -8,7 +8,9 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"time"
 
+	"lumo/internal/auth"
 	"lumo/internal/client"
 	"lumo/internal/log"
 )
@@ -18,6 +20,11 @@ type Manager struct {
 	store *Store
 
 	consolePort string
+	consoleUser string
+	consolePass string
+
+	sessions *auth.Sessions
+	limiter  *auth.Limiter
 
 	mu   sync.Mutex
 	runs map[string]*run
@@ -32,12 +39,18 @@ type run struct {
 
 // New creates a Manager over the given store.
 func New(store *Store) *Manager {
-	return &Manager{store: store, runs: map[string]*run{}}
+	return &Manager{
+		store:    store,
+		runs:     map[string]*run{},
+		sessions: auth.NewSessions(7 * 24 * time.Hour),
+		limiter:  auth.NewLimiter(10 * time.Minute),
+	}
 }
 
 // Run starts every config marked enabled, serves the console and blocks
 // until the process is interrupted.
 func (m *Manager) Run(addr, user, pass string) error {
+	m.consoleUser, m.consolePass = user, pass
 	for _, cfg := range m.store.List() {
 		if cfg.Enabled {
 			if err := m.start(cfg.ID); err != nil {
@@ -53,17 +66,20 @@ func (m *Manager) Run(addr, user, pass string) error {
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle("GET /api/configs", m.guard(user, pass, m.apiList))
-	mux.Handle("POST /api/configs", m.guard(user, pass, m.apiCreate))
-	mux.Handle("GET /api/configs/{id}", m.guard(user, pass, m.apiGet))
-	mux.Handle("PUT /api/configs/{id}", m.guard(user, pass, m.apiUpdate))
-	mux.Handle("DELETE /api/configs/{id}", m.guard(user, pass, m.apiDelete))
-	mux.Handle("POST /api/configs/{id}/start", m.guard(user, pass, m.apiStart))
-	mux.Handle("POST /api/configs/{id}/stop", m.guard(user, pass, m.apiStop))
-	mux.Handle("GET /api/configs/{id}/toml", m.guard(user, pass, m.apiToml))
-	mux.Handle("GET /api/status", m.guard(user, pass, m.apiStatus))
-	mux.Handle("GET /api/info", m.guard(user, pass, m.apiInfo))
-	mux.Handle("/", m.guardUI(user, pass, http.FileServer(consoleFS)))
+	mux.HandleFunc("GET /login", m.loginPage)
+	mux.Handle("POST /api/login", http.HandlerFunc(m.apiLogin))
+	mux.Handle("GET /logout", http.HandlerFunc(m.apiLogout))
+	mux.Handle("GET /api/configs", m.guard(http.HandlerFunc(m.apiList)))
+	mux.Handle("POST /api/configs", m.guard(http.HandlerFunc(m.apiCreate)))
+	mux.Handle("GET /api/configs/{id}", m.guard(http.HandlerFunc(m.apiGet)))
+	mux.Handle("PUT /api/configs/{id}", m.guard(http.HandlerFunc(m.apiUpdate)))
+	mux.Handle("DELETE /api/configs/{id}", m.guard(http.HandlerFunc(m.apiDelete)))
+	mux.Handle("POST /api/configs/{id}/start", m.guard(http.HandlerFunc(m.apiStart)))
+	mux.Handle("POST /api/configs/{id}/stop", m.guard(http.HandlerFunc(m.apiStop)))
+	mux.Handle("GET /api/configs/{id}/toml", m.guard(http.HandlerFunc(m.apiToml)))
+	mux.Handle("GET /api/status", m.guard(http.HandlerFunc(m.apiStatus)))
+	mux.Handle("GET /api/info", m.guard(http.HandlerFunc(m.apiInfo)))
+	mux.Handle("/", m.guardUI(http.FileServer(consoleFS)))
 
 	srv := &http.Server{Addr: addr, Handler: mux}
 	go func() {

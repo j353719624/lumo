@@ -2,17 +2,23 @@ package server
 
 import (
 	"crypto/subtle"
+	"encoding/json"
 	"io/fs"
+	"net"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"lumo/internal/dash"
 	"lumo/internal/log"
 	"lumo/internal/version"
 )
 
+const sessionCookie = "lumo_session"
+
 // runDash serves the control console and its API using the contract
-// expected by assets/api.js.
+// expected by assets/api.js. Pages redirect to /login when the visitor has
+// no session; API calls get 401 instead.
 func (s *Server) runDash() {
 	ui, err := fs.Sub(dash.Server, "server")
 	if err != nil {
@@ -20,6 +26,9 @@ func (s *Server) runDash() {
 		return
 	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /login", s.loginPage)
+	mux.HandleFunc("POST /api/login", s.apiLogin)
+	mux.HandleFunc("GET /logout", s.apiLogout)
 	mux.HandleFunc("/api/serverinfo", s.apiServerInfo)
 	mux.HandleFunc("/api/proxies", s.apiProxies)
 	mux.HandleFunc("/api/logs", s.apiLogs)
@@ -38,20 +47,104 @@ func (s *Server) runDash() {
 	}
 }
 
-// guard wraps handlers with HTTP basic authentication when enabled.
+// guard enforces authentication: a session cookie or HTTP basic auth.
+// HTML pages redirect to /login; API calls receive 401.
 func (s *Server) guard(next http.Handler) http.Handler {
 	user, pass := s.cfg.Web.User, s.cfg.Web.Password
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		u, p, ok := r.BasicAuth()
-		if !ok ||
-			subtle.ConstantTimeCompare([]byte(u), []byte(user)) != 1 ||
-			subtle.ConstantTimeCompare([]byte(p), []byte(pass)) != 1 {
-			w.Header().Set("WWW-Authenticate", `Basic realm="LUMO"`)
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		if s.authed(r, user, pass) {
+			next.ServeHTTP(w, r)
 			return
 		}
-		next.ServeHTTP(w, r)
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			w.Header().Set("WWW-Authenticate", `Basic realm="LUMO"`)
+			failJSON(w, http.StatusUnauthorized, "未登录或会话已过期")
+			return
+		}
+		http.Redirect(w, r, "/login", http.StatusFound)
 	})
+}
+
+// authed checks the session cookie, then basic auth credentials.
+func (s *Server) authed(r *http.Request, user, pass string) bool {
+	if c, err := r.Cookie(sessionCookie); err == nil && s.webSessions.Valid(c.Value) {
+		return true
+	}
+	u, p, ok := r.BasicAuth()
+	return ok &&
+		subtle.ConstantTimeCompare([]byte(u), []byte(user)) == 1 &&
+		subtle.ConstantTimeCompare([]byte(p), []byte(pass)) == 1
+}
+
+// loginPage serves the login form; already-authenticated visitors go to /.
+func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
+	if s.authed(r, s.cfg.Web.User, s.cfg.Web.Password) {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	b, err := fs.ReadFile(dash.Server, "server/login.html")
+	if err != nil {
+		http.Error(w, "login page unavailable", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write(b)
+}
+
+// apiLogin validates credentials, applies the failure limiter and issues a
+// session cookie on success.
+func (s *Server) apiLogin(w http.ResponseWriter, r *http.Request) {
+	origin, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if s.limiter.Locked(origin) {
+		failJSON(w, http.StatusTooManyRequests, "尝试次数过多，请 10 分钟后再试")
+		return
+	}
+	var req struct {
+		Account  string `json:"account"`
+		Password string `json:"password"`
+	}
+	if err := jsonDecodeBody(r, &req); err != nil {
+		failJSON(w, http.StatusBadRequest, "bad request body")
+		return
+	}
+	user, pass := s.cfg.Web.User, s.cfg.Web.Password
+	if subtle.ConstantTimeCompare([]byte(req.Account), []byte(user)) != 1 ||
+		subtle.ConstantTimeCompare([]byte(req.Password), []byte(pass)) != 1 {
+		s.limiter.Fail(origin)
+		failJSON(w, http.StatusUnauthorized, "账号或密码不正确")
+		return
+	}
+	s.limiter.Reset(origin)
+	http.SetCookie(w, &http.Cookie{
+		Name: sessionCookie, Value: s.webSessions.Issue(), Path: "/",
+		HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 7 * 24 * 3600,
+	})
+	writeOK(w)
+}
+
+// apiLogout revokes the session and returns to the login page.
+func (s *Server) apiLogout(w http.ResponseWriter, r *http.Request) {
+	if c, err := r.Cookie(sessionCookie); err == nil {
+		s.webSessions.Revoke(c.Value)
+	}
+	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Path: "/", MaxAge: -1})
+	http.Redirect(w, r, "/login", http.StatusFound)
+}
+
+func failJSON(w http.ResponseWriter, code int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
+func writeOK(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+}
+
+func jsonDecodeBody(r *http.Request, v any) error {
+	defer r.Body.Close()
+	return json.NewDecoder(r.Body).Decode(v)
 }
 
 func (s *Server) apiServerInfo(w http.ResponseWriter, _ *http.Request) {
