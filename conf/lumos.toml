@@ -1,0 +1,16 @@
+# lumos 服务端最小配置
+bindPort = 7000
+
+# HTTP 虚拟主机端口（需要 http 类型代理时打开）
+# vhostHTTPPort = 18090
+
+[auth]
+# 与客户端保持一致的长随机令牌
+token = "change-me-to-a-long-random-string"
+
+# Web 管理面板（不需要可整段删除）
+[webServer]
+addr = "127.0.0.1"
+port = 7500
+user = "admin"
+password = "change-me"

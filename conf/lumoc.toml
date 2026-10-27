@@ -1,0 +1,20 @@
+# lumoc 客户端最小配置
+serverAddr = "127.0.0.1"
+serverPort = 7000
+
+[auth]
+token = "change-me-to-a-long-random-string"
+
+# 客户端控制台（不需要可整段删除；也可改用 `lumoc ui`）
+[webServer]
+addr = "127.0.0.1"
+port = 7400
+user = "admin"
+password = "change-me"
+
+[[prochange-me-to-a-long-random-stringies]]
+name = "ssh"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 22
+remotePort = 6022
