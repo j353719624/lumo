@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 
@@ -36,7 +37,7 @@ func (s *Server) runDash() {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
-	mux.Handle("/", s.guard(http.FileServer(http.FS(ui))))
+	mux.Handle("/", s.guard(serveConsole(http.FS(ui))))
 
 	addr := s.cfg.Web.Addr + ":" + strconv.Itoa(s.cfg.Web.Port)
 	srv := &http.Server{Addr: addr, Handler: mux}
@@ -221,4 +222,21 @@ func (s *Server) apiLogs(w http.ResponseWriter, r *http.Request) {
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	writeJSONBody(w, v)
+}
+
+// serveConsole serves embedded files; unknown paths go back to the root so
+// a stray link or stale bookmark never shows a bare 404.
+func serveConsole(fsys http.FileSystem) http.Handler {
+	fsrv := http.FileServer(fsys)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if p := strings.TrimPrefix(r.URL.Path, "/"); p != "" {
+			f, err := fsys.Open(strings.TrimPrefix(path.Clean("/"+p), "/"))
+			if err != nil {
+				http.Redirect(w, r, "/", http.StatusFound)
+				return
+			}
+			_ = f.Close()
+		}
+		fsrv.ServeHTTP(w, r)
+	})
 }

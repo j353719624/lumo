@@ -79,7 +79,7 @@ func (m *Manager) Run(addr, user, pass string) error {
 	mux.Handle("GET /api/configs/{id}/toml", m.guard(http.HandlerFunc(m.apiToml)))
 	mux.Handle("GET /api/status", m.guard(http.HandlerFunc(m.apiStatus)))
 	mux.Handle("GET /api/info", m.guard(http.HandlerFunc(m.apiInfo)))
-	mux.Handle("/", m.guardUI(http.FileServer(consoleFS)))
+	mux.Handle("/", m.guardUI(serveConsole(consoleFS)))
 
 	srv := &http.Server{Addr: addr, Handler: mux}
 	go func() {

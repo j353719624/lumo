@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 
@@ -351,4 +352,20 @@ func renderToml(cfg ConnConfig) string {
 		L = append(L, "")
 	}
 	return strings.Join(L, "\n")
+}
+
+// serveConsole serves embedded files; unknown paths go back to the root.
+func serveConsole(fsys http.FileSystem) http.Handler {
+	fsrv := http.FileServer(fsys)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if p := strings.TrimPrefix(r.URL.Path, "/"); p != "" {
+			f, err := fsys.Open(strings.TrimPrefix(path.Clean("/"+p), "/"))
+			if err != nil {
+				http.Redirect(w, r, "/", http.StatusFound)
+				return
+			}
+			_ = f.Close()
+		}
+		fsrv.ServeHTTP(w, r)
+	})
 }
