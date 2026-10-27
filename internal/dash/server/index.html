@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LUMO · 服务端控制台</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <svg width="22" height="22" viewBox="0 0 72 72" fill="none" aria-hidden="true">
+      <path d="M22 57V38C22 26.9 28.3 18.4 36 18.4C43.7 18.4 50 26.9 50 38V57" stroke="#5A7BFF" stroke-width="7" stroke-linecap="round"/>
+      <path d="M10 42H62" stroke="#35E0C8" stroke-width="4.8" stroke-linecap="round"/>
+      <circle cx="10" cy="42" r="4" fill="#35E0C8"/><circle cx="62" cy="42" r="4" fill="#35E0C8"/>
+    </svg>
+    <span class="wordmark">LUMO</span>
+    <span class="badge">SERVER</span>
+    <span class="pagename">服务端控制台</span>
+  </div>
+  <div class="top-right">
+    <span class="pill" id="engine"><span class="dot"></span><span id="engineText">连接中…</span></span>
+    <span class="ver" id="ver">—</span>
+    <span class="avatar">A</span>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- ① 顶部状态区 -->
+  <section class="band" id="band">
+    <article class="card status-card">
+      <div class="clabel"><span>① 运行状态</span><span class="health" id="healthz">healthz ·</span></div>
+      <div class="smain"><span class="sdot" id="sdot"></span><b id="statusText">读取中</b></div>
+      <div class="uptime" id="uptime">已稳定运行 —</div>
+      <div class="pid" id="pid">bindPort —</div>
+    </article>
+
+    <article class="card kpi-card">
+      <div class="kpi">
+        <div class="k-label">在线客户端</div>
+        <div class="k-val"><b id="kClient">—</b><span class="k-unit">台</span></div>
+        <div class="k-sub" id="kClientSub">—</div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">在线代理</div>
+        <div class="k-val"><b id="kProxy">—</b><span class="k-unit">条</span></div>
+        <div class="k-sub" id="kProxySub">—</div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">当前连接</div>
+        <div class="k-val"><b id="kConn">—</b><span class="k-unit">条</span></div>
+        <div class="k-sub" id="kConnSub">—</div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">累计流量</div>
+        <div class="k-val"><b id="kTraffic">—</b><span class="k-unit">GB</span></div>
+        <div class="k-sub" id="kTrafficSub">—</div>
+      </div>
+    </article>
+
+    <article class="card rate-card">
+      <div class="clabel"><span>实时速率</span><span class="health unk" id="sampleRate">2s 采样</span></div>
+      <div class="rate-vals">
+        <span class="up" id="rateUp">↑ —</span>
+        <span class="down" id="rateDown">↓ —</span>
+      </div>
+      <svg class="spark" id="spark" viewBox="0 0 372 54" preserveAspectRatio="none" aria-hidden="true">
+        <path id="sparkDownFill" fill="#35E0C8" fill-opacity="0.13"></path>
+        <path id="sparkDown" fill="none" stroke="#35E0C8" stroke-width="1.8" stroke-linejoin="round"></path>
+        <path id="sparkUp" fill="none" stroke="#8FA7FF" stroke-width="1.6" stroke-linejoin="round" opacity="0.8"></path>
+      </svg>
+    </article>
+  </section>
+
+  <!-- ③ 代理与客户端 -->
+  <section class="card panel" id="proxies">
+    <div class="phead">
+      <h2>③ 代理与客户端</h2>
+      <span class="chip" id="proxyChip">— 在线</span>
+      <span class="spacer"></span>
+      <label class="search">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+          <circle cx="7" cy="7" r="4.6" stroke="#5D6A80" stroke-width="1.6"/>
+          <path d="M10.4 10.4L13.4 13.4" stroke="#5D6A80" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <input id="search" type="search" placeholder="搜索代理 / 客户端 / 入口" autocomplete="off">
+      </label>
+      <button class="btn ghost sm" id="refresh">刷新</button>
+    </div>
+
+    <div class="tabs" id="tabs" role="tablist">
+      <button class="tab" role="tab" data-type="all" aria-selected="true">全部 <span data-count="all">0</span></button>
+      <button class="tab" role="tab" data-type="tcp" aria-selected="false">TCP <span data-count="tcp">0</span></button>
+      <button class="tab" role="tab" data-type="http" aria-selected="false">HTTP <span data-count="http">0</span></button>
+      <button class="tab" role="tab" data-type="udp" aria-selected="false">UDP <span data-count="udp">0</span></button>
+      <button class="tab" role="tab" data-type="sealed-tcp" aria-selected="false">sealed-tcp <span data-count="sealed-tcp">0</span></button>
+      <span class="spacer"></span>
+      <label class="switch-row">
+        <span class="switch" id="onlineOnly" role="switch" aria-checked="false" tabindex="0"></span>
+        只看在线
+      </label>
+    </div>
+
+    <div class="table" id="table">
+      <div class="phead-row">
+        <span>代理名称</span><span>类型</span><span class="c-client">所属客户端</span>
+        <span>公网入口</span><span class="c-traffic">今日流量</span><span>状态</span><span></span>
+      </div>
+      <div id="rows"></div>
+    </div>
+
+    <div class="lfoot">
+      <span class="spacer" id="pageInfo">—</span>
+      <div id="pager" style="display:flex;gap:6px"></div>
+    </div>
+  </section>
+
+  <!-- ② 服务配置 -->
+  <aside class="card panel" id="config">
+    <div class="phead">
+      <h2>② 服务配置</h2>
+      <span class="chip">lumos.toml</span>
+      <span class="spacer"></span>
+      <button class="btn ghost sm" id="copyToml">复制</button>
+    </div>
+    <div class="cbody">
+      <div class="field-row">
+        <div class="field"><label>监听端口 bindPort</label><input id="cBind" readonly></div>
+        <div class="field"><label>KCP 端口</label><input id="cKcp" readonly></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>HTTP 虚拟主机</label><input id="cHttp" readonly></div>
+        <div class="field"><label>HTTPS 虚拟主机</label><input id="cHttps" readonly></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>QUIC 端口</label><input id="cQuic" readonly></div>
+        <div class="field"><label>最大连接池</label><input id="cPool" readonly></div>
+      </div>
+      <div class="field"><label>子域名根 subDomainHost</label><input id="cSub" readonly></div>
+      <div class="field"><label>允许端口范围 allowPorts</label><input id="cPorts" readonly></div>
+      <div class="sw-list">
+        <label class="switch-row">
+          <span class="switch" id="cTls" role="switch" aria-checked="false" tabindex="-1"></span>
+          TLS 强制
+        </label>
+        <span class="switch-row" style="cursor:default">
+          <span class="switch" id="cMux" role="switch" aria-checked="true" tabindex="-1"></span>
+          TCP 多路复用
+        </span>
+      </div>
+      <div class="note">注意：lumos 无热加载接口，端口类参数修改后需重启进程才会生效。</div>
+    </div>
+    <div class="cfoot">
+      <button class="btn ghost sm" id="reload">重新读取</button>
+      <span class="spacer"></span>
+      <button class="btn sm" id="copyToml2">复制 lumos.toml</button>
+    </div>
+  </aside>
+
+  <!-- ④ 日志 -->
+  <section class="card panel" id="logs">
+    <div class="phead">
+      <h2>④ 运行事件</h2>
+      <span class="chip" id="logChip">LIVE</span>
+      <span class="spacer"></span>
+      <div class="tabs" style="height:auto;border:0;padding:0;gap:6px" id="logLevels">
+        <button class="tab" data-level="ALL" aria-selected="true">全部</button>
+        <button class="tab" data-level="INFO" aria-selected="false">INFO</button>
+        <button class="tab" data-level="WARN" aria-selected="false">WARN</button>
+        <button class="tab" data-level="ERROR" aria-selected="false">ERROR</button>
+      </div>
+      <label class="switch-row" style="margin-left:6px">
+        <span class="switch" id="logLive" role="switch" aria-checked="true" tabindex="0"></span>
+        实时刷新
+      </label>
+    </div>
+    <div class="lbody" id="logBody">
+      <div class="lempty">等待事件…</div>
+    </div>
+  </section>
+</main>
+
+<div class="menu" id="menu"></div>
+<div class="toast" id="toast"><span class="dot"></span><span id="toastText"></span></div>
+
+<script src="assets/api.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

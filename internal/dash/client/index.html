@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LUMO · 客户端控制台</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; font: 14px/1.6 "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: #0d1117; color: #d7dee8;
+  }
+  header {
+    display: flex; align-items: center; gap: 10px; padding: 14px 22px;
+    border-bottom: 1px solid #1e2733;
+  }
+  header svg { flex: none; }
+  .wordmark { font-weight: 700; letter-spacing: 2px; }
+  .badge {
+    font-size: 10px; letter-spacing: 1px; padding: 2px 8px; border-radius: 999px;
+    background: #16233a; color: #7ea2ff; border: 1px solid #24365c;
+  }
+  .pill {
+    margin-left: auto; display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12px; color: #9fb0c7; border: 1px solid #223042; border-radius: 999px; padding: 4px 12px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #4a5568; }
+  .dot.on { background: #35e0c8; box-shadow: 0 0 8px #35e0c855; }
+  main { max-width: 960px; margin: 26px auto; padding: 0 18px; }
+  .card {
+    background: #131a24; border: 1px solid #1e2733; border-radius: 12px; padding: 18px 20px; margin-bottom: 18px;
+  }
+  h2 { margin: 0 0 12px; font-size: 15px; color: #e8eef7; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #1c2532; font-size: 13px; }
+  th { color: #8494ab; font-weight: 600; }
+  .st { display: inline-flex; align-items: center; gap: 6px; }
+  .st i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .st.running i { background: #35e0c8; } .st.waiting i { background: #f0b429; }
+  .st.offline i, .st.error i { background: #ff5c7a; }
+  .muted { color: #8494ab; }
+  button {
+    background: #2b6cff; color: #fff; border: 0; border-radius: 8px; padding: 8px 18px;
+    font-size: 13px; cursor: pointer;
+  }
+  button:hover { background: #3d7aff; }
+  #msg { font-size: 12px; color: #9fb0c7; margin-left: 10px; }
+  .err { color: #ff8ba0; }
+</style>
+</head>
+<body>
+<header>
+  <svg width="22" height="22" viewBox="0 0 72 72" fill="none" aria-hidden="true">
+    <path d="M22 57V38C22 26.9 28.3 18.4 36 18.4C43.7 18.4 50 26.9 50 38V57" stroke="#5A7BFF" stroke-width="7" stroke-linecap="round"/>
+    <path d="M10 42H62" stroke="#35E0C8" stroke-width="4.8" stroke-linecap="round"/>
+    <circle cx="10" cy="42" r="4" fill="#35E0C8"/><circle cx="62" cy="42" r="4" fill="#35E0C8"/>
+  </svg>
+  <span class="wordmark">LUMO</span>
+  <span class="badge">CLIENT</span>
+  <span class="pagename">客户端控制台</span>
+  <span class="pill"><span class="dot" id="dot"></span><span id="ver">—</span></span>
+</header>
+<main>
+  <section class="card">
+    <h2>代理状态</h2>
+    <table>
+      <thead><tr><th>名称</th><th>类型</th><th>本地服务</th><th>公网入口</th><th>状态</th><th>流量 ↓ / ↑</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="6" class="muted">加载中…</td></tr></tbody>
+    </table>
+  </section>
+  <section class="card">
+    <h2>配置</h2>
+    <p class="muted">修改 lumoc.toml 后点击重载，无需重启进程。</p>
+    <button id="reload">重新加载配置</button><span id="msg"></span>
+  </section>
+</main>
+<script>
+function fmt(n) {
+  n = Number(n) || 0;
+  if (n > 1 << 30) return (n / (1 << 30)).toFixed(2) + ' GiB';
+  if (n > 1 << 20) return (n / (1 << 20)).toFixed(2) + ' MiB';
+  if (n > 1 << 10) return (n / (1 << 10)).toFixed(1) + ' KiB';
+  return n + ' B';
+}
+async function refresh() {
+  try {
+    const r = await fetch('/api/status');
+    if (r.status === 401) { location.reload(); return; }
+    const d = await r.json();
+    document.getElementById('ver').textContent = 'v' + d.version;
+    const rows = d.proxies.length
+      ? d.proxies.map(p => `<tr>
+          <td><b>${p.name}</b></td><td>${p.type.toUpperCase()}</td>
+          <td>${p.local}</td><td>${p.entry || '—'}</td>
+          <td><span class="st ${p.status}"><i></i>${p.status}${p.err ? ' · <span class="err">' + p.err + '</span>' : ''}</span></td>
+          <td class="muted">${fmt(p.traffic_in)} / ${fmt(p.traffic_out)}</td></tr>`).join('')
+      : '<tr><td colspan="6" class="muted">尚无代理，请编辑 lumoc.toml 后重载。</td></tr>';
+    document.getElementById('rows').innerHTML = rows;
+    document.getElementById('dot').classList.add('on');
+  } catch (_) {
+    document.getElementById('dot').classList.remove('on');
+  }
+}
+document.getElementById('reload').onclick = async () => {
+  const m = document.getElementById('msg');
+  m.textContent = '重载中…';
+  try {
+    const r = await fetch('/api/reload', { method: 'POST' });
+    const d = await r.json();
+    m.textContent = d.ok ? '完成' : ('失败：' + d.error);
+    m.className = d.ok ? '' : 'err';
+  } catch (e) { m.textContent = '失败：' + e; m.className = 'err'; }
+  refresh();
+};
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>
