@@ -24,7 +24,6 @@
     prevTotal: null,
     startedAt: Date.now(),
     connected: false,
-    demo: false,
     filter: { type: 'all', q: '', onlineOnly: false, page: 1 },
     logLevel: 'ALL',
     logLive: true,
@@ -60,52 +59,6 @@
   function clock(d = new Date()) {
     return d.toTimeString().slice(0, 8);
   }
-
-  /* ---------------- 演示数据（连不上真实服务端时） ---------------- */
-  const DEMO_TYPES = {
-    tcp: ['hk-nas-ssh', 'office-erp', 'dev-api', 'db-mysql', 'git-serve', 'redis-cache',
-      'mqtt-broker', 'jenkins-ci', 'gitea', 'portainer', 'vnc-office', 'ssh-lab', 'es-node', 'k8s-api'],
-    http: ['hk-nas-web', 'nas-panel', 'blog-site', 'docs-site', 'grafana', 'kibana', 'minio-console', 'jupyter'],
-    udp: ['game-udp', 'dns-local', 'sip-voice', 'wireguard'],
-    sealed-tcp: ['lab-ocr', 'private-db'],
-  };
-  const DEMO_CLIENTS = ['home-nas', 'office-pc', 'dev-mac', 'home-pc', 'lab-01', 'gpu-node'];
-
-  function buildDemo() {
-    const proxies = [];
-    let port = 15000;
-    Object.entries(DEMO_TYPES).forEach(([type, names]) => {
-      names.forEach((name, i) => {
-        const online = !(name === 'dev-api' || name === 'jupyter');
-        proxies.push({
-          name,
-          type,
-          client: DEMO_CLIENTS[(i + port) % DEMO_CLIENTS.length],
-          local: `127.0.0.1:${5000 + i * 7}`,
-          entry: type === 'http'
-            ? `${name.replace(/^hk-/, '')}.lumo.net`
-            : type === 'sealed-tcp' ? '仅密钥访问' : `hk-01.lumo.net:${port++}`,
-          trafficIn: Math.round(Math.random() * 9e8),
-          trafficOut: Math.round(Math.random() * 3e9),
-          conns: online ? Math.ceil(Math.random() * 12) : 0,
-          status: online ? 'online' : 'offline',
-          online,
-          waiting: false,
-        });
-      });
-    });
-    return {
-      version: 'v0.61.1',
-      bindPort: 7000, kcpPort: 7001, quicPort: 7002,
-      vhostHttpPort: 80, vhostHttpsPort: 443,
-      subdomainHost: 'lumo.net', allowPorts: '15000-15100',
-      maxPoolCount: 5, heartbeatTimeout: 90, tlsForce: true,
-      totalIn: 8.6e9, totalOut: 34.2e9,
-      curConns: 143, clientCounts: 12,
-      proxyTypeCount: { tcp: 14, http: 8, udp: 4, sealed-tcp: 2 },
-    };
-  }
-  const DEMO_INFO = buildDemo();
 
   /* ---------------- 事件流（日志接口不可用时由差分生成） ---------------- */
   function pushEvent(level, msg) {
@@ -354,35 +307,16 @@
       info = await API.serverInfo();
       proxies = await API.proxies(API.host());
       state.connected = true;
-      state.demo = false;
     } catch (err) {
-      if (!state.demo && !state.connected) {
-        // 首次就连不上 → 进演示模式，让界面先能看
-        state.demo = true;
-        info = { ...DEMO_INFO, totalIn: DEMO_INFO.totalIn, totalOut: DEMO_INFO.totalOut };
-        proxies = buildDemo();
-        pushEvent('WARN', '未连接服务端，当前为演示数据');
-        pushEvent('INFO', '在地址后加 ?api=http://127.0.0.1:7500 接入真实服务端');
-      } else if (state.demo) {
-        info = { ...state.info };
-        info.totalIn += Math.random() * 1.6e7;
-        info.totalOut += Math.random() * 6.2e7;
-        info.curConns = Math.max(60, Math.round(info.curConns + (Math.random() - 0.5) * 8));
-        proxies = state.proxies.map((p) => {
-          if (!p.online) return p;
-          const addIn = Math.random() * 2.2e6;
-          const addOut = Math.random() * 8e6;
-          return { ...p, trafficIn: p.trafficIn + addIn, trafficOut: p.trafficOut + addOut };
-        });
-      } else {
-        state.connected = false;
-        $('engine').className = 'pill bad';
-        $('engineText').textContent = '连接失败';
-        $('statusText').textContent = '与 lumos 断开连接';
-        $('sdot').className = 'sdot bad';
-        pushEvent('ERROR', `拉取失败：${err.message}（${API.cfg.base || location.origin}）`);
-        return;
-      }
+      // 会话过期 → 回登录页；其余错误保持断线提示并继续重试
+      if (err.status === 401) { location.href = '/login'; return; }
+      state.connected = false;
+      $('engine').className = 'pill bad';
+      $('engineText').textContent = '连接失败';
+      $('statusText').textContent = '与 lumos 断开连接';
+      $('sdot').className = 'sdot bad';
+      pushEvent('ERROR', `拉取失败：${err.message}（${API.cfg.base || location.origin}）`);
+      return;
     }
 
     // 速率：用累计流量差分，这是 lumos 服务端能提供的原始数据
