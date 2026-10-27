@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	"lumo/internal/dash"
-	"lumo/internal/log"
 	"lumo/internal/version"
 )
 
@@ -19,7 +18,7 @@ type httpServer = http.Server
 func (c *Client) runAdmin(ctx context.Context) {
 	ui, err := fs.Sub(dash.Client, "client")
 	if err != nil {
-		log.Errorf("dashboard assets: %v", err)
+		c.loge("dashboard assets: %v", err)
 		return
 	}
 	mux := http.NewServeMux()
@@ -34,9 +33,9 @@ func (c *Client) runAdmin(ctx context.Context) {
 		<-ctx.Done()
 		_ = srv.Close()
 	}()
-	log.Infof("dashboard listening on http://%s (user %s)", addr, c.cfg.Web.User)
+	c.logi("dashboard listening on http://%s (user %s)", addr, c.cfg.Web.User)
 	if err := srv.ListenAndServe(); err != nil {
-		log.Debugf("dashboard stopped: %v", err)
+		c.logd("dashboard stopped: %v", err)
 	}
 }
 
@@ -91,7 +90,7 @@ func (c *Client) apiReload(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
-	log.Infof("configuration reloaded on request")
+	c.logi("configuration reloaded on request")
 	writeJSON(w, map[string]any{"ok": true})
 }
 

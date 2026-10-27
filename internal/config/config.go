@@ -122,13 +122,15 @@ func LoadClient(path string) (*ClientConfig, error) {
 		}
 		c.Proxies = append(c.Proxies, p)
 	}
-	if err := c.validate(); err != nil {
+	if err := c.Validate(); err != nil {
 		return nil, err
 	}
 	return c, nil
 }
 
-func (c *ClientConfig) validate() error {
+// Validate checks the client configuration; it is exported so dynamically
+// built configurations (e.g. from the console) can be checked too.
+func (c *ClientConfig) Validate() error {
 	if c.ServerAddr == "" {
 		return fmt.Errorf("serverAddr is required")
 	}

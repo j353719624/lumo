@@ -3,118 +3,267 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LUMO · 客户端控制台</title>
-<style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; min-height: 100vh; font: 14px/1.6 "Segoe UI", "Microsoft YaHei", sans-serif;
-    background: #0d1117; color: #d7dee8;
-  }
-  header {
-    display: flex; align-items: center; gap: 10px; padding: 14px 22px;
-    border-bottom: 1px solid #1e2733;
-  }
-  header svg { flex: none; }
-  .wordmark { font-weight: 700; letter-spacing: 2px; }
-  .badge {
-    font-size: 10px; letter-spacing: 1px; padding: 2px 8px; border-radius: 999px;
-    background: #16233a; color: #7ea2ff; border: 1px solid #24365c;
-  }
-  .pill {
-    margin-left: auto; display: inline-flex; align-items: center; gap: 7px;
-    font-size: 12px; color: #9fb0c7; border: 1px solid #223042; border-radius: 999px; padding: 4px 12px;
-  }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: #4a5568; }
-  .dot.on { background: #35e0c8; box-shadow: 0 0 8px #35e0c855; }
-  main { max-width: 960px; margin: 26px auto; padding: 0 18px; }
-  .card {
-    background: #131a24; border: 1px solid #1e2733; border-radius: 12px; padding: 18px 20px; margin-bottom: 18px;
-  }
-  h2 { margin: 0 0 12px; font-size: 15px; color: #e8eef7; }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #1c2532; font-size: 13px; }
-  th { color: #8494ab; font-weight: 600; }
-  .st { display: inline-flex; align-items: center; gap: 6px; }
-  .st i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-  .st.running i { background: #35e0c8; } .st.waiting i { background: #f0b429; }
-  .st.offline i, .st.error i { background: #ff5c7a; }
-  .muted { color: #8494ab; }
-  button {
-    background: #2b6cff; color: #fff; border: 0; border-radius: 8px; padding: 8px 18px;
-    font-size: 13px; cursor: pointer;
-  }
-  button:hover { background: #3d7aff; }
-  #msg { font-size: 12px; color: #9fb0c7; margin-left: 10px; }
-  .err { color: #ff8ba0; }
-</style>
+<title>LUMO · 连接配置</title>
+<link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
-<header>
-  <svg width="22" height="22" viewBox="0 0 72 72" fill="none" aria-hidden="true">
-    <path d="M22 57V38C22 26.9 28.3 18.4 36 18.4C43.7 18.4 50 26.9 50 38V57" stroke="#5A7BFF" stroke-width="7" stroke-linecap="round"/>
-    <path d="M10 42H62" stroke="#35E0C8" stroke-width="4.8" stroke-linecap="round"/>
-    <circle cx="10" cy="42" r="4" fill="#35E0C8"/><circle cx="62" cy="42" r="4" fill="#35E0C8"/>
-  </svg>
-  <span class="wordmark">LUMO</span>
-  <span class="badge">CLIENT</span>
-  <span class="pagename">客户端控制台</span>
-  <span class="pill"><span class="dot" id="dot"></span><span id="ver">—</span></span>
-</header>
-<main>
-  <section class="card">
-    <h2>代理状态</h2>
-    <table>
-      <thead><tr><th>名称</th><th>类型</th><th>本地服务</th><th>公网入口</th><th>状态</th><th>流量 ↓ / ↑</th></tr></thead>
-      <tbody id="rows"><tr><td colspan="6" class="muted">加载中…</td></tr></tbody>
-    </table>
-  </section>
-  <section class="card">
-    <h2>配置</h2>
-    <p class="muted">修改 lumoc.toml 后点击重载，无需重启进程。</p>
-    <button id="reload">重新加载配置</button><span id="msg"></span>
-  </section>
-</main>
-<script>
-function fmt(n) {
-  n = Number(n) || 0;
-  if (n > 1 << 30) return (n / (1 << 30)).toFixed(2) + ' GiB';
-  if (n > 1 << 20) return (n / (1 << 20)).toFixed(2) + ' MiB';
-  if (n > 1 << 10) return (n / (1 << 10)).toFixed(1) + ' KiB';
-  return n + ' B';
-}
-async function refresh() {
-  try {
-    const r = await fetch('/api/status');
-    if (r.status === 401) { location.reload(); return; }
-    const d = await r.json();
-    document.getElementById('ver').textContent = 'v' + d.version;
-    const rows = d.proxies.length
-      ? d.proxies.map(p => `<tr>
-          <td><b>${p.name}</b></td><td>${p.type.toUpperCase()}</td>
-          <td>${p.local}</td><td>${p.entry || '—'}</td>
-          <td><span class="st ${p.status}"><i></i>${p.status}${p.err ? ' · <span class="err">' + p.err + '</span>' : ''}</span></td>
-          <td class="muted">${fmt(p.traffic_in)} / ${fmt(p.traffic_out)}</td></tr>`).join('')
-      : '<tr><td colspan="6" class="muted">尚无代理，请编辑 lumoc.toml 后重载。</td></tr>';
-    document.getElementById('rows').innerHTML = rows;
-    document.getElementById('dot').classList.add('on');
-  } catch (_) {
-    document.getElementById('dot').classList.remove('on');
-  }
-}
-document.getElementById('reload').onclick = async () => {
-  const m = document.getElementById('msg');
-  m.textContent = '重载中…';
-  try {
-    const r = await fetch('/api/reload', { method: 'POST' });
-    const d = await r.json();
-    m.textContent = d.ok ? '完成' : ('失败：' + d.error);
-    m.className = d.ok ? '' : 'err';
-  } catch (e) { m.textContent = '失败：' + e; m.className = 'err'; }
-  refresh();
-};
-refresh();
-setInterval(refresh, 2000);
-</script>
+<div class="app">
+
+  <!-- 侧栏 -->
+  <aside class="sidebar">
+    <div class="sbrand">
+      <svg width="26" height="26" viewBox="0 0 72 72" fill="none" aria-hidden="true">
+        <path d="M22 57V38C22 26.9 28.3 18.4 36 18.4C43.7 18.4 50 26.9 50 38V57" stroke="#5A7BFF" stroke-width="6.8" stroke-linecap="round"/>
+        <path d="M10 42H62" stroke="#35E0C8" stroke-width="4.6" stroke-linecap="round"/>
+        <circle cx="10" cy="42" r="3.8" fill="#35E0C8"/><circle cx="62" cy="42" r="3.8" fill="#35E0C8"/>
+      </svg>
+      <span class="wm">LUMO</span>
+    </div>
+
+    <div class="nav-label">工作区</div>
+    <button class="nav" data-view="list" aria-current="page">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="3.6" cy="8" r="2" stroke="#AFC0FF" stroke-width="1.5"/><circle cx="12.4" cy="8" r="2" stroke="#AFC0FF" stroke-width="1.5"/><path d="M5.6 8H10.4" stroke="#AFC0FF" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span>连接配置</span><span class="nbadge" id="navCount">0</span>
+    </button>
+    <button class="nav" data-view="logs">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 4.5H13M3 8H10M3 11.5H7.5" stroke="#7D8AA0" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span>运行日志</span>
+    </button>
+    <button class="nav" data-view="settings">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 5H13M3 11H13" stroke="#7D8AA0" stroke-width="1.5" stroke-linecap="round"/><circle cx="6" cy="5" r="1.8" fill="#0C1017" stroke="#7D8AA0" stroke-width="1.4"/><circle cx="10.5" cy="11" r="1.8" fill="#0C1017" stroke="#7D8AA0" stroke-width="1.4"/></svg>
+      <span>偏好设置</span>
+    </button>
+
+    <div class="nav-label">支持</div>
+    <button class="nav" data-view="settings">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.2" stroke="#7D8AA0" stroke-width="1.4"/><path d="M6.4 6.2C6.4 5.3 7.1 4.7 8 4.7C8.9 4.7 9.6 5.3 9.6 6.2C9.6 7.4 8 7.5 8 8.7" stroke="#7D8AA0" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="11.2" r="0.8" fill="#7D8AA0"/></svg>
+      <span>帮助中心</span>
+    </button>
+    <button class="nav" data-view="settings">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 11.4V3.4M5 6.2L8 3.2L11 6.2" stroke="#7D8AA0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.2 12.6H12.8" stroke="#7D8AA0" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span>检查更新</span><span class="nbadge">新</span>
+    </button>
+
+    <div class="spacer"></div>
+
+    <div class="engine">
+      <div class="row"><span class="dot" id="engDot"></span><span class="t" id="engText">服务引擎运行中</span><span class="v" id="engVer">v1.4</span></div>
+      <div class="addr" id="engAddr">localhost:7500</div>
+    </div>
+    <div class="user">
+      <div class="av">A</div>
+      <div>
+        <div class="nm">Alex Chen</div>
+        <div class="pl" id="userPlan">个人版</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 主区 -->
+  <main class="main">
+    <div class="topbar">
+      <div class="titleblock">
+        <h1 id="pageTitle">连接配置</h1>
+        <p id="pageSub">读取中…</p>
+      </div>
+      <span class="spacer"></span>
+      <label class="search">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.6" stroke="#5D6A80" stroke-width="1.6"/><path d="M10.4 10.4L13.4 13.4" stroke="#5D6A80" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <input id="search" type="search" placeholder="搜索配置" autocomplete="off">
+      </label>
+      <button class="btn" id="newBtn">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 2V12M2 7H12" stroke="#0B1117" stroke-width="2" stroke-linecap="round"/></svg>
+        新建配置
+      </button>
+    </div>
+
+    <!-- 连接配置视图 -->
+    <div class="content" id="viewList">
+      <div class="listcol">
+        <div class="filters">
+          <button class="chip" data-filter="all" aria-pressed="true">全部 <span id="cAll">0</span></button>
+          <button class="chip" data-filter="on" aria-pressed="false">已启用 <span id="cOn">0</span></button>
+          <button class="chip" data-filter="off" aria-pressed="false">未启用 <span id="cOff">0</span></button>
+          <span class="spacer"></span>
+          <button class="sortctl" id="sortBtn">
+            按名称排序
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M3 5L6 8L9 5" stroke="#6C788E" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+
+        <div class="cards" id="cards"></div>
+
+        <div class="empty" id="empty" style="display:none">
+          <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
+            <path d="M22 57V38C22 26.9 28.3 18.4 36 18.4C43.7 18.4 50 26.9 50 38V57" stroke="#2A3346" stroke-width="5.2" stroke-linecap="round"/>
+            <path d="M10 42H62" stroke="#2A3346" stroke-width="3.2" stroke-linecap="round"/>
+            <circle cx="10" cy="42" r="3.3" fill="#2A3346"/><circle cx="62" cy="42" r="3.3" fill="#2A3346"/>
+          </svg>
+          <h3>还没有任何连接配置</h3>
+          <p>添加第一个配置之后，就能从外网访问家里的 NAS、路由器或公司电脑 —— 全程只用鼠标，不写一行命令。</p>
+          <div class="row"><button class="btn" id="emptyNew">新建第一个配置</button></div>
+        </div>
+
+        <div class="hint">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.4" stroke="#5A7BFF" stroke-width="1.4"/><path d="M8 7.2V11.4" stroke="#5A7BFF" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="4.8" r="0.9" fill="#5A7BFF"/></svg>
+          <span>开启配置后，用「服务器地址 : 远程端口」即可从外网访问对应设备，无需再改任何配置文件。</span>
+        </div>
+
+        <div class="stats">
+          <span class="lb">今日流量</span>
+          <span class="up" id="stUp">↑ —</span>
+          <span class="down" id="stDown">↓ —</span>
+          <span class="spacer"></span>
+          <span class="lb" id="stConns">活跃连接 — 条</span>
+        </div>
+      </div>
+
+      <!-- 详情 -->
+      <aside class="detail" id="detail">
+        <div class="dhead">
+          <div class="txt">
+            <h2 id="dName">—</h2>
+            <div class="sub" id="dSub">选择左侧配置查看详情</div>
+          </div>
+          <span class="switch" id="dSwitch" role="switch" aria-checked="false" tabindex="0"></span>
+        </div>
+
+        <div class="sec"><span>连接信息</span><span class="flex1"></span><span class="sechint">对应 lumoc.toml 基础段</span></div>
+
+        <div class="field"><label>配置名称</label><input id="fName" placeholder="例如 家庭 NAS"></div>
+        <div class="field">
+          <label>服务器地址</label>
+          <div class="inputwrap">
+            <input id="fAddr" class="mono" placeholder="hk-01.lumo.net">
+            <button class="testbtn" id="testBtn">测试</button>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>服务端口</label><input id="fPort" class="mono" placeholder="7000"></div>
+          <div class="field"><label>连接协议</label>
+            <select id="fProtocol">
+              <option value="tcp">TCP</option><option value="kcp">KCP</option>
+              <option value="quic">QUIC</option><option value="websocket">WebSocket</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>认证令牌 · auth.token</label><input id="fToken" class="mono" placeholder="与服务端一致"></div>
+
+        <div class="sec"><span id="mapTitle">端口映射</span><span class="flex1"></span>
+          <button class="secadd" id="addMapTop">＋ 添加</button>
+        </div>
+        <div class="cards" id="mapList" style="gap:8px"></div>
+        <button class="addmap" id="addMap">＋ 添加一条端口映射</button>
+
+        <div class="sec"><span>传输与高级</span></div>
+        <div class="optrow"><span class="lbl">TLS 加密传输</span><span class="switch sm" id="fTls" role="switch" aria-checked="true" tabindex="0"></span></div>
+        <div class="optrow"><span class="lbl">断线自动重连</span><span class="switch sm" id="fReconnect" role="switch" aria-checked="true" tabindex="0"></span></div>
+        <div class="optrow"><span class="lbl">开机自动启动</span><span class="switch sm" id="fAutoStart" role="switch" aria-checked="false" tabindex="0"></span></div>
+
+        <div class="dfoot">
+          <span class="link" id="viewToml">查看 lumoc.toml</span>
+          <span class="spacer"></span>
+          <button class="btn" id="saveBtn">保存并应用</button>
+          <button id="deleteBtn" style="display:none"></button>
+        </div>
+      </aside>
+    </div>
+
+    <!-- 运行日志 -->
+    <div class="logview" id="viewLogs" style="display:none"></div>
+
+    <!-- 设置 -->
+    <div class="setpage" id="viewSettings" style="display:none">
+      <div class="setcard">
+        <div class="kv"><span>运行模式</span><b id="sAgent">—</b></div>
+        <div class="kv"><span>隧道引擎</span><b id="sBin">—</b></div>
+        <div class="kv"><span>数据位置</span><b id="sData">—</b></div>
+      </div>
+      <div class="setcard">
+        <div class="kv"><span>说明</span><b>本页为界面实现，配置存于浏览器本地</b></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 新建配置 -->
+<div class="overlay" id="modalNew">
+  <div class="modal">
+    <div class="mhead">
+      <div class="txt">
+        <h3>新建连接配置</h3>
+        <p>只填表单，自动生成 lumoc.toml 并拉起独立进程</p>
+      </div>
+      <button class="mclose" data-close="modalNew">✕</button>
+    </div>
+
+    <div class="tplrow">
+      <span class="lb">快速模板</span>
+      <button class="tpl" data-tpl="nas">群晖 NAS</button>
+      <button class="tpl" data-tpl="rdp">远程桌面</button>
+      <button class="tpl" data-tpl="web">网站服务</button>
+    </div>
+
+    <div class="grp"><span class="gnum">1</span><b>连接服务器</b><em>向服务端发起隧道</em></div>
+    <div class="field-row">
+      <div class="field"><label>服务器地址</label><input id="nAddr" class="mono" placeholder="hk-01.lumo.net"></div>
+      <div class="field"><label>服务端口</label><input id="nPort" class="mono" value="7000"></div>
+    </div>
+    <div class="field"><label>配置名称</label><input id="nName" placeholder="例如 家庭 NAS"></div>
+    <div class="field"><label>认证令牌（与服务端一致即可）</label><input id="nToken" class="mono" placeholder="auth.token"></div>
+
+    <div class="grp"><span class="gnum">2</span><b>配置端口映射</b><em>内网端口 → 公网端口</em></div>
+    <div class="map" id="nMap">
+      <select class="mtype"><option value="tcp">TCP</option><option value="http">HTTP</option><option value="udp">UDP</option><option value="sealed-tcp">sealed-tcp</option></select>
+      <input class="local" placeholder="127.0.0.1:5000">
+      <span style="color:#5A7BFF">→</span>
+      <input class="remote" placeholder="15000">
+    </div>
+
+    <div class="grp"><span class="gnum">3</span><b>启动方式</b><em>可随时在列表里开关</em></div>
+    <div class="optrow"><span class="lbl">保存后立即启用</span><span class="switch sm" id="nStart" role="switch" aria-checked="true" tabindex="0"></span></div>
+
+    <div class="mfoot">
+      <span class="spacer"></span>
+      <button class="btn ghost" data-close="modalNew">取消</button>
+      <button class="btn" id="createBtn">保存并连接</button>
+    </div>
+  </div>
+</div>
+
+<!-- 删除确认 -->
+<div class="overlay" id="modalDel">
+  <div class="modal sm">
+    <div class="mhead">
+      <div class="txt">
+        <h3 id="delTitle">删除这个配置？</h3>
+        <p>该配置的端口映射与令牌会被一并删除，正在运行的隧道会立即中断。此操作不可撤销。</p>
+      </div>
+    </div>
+    <div class="warnbox" id="delSummary">—</div>
+    <div class="mfoot">
+      <span class="spacer"></span>
+      <button class="btn ghost" data-close="modalDel">取消</button>
+      <button class="btn danger" id="delConfirm">删除配置</button>
+    </div>
+  </div>
+</div>
+
+<!-- lumoc.toml -->
+<div class="overlay" id="modalToml">
+  <div class="modal">
+    <div class="mhead">
+      <div class="txt"><h3>lumoc.toml</h3><p>该配置对应的隧道配置</p></div>
+      <button class="mclose" data-close="modalToml">✕</button>
+    </div>
+    <pre class="warnbox" id="tomlBody" style="white-space:pre-wrap;max-height:50vh;overflow:auto"></pre>
+    <div class="mfoot"><span class="spacer"></span><button class="btn ghost" id="copyToml">复制</button></div>
+  </div>
+</div>
+
+<div class="menu" id="menu"></div>
+<div class="toast" id="toast"><span class="dot"></span><span id="toastText"></span></div>
+
+<script src="assets/client.js"></script>
 </body>
 </html>

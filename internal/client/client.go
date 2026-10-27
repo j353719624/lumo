@@ -24,11 +24,15 @@ type Client struct {
 	cfgPath string
 	id      string
 
+	// Log, when set, captures this connection's events in a scoped ring.
+	Log *log.Instance
+
 	mu      sync.Mutex
 	proxies map[string]*config.ProxyConfig
 	state   map[string]*ProxyState
 	stats   map[string]*relay.Counters
 	ctrl    net.Conn
+	lastErr string
 
 	pendMu  sync.Mutex
 	pending map[string]chan proto.Msg
@@ -69,12 +73,42 @@ func (c *Client) addr() string {
 	return net.JoinHostPort(c.cfg.ServerAddr, fmt.Sprintf("%d", c.cfg.ServerPort))
 }
 
+// logi/logw/loge/logd route messages to the scoped instance when present.
+func (c *Client) logd(f string, a ...any) {
+	if c.Log != nil {
+		c.Log.Debugf(f, a...)
+	} else {
+		log.Debugf(f, a...)
+	}
+}
+func (c *Client) logi(f string, a ...any) {
+	if c.Log != nil {
+		c.Log.Infof(f, a...)
+	} else {
+		log.Infof(f, a...)
+	}
+}
+func (c *Client) logw(f string, a ...any) {
+	if c.Log != nil {
+		c.Log.Warnf(f, a...)
+	} else {
+		log.Warnf(f, a...)
+	}
+}
+func (c *Client) loge(f string, a ...any) {
+	if c.Log != nil {
+		c.Log.Errorf(f, a...)
+	} else {
+		log.Errorf(f, a...)
+	}
+}
+
 // Run blocks until ctx is cancelled, reconnecting with backoff.
 func (c *Client) Run(ctx context.Context) error {
 	if c.cfg.Web.Port > 0 {
 		go c.runAdmin(ctx)
 	}
-	log.Infof("lumoc %s starting (server %s)", version.Version, c.addr())
+	c.logi("lumoc %s starting (server %s)", version.Version, c.addr())
 	backoff := time.Second
 	for {
 		if ctx.Err() != nil {
@@ -84,7 +118,10 @@ func (c *Client) Run(ctx context.Context) error {
 		if ctx.Err() != nil {
 			return nil
 		}
-		log.Warnf("connection lost: %v; retrying in %s", err, backoff)
+		c.mu.Lock()
+		c.lastErr = err.Error()
+		c.mu.Unlock()
+		c.logw("connection lost: %v; retrying in %s", err, backoff)
 		c.markAllOffline()
 		select {
 		case <-ctx.Done():
@@ -136,7 +173,15 @@ func (c *Client) serve(ctx context.Context) error {
 	if welcome.Str("type") != "welcome" {
 		return fmt.Errorf("server rejected login: %s", welcome.Str("message"))
 	}
-	log.Infof("connected to %s", c.addr())
+	c.mu.Lock()
+	c.lastErr = ""
+	c.mu.Unlock()
+	c.logi("connected to %s", c.addr())
+
+	// The read loop must run before registration: reg replies are only
+	// delivered through it, and registerAll blocks on those replies.
+	readErr := make(chan error, 1)
+	go func() { readErr <- c.readLoop(ctx, conn) }()
 
 	if err := c.registerAll(); err != nil {
 		return err
@@ -144,23 +189,32 @@ func (c *Client) serve(ctx context.Context) error {
 
 	pingTicker := time.NewTicker(20 * time.Second)
 	defer pingTicker.Stop()
-	go func() {
-		for {
-			select {
-			case <-pingTicker.C:
-				if !c.send(proto.Msg{"type": "ping"}) {
-					return
-				}
-			case <-ctx.Done():
-				return
+	for {
+		select {
+		case err := <-readErr:
+			return err
+		case <-pingTicker.C:
+			if !c.send(proto.Msg{"type": "ping"}) {
+				return fmt.Errorf("control write failed")
 			}
+		case <-ctx.Done():
+			_ = conn.Close()
+			return nil
 		}
-	}()
+	}
+}
 
+// readLoop consumes control messages until the connection breaks. Replies
+// to reg/unreg are routed to the waiting request; work requests spawn a
+// fresh data connection.
+func (c *Client) readLoop(ctx context.Context, conn net.Conn) error {
 	for {
 		_ = conn.SetReadDeadline(time.Now().Add(90 * time.Second))
 		m, err := proto.Recv(conn)
 		if err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
 			return fmt.Errorf("control read: %w", err)
 		}
 		switch m.Str("type") {
@@ -170,9 +224,41 @@ func (c *Client) serve(ctx context.Context) error {
 			c.deliver(m)
 		case "pong":
 		default:
-			log.Debugf("ignoring message type %q", m.Str("type"))
+			c.logd("ignoring message type %q", m.Str("type"))
 		}
 	}
+}
+
+// ProxyStatus is one proxy's dashboard-visible snapshot.
+type ProxyStatus struct {
+	Name   string `json:"name"`
+	Type   string `json:"type"`
+	Status string `json:"status"`
+	Err    string `json:"err,omitempty"`
+	In     uint64 `json:"in"`
+	Out    uint64 `json:"out"`
+}
+
+// State reports engine health for external dashboards: whether the control
+// connection is up, the last failure (empty when healthy) and per-proxy
+// status with traffic counters.
+func (c *Client) State() (running bool, lastErr string, proxies []ProxyStatus) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	running = c.ctrl != nil
+	lastErr = c.lastErr
+	proxies = make([]ProxyStatus, 0, len(c.proxies))
+	for name, p := range c.proxies {
+		ps := ProxyStatus{Name: name, Type: p.Type}
+		if st := c.state[name]; st != nil {
+			ps.Status, ps.Err = st.Status, st.Err
+		}
+		if cnt := c.stats[name]; cnt != nil {
+			ps.In, ps.Out = cnt.In.Load(), cnt.Out.Load()
+		}
+		proxies = append(proxies, ps)
+	}
+	return running, lastErr, proxies
 }
 
 // send writes one control message; returns false when the connection is gone.
@@ -238,10 +324,10 @@ func (c *Client) registerAll() error {
 		c.mu.Lock()
 		if reply.Str("type") == "reg_ok" {
 			c.state[p.Name] = &ProxyState{Status: "running", Since: time.Now()}
-			log.Infof("proxy %q (%s) registered", p.Name, p.Type)
+			c.logi("proxy %q (%s) registered", p.Name, p.Type)
 		} else {
 			c.state[p.Name] = &ProxyState{Status: "error", Err: reply.Str("message"), Since: time.Now()}
-			log.Errorf("proxy %q (%s) rejected: %s", p.Name, p.Type, reply.Str("message"))
+			c.loge("proxy %q (%s) rejected: %s", p.Name, p.Type, reply.Str("message"))
 		}
 		c.mu.Unlock()
 	}

@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"lumo/internal/log"
 	"lumo/internal/proto"
 	"lumo/internal/relay"
 )
@@ -24,16 +23,16 @@ func (c *Client) handleWork(m proto.Msg) {
 	p := c.proxies[name]
 	c.mu.Unlock()
 	if p == nil {
-		log.Warnf("work request for unknown proxy %q", name)
+		c.logw("work request for unknown proxy %q", name)
 		return
 	}
 	dc, err := net.DialTimeout("tcp", c.addr(), 10*time.Second)
 	if err != nil {
-		log.Errorf("proxy %q: dial for work connection: %v", name, err)
+		c.loge("proxy %q: dial for work connection: %v", name, err)
 		return
 	}
 	if err := proto.Send(dc, proto.Msg{"type": "data", "name": name, "cid": m.Str("cid")}); err != nil {
-		log.Errorf("proxy %q: announce data connection: %v", name, err)
+		c.loge("proxy %q: announce data connection: %v", name, err)
 		_ = dc.Close()
 		return
 	}
@@ -58,7 +57,7 @@ func (c *Client) counters(name string) *relay.Counters {
 func (c *Client) rawRelay(name string, dc net.Conn, local string, cnt *relay.Counters) {
 	lc, err := net.DialTimeout("tcp", local, 5*time.Second)
 	if err != nil {
-		log.Errorf("proxy %q: dial local %s: %v", name, local, err)
+		c.loge("proxy %q: dial local %s: %v", name, local, err)
 		_ = dc.Close()
 		return
 	}
@@ -78,7 +77,7 @@ func (c *Client) httpRelay(name string, dc net.Conn, local string, cnt *relay.Co
 	sl := &singleListener{ch: make(chan net.Conn, 1), addr: dc.RemoteAddr()}
 	sl.ch <- &relay.Conn{Conn: dc, C: cnt, In: true}
 	if err := http.Serve(sl, rp); err != nil {
-		log.Debugf("proxy %q: http relay ended: %v", name, err)
+		c.logd("proxy %q: http relay ended: %v", name, err)
 	}
 	_ = dc.Close()
 }
