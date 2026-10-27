@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"lumo/internal/proto"
-	"lumo/internal/relay"
+	"github.com/j353719624/lumo/internal/proto"
+	"github.com/j353719624/lumo/internal/relay"
 )
 
 // handleWork fulfils a work-connection request by dialing the server and

@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"lumo/internal/log"
-	"lumo/internal/proto"
-	"lumo/internal/relay"
+	"github.com/j353719624/lumo/internal/log"
+	"github.com/j353719624/lumo/internal/proto"
+	"github.com/j353719624/lumo/internal/relay"
 )
 
 // handleReg processes a proxy registration from a client session.

@@ -9,8 +9,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"lumo/internal/config"
-	"lumo/internal/server"
+	"github.com/j353719624/lumo/internal/config"
+	"github.com/j353719624/lumo/internal/server"
 )
 
 func main() {

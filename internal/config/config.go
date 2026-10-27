@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"lumo/internal/toml"
+	"github.com/j353719624/lumo/internal/toml"
 )
 
 // WebServer configures the embedded admin dashboard.

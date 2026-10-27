@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"lumo/internal/config"
+	"github.com/j353719624/lumo/internal/config"
 )
 
 // Mapping is one port forwarding rule inside a connection config.

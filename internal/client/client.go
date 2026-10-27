@@ -11,11 +11,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"lumo/internal/config"
-	"lumo/internal/log"
-	"lumo/internal/proto"
-	"lumo/internal/relay"
-	"lumo/internal/version"
+	"github.com/j353719624/lumo/internal/config"
+	"github.com/j353719624/lumo/internal/log"
+	"github.com/j353719624/lumo/internal/proto"
+	"github.com/j353719624/lumo/internal/relay"
+	"github.com/j353719624/lumo/internal/version"
 )
 
 // Client is a running lumoc instance.

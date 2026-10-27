@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"lumo/internal/dash"
-	"lumo/internal/version"
+	"github.com/j353719624/lumo/internal/dash"
+	"github.com/j353719624/lumo/internal/version"
 )
 
 // httpServer is the admin dashboard server type; aliased for the Client struct.

@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"strings"
 
-	"lumo/internal/dash"
-	"lumo/internal/log"
-	"lumo/internal/version"
+	"github.com/j353719624/lumo/internal/dash"
+	"github.com/j353719624/lumo/internal/log"
+	"github.com/j353719624/lumo/internal/version"
 )
 
 const sessionCookie = "lumo_session"

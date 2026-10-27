@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 
-	"lumo/internal/dash"
-	"lumo/internal/proto"
-	"lumo/internal/version"
+	"github.com/j353719624/lumo/internal/dash"
+	"github.com/j353719624/lumo/internal/proto"
+	"github.com/j353719624/lumo/internal/version"
 )
 
 func writeJSON(w http.ResponseWriter, code int, v any) {

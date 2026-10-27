@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"lumo/internal/auth"
-	"lumo/internal/client"
-	"lumo/internal/log"
+	"github.com/j353719624/lumo/internal/auth"
+	"github.com/j353719624/lumo/internal/client"
+	"github.com/j353719624/lumo/internal/log"
 )
 
 // Manager runs zero or more tunnel connections and serves the console.

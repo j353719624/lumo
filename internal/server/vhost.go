@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"lumo/internal/log"
-	"lumo/internal/relay"
+	"github.com/j353719624/lumo/internal/log"
+	"github.com/j353719624/lumo/internal/relay"
 )
 
 // runVhost serves http (routed by Host header) or https (routed by SNI)
