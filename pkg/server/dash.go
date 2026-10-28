@@ -180,7 +180,7 @@ func (s *Server) apiTestConn(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]string{"error": "bad body"})
 		return
 	}
-	addr := fmt.Sprintf("%s:%d", req.Addr, req.Port)
+	addr := net.JoinHostPort(req.Addr, strconv.Itoa(req.Port))
 	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
 	if err != nil {
 		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
@@ -271,10 +271,20 @@ func writeJSON(w http.ResponseWriter, v any) {
 
 // serveConsole serves embedded files; unknown paths go back to the root so
 // a stray link or stale bookmark never shows a bare 404.
+//
+// HTML is always revalidated (hashed asset names make it safe to cache
+// assets for a year); without this, browsers keep serving a stale index
+// that references old asset hashes after an upgrade.
 func serveConsole(fsys http.FileSystem) http.Handler {
 	fsrv := http.FileServer(fsys)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if p := strings.TrimPrefix(r.URL.Path, "/"); p != "" {
+		p := strings.TrimPrefix(r.URL.Path, "/")
+		if strings.HasSuffix(p, ".html") || p == "" || p == "/" {
+			w.Header().Set("Cache-Control", "no-cache")
+		} else if strings.HasPrefix(p, "assets/") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		}
+		if p != "" {
 			f, err := fsys.Open(strings.TrimPrefix(path.Clean("/"+p), "/"))
 			if err != nil {
 				http.Redirect(w, r, "/", http.StatusFound)

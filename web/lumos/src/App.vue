@@ -354,7 +354,7 @@ function closeMenu(e: MouseEvent) {
 
   <main class="layout">
     <!-- 顶部状态区 -->
-    <section class="band">
+    <section class="band" id="band">
       <article class="card status-card">
         <div class="clabel"><span>运行状态</span><span class="health">{{ connected ? `healthz ${healthOk === false ? '—' : '200'}` : 'healthz —' }}</span></div>
         <div class="smain"><span class="sdot" :class="{ bad: !connected }"></span><b>{{ connected ? '服务运行正常' : '与 lumos 断开连接' }}</b></div>
