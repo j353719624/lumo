@@ -210,7 +210,7 @@ async function saveServerConfig() {
     if (res.ok) {
       // 令牌仅用于“写入新值”：保存后立即从表单移除，避免任何回显
       srvCfg.value.authToken = ''
-      if (savedCfg.value) savedCfg.value.authToken = ''
+      if (savedCfg.value) (savedCfg.value as any).authToken = ''
       showToast(d.restart ? '已保存并重启服务' : '已保存（token/面板密码热生效）')
       if (d.restart) setTimeout(() => location.reload(), 1500)
     } else {
@@ -518,7 +518,10 @@ function closeMenu(e: MouseEvent) {
         </div>
       </article>
 
-      <article class="card rate-card">
+
+    </section>
+
+          <article class="card rate-card" id="rate">
         <div class="clabel"><span>{{ t('rate.title') }}</span><span class="health unk">{{ t('rate.sampling') }}</span></div>
         <div class="rate-vals">
           <span class="up">{{ rateUp }}</span>
@@ -530,7 +533,6 @@ function closeMenu(e: MouseEvent) {
           <path :d="sparkPaths.up.line" fill="none" stroke="#8FA7FF" stroke-width="1.6" stroke-linejoin="round" opacity="0.8"></path>
         </svg>
       </article>
-    </section>
 
     <!-- 代理与客户端 -->
     <section class="card panel" id="proxies">
