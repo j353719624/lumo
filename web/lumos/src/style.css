@@ -199,6 +199,7 @@ a{color:inherit;text-decoration:none}
 .c-traffic{text-align:right;color:var(--tx-2)}
 .t-tcp{color:var(--accent-soft)} .t-http{color:var(--teal)}
 .t-udp{color:var(--warn)} .t-sealed-tcp{color:var(--sealed-tcp)}
+.t-https{color:#7BE3C3} .t-mux{color:#E8A45E} .t-sealed-udp{color:#F07FA6}
 .state-pill{height:22px;border-radius:11px;display:flex;align-items:center;justify-content:center;
   font-size:10px;font-weight:500;background:#171C26;color:var(--tx-3)}
 .state-pill.on{background:#12281F;color:var(--ok)}

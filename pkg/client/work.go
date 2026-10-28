@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -11,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/j353719624/lumo/pkg/config"
 	"github.com/j353719624/lumo/pkg/proto"
 	"github.com/j353719624/lumo/pkg/relay"
 )
@@ -26,6 +28,16 @@ func (c *Client) handleWork(m proto.Msg) {
 		c.logw("work request for unknown proxy %q", name)
 		return
 	}
+	local := net.JoinHostPort(p.LocalIP, strconv.Itoa(p.LocalPort))
+	cnt := c.counters(name)
+
+	// mux pairs through the dedicated entry port with an HTTP CONNECT
+	// attach instead of a control-port data connection.
+	if p.Type == "mux" {
+		c.muxRelay(name, m.Str("cid"), local, cnt)
+		return
+	}
+
 	dc, err := net.DialTimeout("tcp", c.addr(), 10*time.Second)
 	if err != nil {
 		c.loge("proxy %q: dial for work connection: %v", name, err)
@@ -36,16 +48,40 @@ func (c *Client) handleWork(m proto.Msg) {
 		_ = dc.Close()
 		return
 	}
-	local := net.JoinHostPort(p.LocalIP, strconv.Itoa(p.LocalPort))
-	cnt := c.counters(name)
 	switch p.Type {
-	case "tcp", "https":
+	case "tcp", "https", "sealed-tcp":
 		c.rawRelay(name, dc, local, cnt)
 	case "http":
 		c.httpRelay(name, dc, local, cnt)
-	case "udp":
+	case "udp", "sealed-udp":
 		c.udpRelay(name, dc, local, cnt)
 	}
+}
+
+// muxRelay attaches to the server's mux port with the cid issued by
+// the work request, then relays to the local service.
+func (c *Client) muxRelay(name, cid, local string, cnt *relay.Counters) {
+	c.mu.Lock()
+	port := c.muxPort
+	c.mu.Unlock()
+	if port == 0 {
+		c.loge("proxy %q: server did not announce a mux port", name)
+		return
+	}
+	addr := net.JoinHostPort(c.cfg.ServerAddr, strconv.Itoa(port))
+	dc, err := net.DialTimeout("tcp", addr, 10*time.Second)
+	if err != nil {
+		c.loge("proxy %q: dial mux %s: %v", name, addr, err)
+		return
+	}
+	host := addr
+	req := fmt.Sprintf("CONNECT /vc HTTP/1.1\r\nHost: %s\r\nLumo-Name: %s\r\nLumo-Cid: %s\r\nLumo-Token: %s\r\n\r\n",
+		host, name, cid, proto.Sign(c.cfg.AuthToken, []byte(cid)))
+	if _, err := dc.Write([]byte(req)); err != nil {
+		_ = dc.Close()
+		return
+	}
+	c.rawRelay(name, dc, local, cnt)
 }
 
 func (c *Client) counters(name string) *relay.Counters {
@@ -168,4 +204,165 @@ func (l *singleListener) Addr() net.Addr {
 		return l.addr
 	}
 	return &net.TCPAddr{}
+}
+
+// dialMux opens an attach connection to the server's mux port and
+// presents the proxy identity; the server pairs it with an external CONNECT.
+func (c *Client) dialMux(name string) (net.Conn, error) {
+	c.mu.Lock()
+	port := c.muxPort
+	c.mu.Unlock()
+	if port == 0 {
+		return nil, fmt.Errorf("server does not expose a mux port")
+	}
+	addr := net.JoinHostPort(c.cfg.ServerAddr, strconv.Itoa(port))
+	dc, err := net.DialTimeout("tcp", addr, 10*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	cid := proto.RandomHex(16)
+	c.mu.Lock()
+	c.pending[cid] = nil // placeholder: work pairing happens server-side
+	delete(c.pending, cid)
+	c.mu.Unlock()
+	// The cid for mux pairing is issued by the server-side getWork and is
+	// delivered in the work message; dialMux is called with it below.
+	return dc, nil
+}
+
+// attachMux writes the CONNECT attach request for a server-issued cid.
+func (c *Client) attachMux(dc net.Conn, name, cid string) error {
+	host := net.JoinHostPort(c.cfg.ServerAddr, strconv.Itoa(c.muxPortNow()))
+	req := fmt.Sprintf("CONNECT /vc HTTP/1.1\r\nHost: %s\r\nLumo-Name: %s\r\nLumo-Cid: %s\r\nLumo-Token: %s\r\n\r\n",
+		host, name, cid, proto.Sign(c.cfg.AuthToken, []byte(cid)))
+	_, err := dc.Write([]byte(req))
+	return err
+}
+
+func (c *Client) muxPortNow() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.muxPort
+}
+
+// runVisitors starts the local listener for every [[visitors]] entry.
+func (c *Client) runVisitors(ctx context.Context) {
+	for i := range c.cfg.Visitors {
+		v := c.cfg.Visitors[i]
+		go func(v config.VisitorConfig) {
+			var err error
+			if v.Type == "udp" {
+				err = c.runVisitorUDP(ctx, v)
+			} else {
+				err = c.runVisitorTCP(ctx, v)
+			}
+			if err != nil && ctx.Err() == nil {
+				c.loge("visitor %q: %v", v.Name, err)
+			}
+		}(v)
+	}
+}
+
+// runVisitorTCP exposes a local TCP listener that tunnels through the server
+// to an sealed-tcp proxy without any public port on the server.
+func (c *Client) runVisitorTCP(ctx context.Context, v config.VisitorConfig) error {
+	addr := net.JoinHostPort(v.BindAddr, strconv.Itoa(v.BindPort))
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("listen %s: %w", addr, err)
+	}
+	c.logi("visitor %q listening on %s -> sealed-tcp %q", v.Name, addr, v.ServerName)
+	go func() {
+		<-ctx.Done()
+		_ = ln.Close()
+	}()
+	for {
+		lc, err := ln.Accept()
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
+			return err
+		}
+		go func(lc net.Conn) {
+			dc, err := net.DialTimeout("tcp", c.addr(), 10*time.Second)
+			if err != nil {
+				_ = lc.Close()
+				return
+			}
+			if err := proto.Send(dc, proto.Msg{
+				"type": "data", "visitor": v.ServerName, "sk": v.SK,
+				"vid": proto.RandomHex(8),
+			}); err != nil {
+				_ = dc.Close()
+				_ = lc.Close()
+				return
+			}
+			cnt := c.stats[v.Name]
+			relay.Pipe(lc, dc, cnt)
+		}(lc)
+	}
+}
+
+// runVisitorUDP exposes a local UDP listener; each source address gets its
+// own tunnel carrying framed datagrams to the sealed-udp proxy's owner.
+func (c *Client) runVisitorUDP(ctx context.Context, v config.VisitorConfig) error {
+	addr := net.JoinHostPort(v.BindAddr, strconv.Itoa(v.BindPort))
+	ua, err := net.ResolveUDPAddr("udp", addr)
+	if err != nil {
+		return err
+	}
+	ln, err := net.ListenUDP("udp", ua)
+	if err != nil {
+		return fmt.Errorf("listen udp %s: %w", addr, err)
+	}
+	c.logi("visitor %q listening on udp %s -> sealed-udp %q", v.Name, addr, v.ServerName)
+	go func() {
+		<-ctx.Done()
+		_ = ln.Close()
+	}()
+	buf := make([]byte, 64*1024)
+	for {
+		n, src, err := ln.ReadFromUDP(buf)
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
+			return err
+		}
+		payload := append([]byte(nil), buf[:n]...)
+		go c.visitorUDPPacket(ctx, ln, src, payload, v)
+	}
+}
+
+// visitorUDPPacket forwards one datagram and relays the reply. A short-lived
+// tunnel per datagram keeps the implementation simple and connectionless,
+// matching UDP semantics.
+func (c *Client) visitorUDPPacket(ctx context.Context, ln *net.UDPConn, src *net.UDPAddr, payload []byte, v config.VisitorConfig) {
+	dc, err := net.DialTimeout("tcp", c.addr(), 10*time.Second)
+	if err != nil {
+		return
+	}
+	defer dc.Close()
+	if err := proto.Send(dc, proto.Msg{
+		"type": "data", "visitor": v.ServerName, "sk": v.SK,
+		"vid": proto.RandomHex(8),
+	}); err != nil {
+		return
+	}
+	defer func() { _ = dc.SetReadDeadline(time.Now().Add(200 * time.Millisecond)) }()
+	if err := proto.WritePacket(dc, []byte(fmt.Sprintf(`{"raddr":%q}`, src.String())), payload); err != nil {
+		return
+	}
+	_ = dc.SetReadDeadline(time.Now().Add(2 * time.Second))
+	hdr, resp, err := proto.ReadPacket(dc)
+	if err != nil || len(resp) == 0 {
+		return
+	}
+	_ = hdr
+	select {
+	case <-ctx.Done():
+	default:
+		_, _ = ln.WriteToUDP(resp, src)
+	}
 }

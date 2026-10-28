@@ -416,7 +416,7 @@ watch(visibleLogs, () => {
 })
 
 function typeClass(t: string) {
-  return ['tcp', 'http', 'udp', 'sealed-tcp'].includes(t) ? 't-' + t : 't-tcp'
+  return ['tcp', 'udp', 'http', 'https', 'mux', 'sealed-tcp', 'sealed-udp'].includes(t) ? 't-' + t : 't-tcp'
 }
 
 onMounted(() => {
@@ -551,7 +551,7 @@ function closeMenu(e: MouseEvent) {
       </div>
 
       <div class="tabs" role="tablist">
-        <button v-for="tp in ['all', 'tcp', 'http', 'udp', 'sealed-tcp']" :key="tp"
+        <button v-for="tp in ['all', 'tcp', 'udp', 'http', 'https', 'mux', 'sealed-tcp', 'sealed-udp']" :key="tp"
                 class="tab" role="tab" :data-type="tp"
                 :aria-selected="filter.type === tp" @click="setFilterType(tp)">
           {{ tp === 'all' ? t('proxies.all') : tp.toUpperCase() }} <span>{{ typeCounts[tp] || 0 }}</span>

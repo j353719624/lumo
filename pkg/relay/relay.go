@@ -63,8 +63,12 @@ func (c *Conn) Write(p []byte) (int, error) {
 }
 
 // Pipe splices a and b together until either side closes. a is the public
-// side, b the service side. Both connections are closed on return.
+// side, b the service side. Both connections are closed on return. A nil
+// counter set disables accounting, which keeps visitor paths allocation-free.
 func Pipe(a, b net.Conn, c *Counters) {
+	if c == nil {
+		c = &Counters{}
+	}
 	done := make(chan struct{}, 2)
 	go func() {
 		_, _ = io.Copy(countWriter{b, &c.In}, countReader{a, &c.In})

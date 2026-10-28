@@ -35,6 +35,8 @@ type Client struct {
 	ctrl    net.Conn
 	lastErr string
 
+	muxPort int
+
 	pendMu  sync.Mutex
 	pending map[string]chan proto.Msg
 
@@ -66,6 +68,10 @@ func New(cfg *config.ClientConfig, cfgPath string) *Client {
 		c.proxies[p.Name] = &c.cfg.Proxies[i]
 		c.state[p.Name] = &ProxyState{Status: "waiting", Since: time.Now()}
 		c.stats[p.Name] = &relay.Counters{}
+	}
+	for i := range cfg.Visitors {
+		v := cfg.Visitors[i]
+		c.stats[v.Name] = &relay.Counters{}
 	}
 	return c
 }
@@ -108,6 +114,9 @@ func (c *Client) loge(f string, a ...any) {
 func (c *Client) Run(ctx context.Context) error {
 	if c.cfg.Web.Port > 0 {
 		go c.runAdmin(ctx)
+	}
+	if len(c.cfg.Visitors) > 0 {
+		go c.runVisitors(ctx)
 	}
 	c.logi("lumoc %s starting (server %s)", version.Version, c.addr())
 	backoff := time.Second
@@ -189,6 +198,9 @@ func (c *Client) serve(ctx context.Context) error {
 	if welcome.Str("type") != "welcome" {
 		return fmt.Errorf("server rejected login: %s", welcome.Str("message"))
 	}
+	c.mu.Lock()
+	c.muxPort = welcome.Int("mux_port")
+	c.mu.Unlock()
 	c.mu.Lock()
 	c.lastErr = ""
 	c.mu.Unlock()
@@ -335,6 +347,7 @@ func (c *Client) registerAll() error {
 			"name":        p.Name,
 			"kind":        p.Type,
 			"remote_port": p.RemotePort,
+			"sk":          p.SK,
 			"domains":     p.CustomDomains,
 		}, 10*time.Second)
 		c.mu.Lock()

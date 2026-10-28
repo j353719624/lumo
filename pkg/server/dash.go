@@ -414,8 +414,10 @@ func (s *Server) apiProxies(w http.ResponseWriter, _ *http.Request) {
 			conf["localIP"] = "—"
 			conf["localPort"] = ent.remotePort
 			conf["remotePort"] = ent.remotePort
-		case "http", "https":
+		case "http", "https", "mux":
 			conf["customDomains"] = ent.domains
+		case "sealed-tcp", "sealed-udp":
+			conf["sk"] = "••••"
 		}
 		list = append(list, map[string]any{
 			"name":              ent.name,

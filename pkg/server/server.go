@@ -3,6 +3,7 @@
 package server
 
 import (
+	"bufio"
 	"context"
 	"crypto/hmac"
 	"crypto/tls"
@@ -11,6 +12,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -29,9 +31,10 @@ type Server struct {
 	cfg   *config.ServerConfig
 	start time.Time
 
-	ln      net.Listener
-	closed  atomic.Bool
-	dashSrv *http.Server
+	ln       net.Listener
+	muxLn net.Listener
+	closed   atomic.Bool
+	dashSrv  *http.Server
 
 	mu       sync.Mutex
 	sessions map[string]*session
@@ -39,6 +42,7 @@ type Server struct {
 	usedPort map[int]bool
 	httpDom  map[string]*proxyEnt
 	httpsDom map[string]*proxyEnt
+	muxDom   map[string]*proxyEnt
 
 	pendMu   sync.Mutex
 	pending  map[string]pendEntry
@@ -70,6 +74,7 @@ type session struct {
 type proxyEnt struct {
 	name       string
 	kind       string
+	sk         string
 	remotePort int
 	domains    []string
 	owner      *session
@@ -97,6 +102,7 @@ func New(cfg *config.ServerConfig) *Server {
 		usedPort:    map[int]bool{},
 		httpDom:     map[string]*proxyEnt{},
 		httpsDom:    map[string]*proxyEnt{},
+		muxDom:      map[string]*proxyEnt{},
 		pending:     map[string]pendEntry{},
 		webSessions: auth.NewSessions(7 * 24 * time.Hour),
 		limiter:     auth.NewLimiter(10 * time.Minute),
@@ -111,6 +117,9 @@ func New(cfg *config.ServerConfig) *Server {
 
 // Run blocks until ctx is cancelled or the listener fails.
 func (s *Server) Run(ctx context.Context) error {
+	if s.cfg.MuxPort > 0 {
+		go s.runMux()
+	}
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.cfg.BindPort))
 	if err != nil {
 		return fmt.Errorf("bind port %d: %w", s.cfg.BindPort, err)
@@ -240,7 +249,7 @@ func (s *Server) newSession(c net.Conn, hello proto.Msg) {
 	s.mu.Unlock()
 	log.Infof("client %q connected (session %s)", sid, sid[:6])
 
-	if err := ses.send(proto.Msg{"type": "welcome", "sid": sid, "version": version.Version}); err != nil {
+	if err := ses.send(proto.Msg{"type": "welcome", "sid": sid, "version": version.Version, "mux_port": s.cfg.MuxPort}); err != nil {
 		ses.drop("write welcome: " + err.Error())
 		return
 	}
@@ -295,6 +304,12 @@ func (s *session) drop(reason string) {
 }
 
 func (s *Server) handleData(c net.Conn, m proto.Msg) {
+	// sealed-tcp/sealed-udp visitor data connections carry the visitor marker instead of
+	// a cid; pair them with a work connection from the proxy owner.
+	if v := m.Str("visitor"); v != "" {
+		s.handleVisitorData(c, v, m.Str("sk"))
+		return
+	}
 	cid := m.Str("cid")
 	s.pendMu.Lock()
 	pe, ok := s.pending[cid]
@@ -308,6 +323,126 @@ func (s *Server) handleData(c net.Conn, m proto.Msg) {
 		return
 	}
 	pe.ch <- c
+}
+
+// handleVisitorData pairs an sealed-tcp/sealed-udp visitor data connection with a fresh
+// work connection from the proxy owner, then pipes payload both ways. The
+// two sides speak the same framing end to end, so the server only copies.
+func (s *Server) handleVisitorData(c net.Conn, name, sk string) {
+	s.mu.Lock()
+	ent := s.proxies[name]
+	s.mu.Unlock()
+	if ent == nil || (ent.kind != "sealed-tcp" && ent.kind != "sealed-udp") {
+		log.Warnf("visitor data for unknown proxy %q rejected", name)
+		_ = c.Close()
+		return
+	}
+	if ent.sk == "" || sk != ent.sk {
+		log.Warnf("visitor data for proxy %q rejected: bad secret key", name)
+		_ = c.Close()
+		return
+	}
+	owner, err := s.getWork(ent, 10*time.Second)
+	if err != nil {
+		log.Warnf("visitor data for proxy %q: %v", name, err)
+		_ = c.Close()
+		return
+	}
+	log.Infof("proxy %q (%s): visitor channel established", name, ent.kind)
+	relay.Pipe(c, owner, &ent.cnt)
+}
+
+// runMux serves the mux entry port: clients ATTACH with Lumo-Name and
+// are later paired with external CONNECT requests routed by Host.
+func (s *Server) runMux() {
+	addr := fmt.Sprintf(":%d", s.cfg.MuxPort)
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Errorf("mux listen %s: %v", addr, err)
+		return
+	}
+	s.mu.Lock()
+	s.muxLn = ln
+	s.mu.Unlock()
+	log.Infof("mux listening on %s", addr)
+	for {
+		c, err := ln.Accept()
+		if err != nil {
+			if s.closed.Load() {
+				return
+			}
+			continue
+		}
+		go s.serveMuxConn(c)
+	}
+}
+
+// serveMuxConn handles one connection on the mux entry port. Clients
+// attach with Lumo-Name headers (verified against the auth token); external
+// callers issue CONNECT and are routed by Host to the matching proxy.
+func (s *Server) serveMuxConn(c net.Conn) {
+	_ = c.SetDeadline(time.Now().Add(15 * time.Second))
+	br := bufio.NewReader(c)
+	req, err := http.ReadRequest(br)
+	if err != nil {
+		_ = c.Close()
+		return
+	}
+	_ = c.SetDeadline(time.Time{})
+	if name := req.Header.Get("Lumo-Name"); name != "" {
+		// client attach: verify token + proxy, then hand off to the pairing
+		cid := req.Header.Get("Lumo-Cid")
+		if !hmac.Equal([]byte(proto.Sign(s.cfg.AuthToken, []byte(cid))),
+			[]byte(req.Header.Get("Lumo-Token"))) {
+			_ = c.Close()
+			return
+		}
+		s.mu.Lock()
+		ent := s.proxies[name]
+		s.mu.Unlock()
+		if ent == nil || ent.kind != "mux" {
+			_ = c.Close()
+			return
+		}
+		s.pendMu.Lock()
+		pe, ok := s.pending[cid]
+		s.pendMu.Unlock()
+		if !ok || pe.name != name {
+			_ = c.Close()
+			return
+		}
+		pe.ch <- c
+		return
+	}
+	// external CONNECT: route by Host header (domain) or CONNECT target
+	host := strings.ToLower(strings.TrimSpace(req.Host))
+	if host == "" {
+		host = strings.ToLower(req.URL.Host)
+	}
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	s.mu.Lock()
+	ent := s.muxDom[host]
+	if ent == nil {
+		ent = s.proxies[host]
+	}
+	s.mu.Unlock()
+	if ent == nil || ent.kind != "mux" {
+		_ = c.Close()
+		return
+	}
+	owner, err := s.getWork(ent, 10*time.Second)
+	if err != nil {
+		_ = c.Close()
+		return
+	}
+	if _, err := c.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n")); err != nil {
+		_ = owner.Close()
+		_ = c.Close()
+		return
+	}
+	relay.Pipe(c, owner, &ent.cnt)
 }
 
 func (s *Server) getWork(ent *proxyEnt, timeout time.Duration) (net.Conn, error) {
@@ -362,6 +497,10 @@ func (s *Server) removeProxyLocked(name string, ent *proxyEnt) {
 	case "https":
 		for _, d := range ent.domains {
 			delete(s.httpsDom, d)
+		}
+	case "mux":
+		for _, d := range ent.domains {
+			delete(s.muxDom, d)
 		}
 	case "tcp", "udp":
 		delete(s.usedPort, ent.remotePort)

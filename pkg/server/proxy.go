@@ -29,7 +29,7 @@ func (s *Server) handleReg(ses *session, m proto.Msg) {
 		return
 	}
 	switch kind {
-	case "tcp", "udp", "http", "https":
+	case "tcp", "udp", "http", "https", "mux", "sealed-tcp", "sealed-udp":
 	default:
 		reply(false, "unsupported proxy kind "+kind)
 		return
@@ -49,6 +49,7 @@ func (s *Server) handleReg(ses *session, m proto.Msg) {
 	ent := &proxyEnt{
 		name:       name,
 		kind:       kind,
+		sk:         m.Str("sk"),
 		remotePort: m.Int("remote_port"),
 		domains:    lowerAll(m.StrList("domains")),
 		owner:      ses,
@@ -106,6 +107,25 @@ func (s *Server) setupProxyLocked(ent *proxyEnt) error {
 		}
 		s.usedPort[ent.remotePort] = true
 		ent.udpLn = ln
+	case "sealed-tcp", "sealed-udp":
+		if ent.sk == "" {
+			return fmt.Errorf("sk is required for %s proxies", ent.kind)
+		}
+	case "mux":
+		if s.cfg.MuxPort == 0 {
+			return fmt.Errorf("server has no mux port configured")
+		}
+		if len(ent.domains) == 0 {
+			return fmt.Errorf("at least one domain is required")
+		}
+		for _, d := range ent.domains {
+			if _, taken := s.muxDom[d]; taken {
+				return fmt.Errorf("domain %q already in use", d)
+			}
+		}
+		for _, d := range ent.domains {
+			s.muxDom[d] = ent
+		}
 	case "http", "https":
 		if (ent.kind == "http" && s.cfg.VhostHTTPPort == 0) ||
 			(ent.kind == "https" && s.cfg.VhostHTTPSPort == 0) {

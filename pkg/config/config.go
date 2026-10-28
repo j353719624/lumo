@@ -24,6 +24,7 @@ type ServerConfig struct {
 	BindPort       int
 	VhostHTTPPort  int
 	VhostHTTPSPort int
+	MuxPort     int
 	AuthToken      string
 	Web            WebServer
 }
@@ -35,7 +36,19 @@ type ProxyConfig struct {
 	LocalIP       string
 	LocalPort     int
 	RemotePort    int
+	SK            string // secret key for sealed-tcp/sealed-udp
 	CustomDomains []string
+}
+
+// VisitorConfig is a local listener that reaches an sealed-tcp/sealed-udp proxy without
+// exposing a public port.
+type VisitorConfig struct {
+	Name       string // visitor label
+	ServerName string // target sealed-tcp/sealed-udp proxy name
+	SK         string
+	Type       string // tcp (sealed-tcp) or udp (sealed-udp)
+	BindAddr   string
+	BindPort   int
 }
 
 // ClientConfig is the lumoc (client) configuration.
@@ -46,15 +59,18 @@ type ClientConfig struct {
 	TLSEnable  bool
 	Web        WebServer
 	Proxies    []ProxyConfig
+	Visitors   []VisitorConfig
 }
 
 // ValidProxyTypes lists the proxy kinds this build supports.
 var ValidProxyTypes = map[string]bool{
-	"tcp":   true,
-	"udp":   true,
-	"http":  true,
-	"https": true,
-	"sealed-tcp":  true,
+	"tcp":    true,
+	"udp":    true,
+	"http":   true,
+	"https":  true,
+	"mux": true,
+	"sealed-tcp":   true,
+	"sealed-udp":   true,
 }
 
 // LoadServer reads and validates a lumos config file.
@@ -71,6 +87,7 @@ func LoadServer(path string) (*ServerConfig, error) {
 	c.BindPort = getInt(root, "bindPort", 7000)
 	c.VhostHTTPPort = getInt(root, "vhostHTTPPort", 0)
 	c.VhostHTTPSPort = getInt(root, "vhostHTTPSPort", 0)
+	c.MuxPort = getInt(root, "muxPort", 0)
 	if a := getTable(root, "auth"); a != nil {
 		c.AuthToken = getStr(a, "token", "")
 	}
@@ -88,7 +105,7 @@ func (c *ServerConfig) validate() error {
 	if c.AuthToken == "" {
 		return fmt.Errorf("auth.token is required")
 	}
-	for name, port := range map[string]int{"vhostHTTPPort": c.VhostHTTPPort, "vhostHTTPSPort": c.VhostHTTPSPort} {
+	for name, port := range map[string]int{"vhostHTTPPort": c.VhostHTTPPort, "vhostHTTPSPort": c.VhostHTTPSPort, "muxPort": c.MuxPort} {
 		if port != 0 && (port < 1 || port > 65535) {
 			return fmt.Errorf("%s %d out of range", name, port)
 		}
@@ -123,9 +140,21 @@ func LoadClient(path string) (*ClientConfig, error) {
 			LocalIP:       getStr(item, "localIP", "127.0.0.1"),
 			LocalPort:     getInt(item, "localPort", 0),
 			RemotePort:    getInt(item, "remotePort", 0),
+			SK:            getStr(item, "sk", ""),
 			CustomDomains: getStrs(item, "customDomains"),
 		}
 		c.Proxies = append(c.Proxies, p)
+	}
+	for _, item := range getTables(root, "visitors") {
+		v := VisitorConfig{
+			Name:       getStr(item, "name", ""),
+			ServerName: getStr(item, "serverName", ""),
+			SK:         getStr(item, "sk", ""),
+			Type:       getStr(item, "type", "tcp"),
+			BindAddr:   getStr(item, "bindAddr", "127.0.0.1"),
+			BindPort:   getInt(item, "bindPort", 0),
+		}
+		c.Visitors = append(c.Visitors, v)
 	}
 	if err := c.Validate(); err != nil {
 		return nil, err
@@ -172,6 +201,14 @@ func (c *ClientConfig) Validate() error {
 		case "http", "https":
 			if len(p.CustomDomains) == 0 {
 				return fmt.Errorf("proxy %q: customDomains is required for %s", p.Name, p.Type)
+			}
+		case "mux":
+			if len(p.CustomDomains) == 0 {
+				return fmt.Errorf("proxy %q: customDomains is required for mux", p.Name)
+			}
+		case "sealed-tcp", "sealed-udp":
+			if p.SK == "" {
+				return fmt.Errorf("proxy %q: sk is required for %s", p.Name, p.Type)
 			}
 		}
 	}
