@@ -124,8 +124,10 @@ func (s *Server) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("bind port %d: %w", s.cfg.BindPort, err)
 	}
+	s.mu.Lock()
 	s.ln = ln
 	s.usedPort[ln.Addr().(*net.TCPAddr).Port] = true
+	s.mu.Unlock()
 	log.Infof("lumos %s listening on :%d", version.Version, s.cfg.BindPort)
 
 	if s.cfg.VhostHTTPPort > 0 {
@@ -141,16 +143,64 @@ func (s *Server) Run(ctx context.Context) error {
 		<-ctx.Done()
 		s.Close()
 	}()
+	go s.acceptLoop()
+	<-ctx.Done()
+	return nil
+}
+
+// acceptLoop serves the tunnel listener; the listener pointer may be swapped
+// by rebind while the loop runs.
+func (s *Server) acceptLoop() {
 	for {
+		if s.closed.Load() {
+			return
+		}
+		s.mu.Lock()
+		ln := s.ln
+		s.mu.Unlock()
+		if ln == nil {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
 		c, err := ln.Accept()
 		if err != nil {
 			if s.closed.Load() {
-				return nil
+				return
 			}
-			return err
+			// 监听被热切换关闭：短暂等待后使用新监听继续
+			time.Sleep(150 * time.Millisecond)
+			continue
 		}
 		go s.handleConn(c)
 	}
+}
+
+// Rebind switches the tunnel listener to a new port without restarting the
+// process. Existing sessions keep running; new clients must use the new port.
+func (s *Server) Rebind(port int) error {
+	nl, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return fmt.Errorf("port %d: %w", port, err)
+	}
+	s.mu.Lock()
+	old := s.ln
+	oldPort := 0
+	if old != nil {
+		if ta, ok := old.Addr().(*net.TCPAddr); ok {
+			oldPort = ta.Port
+		}
+	}
+	s.ln = nl
+	s.usedPort[port] = true
+	if oldPort != 0 {
+		delete(s.usedPort, oldPort)
+	}
+	s.mu.Unlock()
+	if old != nil {
+		_ = old.Close()
+	}
+	log.Infof("tunnel listener moved to :%d", port)
+	return nil
 }
 
 // Close shuts everything down.
@@ -183,7 +233,9 @@ func (s *Server) handleConn(c net.Conn) {
 		return
 	}
 	if tlsBuf[0] == 0x16 && s.tlsCert != nil {
-		tlsConn := tls.Server(c, &tls.Config{Certificates: []tls.Certificate{*s.tlsCert}})
+		// 探测字节必须先还给连接，否则 TLS 记录从第二字节开始解析，
+		// 握手必然失败（表现为客户端 connection reset）
+		tlsConn := tls.Server(&bufferedConn{Conn: c, pre: tlsBuf}, &tls.Config{Certificates: []tls.Certificate{*s.tlsCert}})
 		if err := tlsConn.Handshake(); err != nil {
 			_ = c.Close()
 			return

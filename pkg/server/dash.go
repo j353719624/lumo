@@ -11,7 +11,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -501,7 +503,16 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	oldVhostHTTP := s.cfg.VhostHTTPPort
+	oldVhostHTTPS := s.cfg.VhostHTTPSPort
 	oldBind := s.cfg.BindPort
+	if req.BindPort != oldBind {
+		if err := s.Rebind(req.BindPort); err != nil {
+			failJSON(w, http.StatusBadRequest, "切换监听端口失败："+err.Error())
+			return
+		}
+		persistFirewallPort(req.BindPort)
+	}
 	s.cfg.BindPort = req.BindPort
 	s.cfg.VhostHTTPPort = req.VhostHTTPPort
 	s.cfg.VhostHTTPSPort = req.VhostHTTPSPort
@@ -515,6 +526,39 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 		_ = config.SaveServer(s.cfgPath, s.cfg)
 	}
 
-	needsRestart := oldBind != req.BindPort
+	needsRestart := false // 隧道端口已热切换；vhost 端口改动需要重启
+	if req.VhostHTTPPort != oldVhostHTTP || req.VhostHTTPSPort != oldVhostHTTPS {
+		needsRestart = true
+	}
 	writeJSON(w, map[string]any{"ok": true, "restart": needsRestart})
+}
+
+// persistFirewallPort opens a newly-bound tunnel port in the local firewall
+// layers (firewalld + the persistent nft allowlist) so the change survives
+// reboots. Failures are logged, never fatal.
+func persistFirewallPort(port int) {
+	spec := fmt.Sprintf("%d/tcp", port)
+	if err := exec.Command("firewall-cmd", "--permanent", "--add-port="+spec).Run(); err == nil {
+		_ = exec.Command("firewall-cmd", "--reload").Run()
+	}
+	const nftPath = "/etc/egress.nft"
+	data, err := os.ReadFile(nftPath)
+	if err != nil {
+		return
+	}
+	text := string(data)
+	ps := strconv.Itoa(port)
+	if strings.Contains(text, ps+",") || strings.Contains(text, ps+" }") {
+		return
+	}
+	re := regexp.MustCompile(`(?m)^(\s*tcp dport \{)([0-9, ]+)(\} accept)$`)
+	loc := re.FindStringSubmatchIndex(text)
+	if loc == nil {
+		return
+	}
+	set := strings.TrimSpace(text[loc[4]:loc[5]])
+	text = text[:loc[4]] + set + ", " + ps + text[loc[5]:]
+	if err := os.WriteFile(nftPath, []byte(text), 0o644); err == nil {
+		_ = exec.Command("systemctl", "restart", "egress-filter.service").Run()
+	}
 }
