@@ -187,7 +187,7 @@ a{color:inherit;text-decoration:none}
 
 .table{flex:1 1 auto;min-height:0;overflow:auto}
 .phead-row,.prow{display:grid;gap:16px;align-items:center;padding:0 18px;
-  grid-template-columns:minmax(0,2.2fr) 84px minmax(0,1.35fr) minmax(0,1.45fr) minmax(0,1.05fr) 92px 34px}
+  grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 34px}
 .phead-row{height:30px;background:#10161F;position:sticky;top:0;z-index:2;
   font-size:10px;letter-spacing:.9px;color:var(--tx-5);font-weight:500}
 .prow{height:44px;border-bottom:1px solid var(--line-2);font-size:12px}
@@ -197,7 +197,7 @@ a{color:inherit;text-decoration:none}
 .c-client,.c-entry,.c-traffic{font:10.5px/1 var(--mono);color:var(--tx-3);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .c-entry{color:#C7D2E4}
-.c-traffic{text-align:right;color:var(--tx-2)}
+.c-traffic{text-align:left;color:var(--tx-2)}
 .t-tcp{color:var(--accent-soft)} .t-http{color:var(--teal)}
 .t-udp{color:var(--warn)} .t-sealed-tcp{color:var(--sealed-tcp)}
 .t-https{color:#7BE3C3} .t-mux{color:#E8A45E} .t-sealed-udp{color:#F07FA6}
