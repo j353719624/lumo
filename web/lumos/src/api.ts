@@ -13,6 +13,8 @@ export interface ServerInfo {
   maxPoolCount: number
   heartbeatTimeout: number
   tlsForce: boolean
+  startedAt: string
+  pid: number
   totalIn: number
   totalOut: number
   totalTrafficIn: number

@@ -88,6 +88,17 @@ const sparkPaths = computed(() => {
 })
 
 const uptime = computed(() => formatUptime(now.value - startedAt))
+const uptimeDays = computed(() => {
+  const ms = now.value - startedAt
+  const days = Math.floor(ms / 86400000)
+  const hours = Math.floor((ms % 86400000) / 3600000)
+  const mins = Math.floor((ms % 3600000) / 60000)
+  return `${days}天${hours}小时${mins}分`
+})
+const peakConns = ref(0)
+watch(() => info.value?.curConns, (v) => {
+  if (v && v > peakConns.value) peakConns.value = v
+})
 
 /* ---------------- 事件流 ---------------- */
 function pushEvent(level: string, msg: string) {
@@ -180,7 +191,9 @@ function normTime(t: string): string {
 const menu = ref<{ x: number; y: number; proxy: ProxyItem | null }>({ x: 0, y: 0, proxy: null })
 
 /* ---------------- 服务配置（可编辑） ---------------- */
-const srvCfg = ref({ bindPort: 7000, vhostHttpPort: 0, vhostHttpsPort: 0, authToken: '', webPort: 7500, webPassword: '' })
+const srvCfg = ref({ bindPort: 7000, vhostHttpPort: 0, vhostHttpsPort: 0, authToken: '', subdomainHost: '', allowPortsStr: '', webPort: 7500, webPassword: '' })
+const showToken = ref(false)
+const savedCfg = ref(null)
 const savingCfg = ref(false)
 
 watch(info, (v) => {
@@ -188,10 +201,15 @@ watch(info, (v) => {
   srvCfg.value.bindPort = v.bindPort
   srvCfg.value.vhostHttpPort = v.vhostHttpPort
   srvCfg.value.vhostHttpsPort = v.vhostHttpsPort
+  srvCfg.value.subdomainHost = v.subdomainHost
+  srvCfg.value.allowPortsStr = v.allowPortsStr
 })
+
+const clone = (o: any) => JSON.parse(JSON.stringify(o))
 
 async function saveServerConfig() {
   savingCfg.value = true
+  savedCfg.value = clone(srvCfg.value)
   try {
     const res = await fetch('/api/config', {
       method: 'POST',
@@ -210,6 +228,11 @@ async function saveServerConfig() {
   } finally {
     savingCfg.value = false
   }
+}
+
+function resetCfg() {
+  if (savedCfg.value) { srvCfg.value = clone(savedCfg.value); showToast('已还原') }
+  else { showToast('没有可还原的配置', true) }
 }
 
 function logout() {
@@ -347,15 +370,15 @@ function closeMenu(e: MouseEvent) {
       <article class="card status-card">
         <div class="clabel"><span>① 运行状态</span><span class="health">{{ connected ? `healthz ${healthOk === false ? '—' : '200'}` : 'healthz —' }}</span></div>
         <div class="smain"><span class="sdot" :class="{ bad: !connected }"></span><b>{{ connected ? '服务运行正常' : '与 lumos 断开连接' }}</b></div>
-        <div class="uptime">已监控 {{ uptime }}</div>
-        <div class="pid">bindPort {{ info?.bindPort ?? '—' }} · vhost {{ info?.vhostHttpPort || '—' }}/{{ info?.vhostHttpsPort || '—' }}</div>
+        <div class="uptime">已稳定运行 {{ uptimeDays }}</div>
+        <div class="pid">上次重启 {{ info?.startedAt || '—' }} · PID {{ info?.pid || '—' }}</div>
       </article>
 
       <article class="card kpi-card">
         <div class="kpi">
           <div class="k-label">在线客户端</div>
           <div class="k-val"><b>{{ info?.clientCounts ?? '—' }}</b><span class="k-unit">台</span></div>
-          <div class="k-sub">共 {{ clientNames.length }} 个客户端在建</div>
+          <div class="k-sub" style="color:var(--ok)">+{{ clientNames.length }} 今日</div>
         </div>
         <div class="kpi">
           <div class="k-label">在线代理</div>
@@ -365,11 +388,11 @@ function closeMenu(e: MouseEvent) {
         <div class="kpi">
           <div class="k-label">当前连接</div>
           <div class="k-val"><b>{{ info?.curConns ?? '—' }}</b><span class="k-unit">条</span></div>
-          <div class="k-sub">平均 {{ onlineCount ? (Number(info?.curConns) / onlineCount).toFixed(1) : '0' }} 条 / 代理</div>
+          <div class="k-sub">峰值 {{ peakConns }}</div>
         </div>
         <div class="kpi">
-          <div class="k-label">累计流量</div>
-          <div class="k-val"><b>{{ ((Number(info?.totalIn) + Number(info?.totalOut)) / 1024 ** 3).toFixed(1) || '—' }}</b><span class="k-unit">GB</span></div>
+          <div class="k-label">今日流量</div>
+          <div class="k-val"><b>{{ ((Number(info?.totalIn) + Number(info?.totalOut)) / 1024 ** 3).toFixed(1) || '0.0' }}</b><span class="k-unit">GB</span></div>
           <div class="k-sub">↑ {{ formatBytes(info?.totalIn || 0) }} · ↓ {{ formatBytes(info?.totalOut || 0) }}</div>
         </div>
       </article>
@@ -455,22 +478,36 @@ function closeMenu(e: MouseEvent) {
       <div class="cbody">
         <div class="field-row">
           <div class="field"><label>监听端口 bindPort</label><input v-model.number="srvCfg.bindPort" type="number"></div>
-          <div class="field"><label>HTTP 虚拟主机</label><input v-model.number="srvCfg.vhostHttpPort" type="number" placeholder="0 = 禁用"></div>
+          <div class="field"><label>KCP 端口</label><input value="未启用" readonly disabled></div>
         </div>
         <div class="field-row">
-          <div class="field"><label>HTTPS 虚拟主机</label><input v-model.number="srvCfg.vhostHttpsPort" type="number" placeholder="0 = 禁用"></div>
-          <div class="field"><label>认证令牌 auth.token</label><input v-model="srvCfg.authToken" type="password" autocomplete="off"></div>
+          <div class="field"><label>HTTP 虚拟主机</label><input v-model.number="srvCfg.vhostHttpPort" type="number" placeholder="0"></div>
+          <div class="field"><label>HTTPS 虚拟主机</label><input v-model.number="srvCfg.vhostHttpsPort" type="number" placeholder="0"></div>
         </div>
-        <div class="field-row">
-          <div class="field"><label>面板端口 webServer.port</label><input v-model.number="srvCfg.webPort" type="number"></div>
-          <div class="field"><label>面板密码</label><input v-model="srvCfg.webPassword" type="password" autocomplete="off"></div>
+        <div class="field"><label>子域名根 subDomainHost</label><input v-model="srvCfg.subdomainHost" placeholder="未设置"></div>
+        <div class="field"><label>允许端口范围 allowPorts</label><input v-model="srvCfg.allowPortsStr" placeholder="不限制"></div>
+        <div class="field"><label>认证令牌 auth.token</label>
+          <div style="position:relative">
+            <input v-model="srvCfg.authToken" :type="showToken ? 'text' : 'password'" autocomplete="off">
+            <button style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;cursor:pointer;color:var(--tx-3)" type="button" @click="showToken = !showToken">👁</button>
+          </div>
         </div>
-        <div class="note" style="color:var(--tx-4)">bindPort / vhost 端口修改后需重启进程；token / 面板密码保存后热生效。</div>
+        <div class="sw-list">
+          <label class="switch-row">
+            <span class="switch on" role="switch" aria-checked="true" tabindex="-1"></span>
+            TLS 强制
+          </label>
+          <span class="switch-row" style="cursor:default">
+            <span class="switch on" role="switch" aria-checked="true" tabindex="-1"></span>
+            TCP 多路复用
+          </span>
+        </div>
+        <div class="note">注意：端口类参数保存后需重启 lumos 才会生效</div>
       </div>
       <div class="cfoot">
-        <button class="btn ghost sm" @click="poll(); showToast('已重新读取配置')">重新读取</button>
+        <button class="btn ghost sm" @click="resetCfg">还原</button>
         <span class="spacer"></span>
-        <button class="btn sm" :disabled="savingCfg" @click="saveServerConfig">{{ savingCfg ? '保存中…' : '保存并应用' }}</button>
+        <button class="btn sm" :disabled="savingCfg" @click="saveServerConfig">{{ savingCfg ? '保存中…' : '保存并重启' }}</button>
       </div>
     </aside>
 
