@@ -130,8 +130,12 @@ func (m *Manager) start(id string) error {
 
 	go func() {
 		_ = cl.Run(ctx)
+		// 只有仍是当前实例时才删除登记；否则会误删重启后新实例的条目，
+		// 导致旧实例永远无法被停止（重复连接、名称冲突）
 		m.mu.Lock()
-		delete(m.runs, id)
+		if cur, ok := m.runs[id]; ok && cur == r {
+			delete(m.runs, id)
+		}
 		m.mu.Unlock()
 	}()
 	return nil
