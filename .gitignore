@@ -32,3 +32,6 @@ web/*/dist/
 .claude/
 .sisyphus/
 .superpowers/
+
+# 本地构建产物
+build/
