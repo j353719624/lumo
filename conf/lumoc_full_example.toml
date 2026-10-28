@@ -1,0 +1,47 @@
+# LUMO client full example. Every supported field is shown.
+
+serverAddr = "127.0.0.1"
+serverPort = 7000
+
+[auth]
+token = "change-me-to-a-long-random-string"
+
+[webServer]
+# Admin console for single-config mode (`lumoc -c`).
+# The multi-connection console is started with `lumoc ui` instead.
+addr = "127.0.0.1"
+port = 7400
+user = "admin"
+password = "change-me"
+
+# TCP tunnel: expose local 22 as remote 6022.
+[[proxies]]
+name = "ssh"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 22
+remotePort = 6022
+
+# UDP tunnel: expose a local DNS server.
+# [[proxies]]
+# name = "dns"
+# type = "udp"
+# localIP = "127.0.0.1"
+# localPort = 53
+# remotePort = 6053
+
+# HTTP tunnel: routed by the server's vhostHTTPPort.
+# [[proxies]]
+# name = "web"
+# type = "http"
+# localIP = "127.0.0.1"
+# localPort = 8080
+# customDomains = ["app.example.com"]
+
+# HTTPS tunnel: routed by SNI, TLS terminates at the local service.
+# [[proxies]]
+# name = "secure"
+# type = "https"
+# localIP = "127.0.0.1"
+# localPort = 8443
+# customDomains = ["secure.example.com"]

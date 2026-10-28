@@ -1,51 +1,79 @@
 #!/bin/sh
-# LUMO release packaging: cross-compile lumos/lumoc for the supported
-# platform matrix and produce standard archives plus a checksum file.
 set -e
 cd "$(dirname "$0")"
 
-VERSION=$(sed -n 's/.*Version = "\(.*\)"/\1/p' internal/version/version.go | head -1)
-if [ -z "$VERSION" ]; then
-    echo "cannot determine version" >&2
+# compile for version
+make
+if [ $? -ne 0 ]; then
+    echo "make error"
     exit 1
 fi
-echo "packaging LUMO $VERSION"
 
-OUT=release/packages
-rm -rf "$OUT"
-mkdir -p "$OUT"
+lumo_version=`./bin/lumos --version`
+echo "build version: $lumo_version"
 
-TARGETS="linux/amd64 linux/arm64 linux/386 windows/amd64 windows/arm64 darwin/amd64 darwin/arm64"
+# cross_compiles
+make -f ./Makefile.cross-compiles
 
-for t in $TARGETS; do
-    os=${t%/*}
-    arch=${t#*/}
-    suffix="${os}_${arch}"
-    dir="$OUT/lumo_${VERSION}_${suffix}"
-    mkdir -p "$dir"
+rm -rf ./release/packages
+mkdir -p ./release/packages
 
-    ext=""
-    [ "$os" = "windows" ] && ext=".exe"
+os_all='linux windows darwin freebsd openbsd android'
+arch_all='386 amd64 arm arm64 mips64 mips64le mips mipsle riscv64 loong64'
+extra_all='_ hf'
 
-    for cmd in lumos lumoc; do
-        env CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" \
-            go build -trimpath -ldflags "-s -w" \
-            -o "$dir/$cmd$ext" "./cmd/$cmd"
+cd ./release
+
+for os in $os_all; do
+    for arch in $arch_all; do
+        for extra in $extra_all; do
+            suffix="${os}_${arch}"
+            if [ "x${extra}" != x"_" ]; then
+                suffix="${os}_${arch}_${extra}"
+            fi
+            lumo_dir_name="lumo_${lumo_version}_${suffix}"
+            lumo_path="./packages/lumo_${lumo_version}_${suffix}"
+
+            if [ "x${os}" = x"windows" ]; then
+                if [ ! -f "./lumoc_${suffix}.exe" ]; then
+                    continue
+                fi
+                if [ ! -f "./lumos_${suffix}.exe" ]; then
+                    continue
+                fi
+                mkdir ${lumo_path}
+                mv ./lumoc_${suffix}.exe ${lumo_path}/lumoc.exe
+                mv ./lumos_${suffix}.exe ${lumo_path}/lumos.exe
+            else
+                if [ ! -f "./lumoc_${suffix}" ]; then
+                    continue
+                fi
+                if [ ! -f "./lumos_${suffix}" ]; then
+                    continue
+                fi
+                mkdir ${lumo_path}
+                mv ./lumoc_${suffix} ${lumo_path}/lumoc
+                mv ./lumos_${suffix} ${lumo_path}/lumos
+            fi
+            cp ../LICENSE ${lumo_path}
+            cp -f ../conf/lumos.toml ${lumo_path}
+            cp -f ../conf/lumoc.toml ${lumo_path}
+
+            # packages
+            cd ./packages
+            if [ "x${os}" = x"windows" ]; then
+                if command -v zip >/dev/null 2>&1; then
+                    zip -rq ${lumo_dir_name}.zip ${lumo_dir_name}
+                else
+                    /c/Windows/System32/tar.exe -a -c -f ${lumo_dir_name}.zip ${lumo_dir_name}
+                fi
+            else
+                tar -zcf ${lumo_dir_name}.tar.gz ${lumo_dir_name}
+            fi
+            cd ..
+            rm -rf ${lumo_path}
+        done
     done
-
-    cp conf/lumos.toml conf/lumoc.toml LICENSE "$dir/"
-
-    if [ "$os" = "windows" ]; then
-        /c/Windows/System32/tar.exe -a -c -f "$OUT/lumo_${VERSION}_${suffix}.zip" -C "$OUT" "lumo_${VERSION}_${suffix}"
-    else
-        tar -zcf "$OUT/lumo_${VERSION}_${suffix}.tar.gz" -C "$OUT" "lumo_${VERSION}_${suffix}"
-    fi
-    rm -rf "$dir"
-    echo "built lumo_${VERSION}_${suffix}"
 done
 
-rm -rf "$OUT"/lumo_${VERSION}_*/
-cd "$OUT"
-sha256sum lumo_* > "lumo_${VERSION}_sha256_checksums.txt"
-echo "---- artifacts ----"
-ls -lh
+cd -

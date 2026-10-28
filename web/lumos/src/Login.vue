@@ -1,0 +1,252 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+
+const account = ref('')
+const password = ref('')
+const remember = ref(true)
+const showPwd = ref(false)
+const state = ref<'idle' | 'loading' | 'done'>('idle')
+const alertMsg = ref('')
+const alertShow = ref(false)
+const successShow = ref(false)
+
+function showError(msg: string) {
+  alertMsg.value = msg
+  alertShow.value = false
+  void document.body.offsetWidth // 重新触发抖动动画
+  alertShow.value = true
+  successShow.value = false
+}
+
+function clearError() {
+  alertShow.value = false
+}
+
+async function submit() {
+  if (state.value !== 'idle') return
+
+  const acc = account.value.trim()
+  const pass = password.value
+
+  if (!acc) { showError('请输入账号，可以是邮箱或用户名'); return }
+  if (acc.includes('@') && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(acc)) {
+    showError('邮箱格式看起来不对，请检查 @ 前后的内容'); return
+  }
+  if (!pass) { showError('请输入密码'); return }
+  if (pass.length < 6) { showError('密码至少 6 位'); return }
+
+  clearError()
+  state.value = 'loading'
+
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ account: acc, password: pass }),
+    })
+    const d = await res.json()
+    if (res.ok) {
+      try {
+        if (remember.value) localStorage.setItem('lumo.remember', acc)
+        else localStorage.removeItem('lumo.remember')
+      } catch { /* localStorage 不可用时忽略 */ }
+      state.value = 'done'
+      successShow.value = true
+      setTimeout(() => { location.href = '/' }, 350)
+    } else {
+      state.value = 'idle'
+      showError(d.error || '账号或密码不正确。连续 5 次失败会锁定 10 分钟')
+    }
+  } catch {
+    state.value = 'idle'
+    showError('无法连接本地服务，请确认进程正在运行')
+  }
+}
+
+try {
+  const saved = localStorage.getItem('lumo.remember')
+  if (saved) account.value = saved
+} catch { /* ignore */ }
+</script>
+
+<template>
+  <div class="backdrop"></div>
+  <main class="stage">
+    <!-- 左：品牌 -->
+    <section class="brandside">
+      <svg class="deco" viewBox="0 0 720 720" fill="none" aria-hidden="true">
+        <path d="M132 706V382C132 202 236 100 360 100C484 100 588 202 588 382V706" stroke="url(#dg)" stroke-width="1.6"/>
+        <path d="M148 634V390C148 226 244 128 360 128C476 128 572 226 572 390V634" stroke="url(#dg2)" stroke-width="1.2"/>
+        <path d="M0 438H720" stroke="#35E0C8" stroke-opacity=".13" stroke-width="1.1"/>
+        <circle cx="0" cy="438" r="4" fill="#35E0C8" fill-opacity=".28"/>
+        <circle cx="720" cy="438" r="4" fill="#35E0C8" fill-opacity=".28"/>
+        <circle cx="360" cy="438" r="2" fill="#35E0C8" fill-opacity=".2"/>
+        <defs>
+          <linearGradient id="dg" x1="132" y1="100" x2="588" y2="706" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#5A7BFF" stop-opacity=".26"/>
+            <stop offset="1" stop-color="#35E0C8" stop-opacity=".05"/>
+          </linearGradient>
+          <linearGradient id="dg2" x1="148" y1="128" x2="572" y2="634" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#5A7BFF" stop-opacity=".1"/>
+            <stop offset="1" stop-color="#35E0C8" stop-opacity=".03"/>
+          </linearGradient>
+        </defs>
+      </svg>
+
+      <div class="lockup">
+        <svg width="30" height="30" viewBox="0 0 72 72" fill="none" aria-hidden="true">
+          <path d="M22 57V38C22 26.9 28.3 18.4 36 18.4C43.7 18.4 50 26.9 50 38V57" stroke="#5A7BFF" stroke-width="6.6" stroke-linecap="round"/>
+          <path d="M10 42H62" stroke="#35E0C8" stroke-width="4.4" stroke-linecap="round"/>
+          <circle cx="10" cy="42" r="3.9" fill="#35E0C8"/><circle cx="62" cy="42" r="3.9" fill="#35E0C8"/>
+        </svg>
+        <span class="wordmark">LUMO</span>
+        <span class="divider"></span>
+        <span class="cn">隧光</span>
+      </div>
+
+      <div class="pitch">
+        <h1>让内网服务，<br>出现在<em>该出现的地方</em>。</h1>
+        <p>一条隧道，两端点亮。登录后即可管理全部连接：为每台设备建一套配置，端口映射、TLS 与令牌收在同一张表单里，打开开关就开始工作。</p>
+
+        <div class="feats">
+          <div class="feat">
+            <span class="ic">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M8 1.8V7.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M4.6 4.2A5.2 5.2 0 1 0 11.4 4.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <div><b>一键启停</b><span>每条配置独立连接，互不干扰，切换只点一次开关</span></div>
+          </div>
+          <div class="feat">
+            <span class="ic">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M2.2 5.4H13.8M2.2 10.6H13.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                <circle cx="6" cy="5.4" r="1.7" fill="#151B26" stroke="currentColor" stroke-width="1.4"/>
+                <circle cx="10.2" cy="10.6" r="1.7" fill="#151B26" stroke="currentColor" stroke-width="1.4"/>
+              </svg>
+            </span>
+            <div><b>配置即表单</b><span>端口映射可视化编辑，保存即时生效，无需重启进程</span></div>
+          </div>
+          <div class="feat">
+            <span class="ic">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2.2L13 4.1V8.2C13 11.1 10.9 13.1 8 14.1C5.1 13.1 3 11.1 3 8.2V4.1L8 2.2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+                <path d="M6.1 8L7.5 9.4L10 6.7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <div><b>令牌与 TLS</b><span>传输加密默认开启，认证令牌只留在本机</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="brandfoot">
+        <span class="pill"><span class="dot"></span>服务运行中</span>
+        <span>v0.1.0</span>
+        <span class="sep"></span>
+        <span>localhost:7500</span>
+        <span class="sep"></span>
+        <span>© 2026 LUMO</span>
+      </div>
+
+      <p class="pitch-mobile">让内网服务，出现在该出现的地方。</p>
+    </section>
+
+    <!-- 右：登录表单 -->
+    <section class="formside">
+      <div class="panel">
+        <h2>登录</h2>
+        <p class="sub">内网穿透服务端</p>
+
+        <form @submit.prevent="submit" novalidate>
+          <div class="field">
+            <label for="acc">账号</label>
+            <div class="ctrl">
+              <span class="lead">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="5.4" r="2.7" stroke="currentColor" stroke-width="1.4"/>
+                  <path d="M3 13.4C3.5 11.2 5.5 9.8 8 9.8C10.5 9.8 12.5 11.2 13 13.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+              </span>
+              <input id="acc" v-model="account" type="text" inputmode="email"
+                     placeholder="邮箱或用户名" autocomplete="username" spellcheck="false" autofocus>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="pwd">密码</label>
+            <div class="ctrl has-eye">
+              <span class="lead">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                  <rect x="3" y="7.2" width="10" height="6.6" rx="1.8" stroke="currentColor" stroke-width="1.4"/>
+                  <path d="M5.7 7.2V5.4C5.7 4.1 6.7 3.1 8 3.1C9.3 3.1 10.3 4.1 10.3 5.4V7.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                  <circle cx="8" cy="10.5" r="1" fill="currentColor"/>
+                </svg>
+              </span>
+              <input id="pwd" v-model="password" :type="showPwd ? 'text' : 'password'"
+                     placeholder="请输入密码" autocomplete="current-password">
+              <button class="eye" type="button" :aria-pressed="showPwd ? 'true' : 'false'" aria-label="显示密码" @click="showPwd = !showPwd">
+                <svg class="on" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M1.6 8C3.4 4.9 5.6 3.4 8 3.4C10.4 3.4 12.6 4.9 14.4 8C12.6 11.1 10.4 12.6 8 12.6C5.6 12.6 3.4 11.1 1.6 8Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+                  <circle cx="8" cy="8" r="2.1" fill="currentColor"/>
+                </svg>
+                <svg class="off" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M2.6 5.5C2 6.2 1.7 7 1.6 8C3.4 11.1 5.6 12.6 8 12.6C9 12.6 10 12.3 10.9 11.7M6.2 3.7C6.8 3.5 7.4 3.4 8 3.4C10.4 3.4 12.6 4.9 14.4 8C14 8.7 13.5 9.3 13 9.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M2.6 2.6L13.4 13.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="row">
+            <label class="remember">
+              <input type="checkbox" v-model="remember">
+              <span class="sw"></span>
+              <span>记住这台设备</span>
+            </label>
+            <a class="link" href="#" @click.prevent="showError('密码重置需要管理员在服务端执行，或使用访问令牌登录')">忘记密码？</a>
+          </div>
+
+          <div class="alert" :class="{ show: alertShow }" role="alert" aria-live="polite">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6.4" stroke="#FF5F73" stroke-width="1.4"/>
+              <path d="M8 4.9V8.7" stroke="#FF5F73" stroke-width="1.6" stroke-linecap="round"/>
+              <circle cx="8" cy="11.1" r=".95" fill="#FF5F73"/>
+            </svg>
+            <span>{{ alertMsg || '账号或密码不正确' }}</span>
+          </div>
+
+          <div class="success" :class="{ show: successShow }">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6.4" stroke="#3DDC97" stroke-width="1.4"/>
+              <path d="M5.2 8.2L7.1 10.1L10.8 6.2" stroke="#3DDC97" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>验证通过</span>
+            <a href="/">进入控制台 →</a>
+          </div>
+
+          <button class="submit" type="submit" :data-state="state" :disabled="state !== 'idle'">
+            <span class="spinner" aria-hidden="true"></span>
+            <span class="label">{{ state === 'loading' ? '正在验证…' : state === 'done' ? '已登录' : '登录' }}</span>
+          </button>
+        </form>
+
+        <div class="or">或</div>
+
+        <button class="alt" type="button" @click="showError('访问令牌登录：粘贴服务端生成的 token 即可，无需密码')">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <circle cx="5.6" cy="10.4" r="2.6" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M7.5 8.5L12.6 3.4M10.6 5.4L12.2 7M12 4L13.6 5.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          使用访问令牌登录
+        </button>
+
+        <div class="panelfoot">
+          还没有账号？<a class="link" href="#" @click.prevent="showError('请让管理员在服务端配置中为你创建账号')">联系管理员开通</a>
+        </div>
+      </div>
+    </section>
+  </main>
+</template>
+
+<style src="./login.css"></style>

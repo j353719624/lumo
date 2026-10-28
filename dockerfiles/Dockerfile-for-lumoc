@@ -1,0 +1,21 @@
+FROM node:22-alpine AS web-builder
+WORKDIR /web
+COPY web/package.json web/package-lock.json ./
+COPY web/shared/package.json ./shared/
+COPY web/lumos/package.json ./lumos/
+COPY web/lumoc/package.json ./lumoc/
+RUN npm ci
+COPY web/ ./
+RUN npm run build --workspace lumoc
+
+FROM golang:1.26-alpine AS building
+WORKDIR /lumo
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+COPY --from=web-builder /web/lumoc/dist /lumo/web/lumoc/dist
+RUN env CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -tags lumoc -o bin/lumoc ./cmd/lumoc
+
+FROM alpine:latest
+COPY --from=building /lumo/bin/lumoc /usr/bin/lumoc
+ENTRYPOINT ["/usr/bin/lumoc"]

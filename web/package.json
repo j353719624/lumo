@@ -1,0 +1,13 @@
+{
+  "name": "lumo-web",
+  "private": true,
+  "workspaces": ["shared", "lumos", "lumoc"],
+  "scripts": {
+    "build": "npm run build --workspace lumos && npm run build --workspace lumoc",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  }
+}

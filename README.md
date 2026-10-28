@@ -30,11 +30,28 @@ LUMO 是一个自研的内网穿透 / 反向代理工具，把 NAT 或防火墙�
 
 ## 构建
 
-依赖：Go 1.26+（无需 Node，前端已内嵌源码随编译打入）
+依赖：Go 1.26+、Node.js 20+（Go 二进制不会内嵌未构建的前端，面板需要先构建）
 
 ```bash
-go build -trimpath -ldflags "-s -w" -o bin/lumos ./cmd/lumos
-go build -trimpath -ldflags "-s -w" -o bin/lumoc ./cmd/lumoc
+# 1. 构建两个 Vue 3 控制台（web/ 是 npm workspace）
+cd web && npm ci && npm run build && cd ..
+
+# 2. 编译二进制（面板经 //go:embed 打入）
+make build        # 或：go build -trimpath -ldflags "-s -w" -o bin/lumos ./cmd/lumos
+```
+
+只需要后端、不需要面板时，用 `noweb` 标签跳过前端嵌入：
+
+```bash
+go build -tags noweb -o bin/lumos ./cmd/lumos
+go build -tags noweb -o bin/lumoc ./cmd/lumoc
+```
+
+完整开发流程（格式化、构建、测试）：
+
+```bash
+make all      # env + fmt + web + build
+make alltest  # vet + 单测 + e2e
 ```
 
 ## 快速开始

@@ -1,0 +1,26 @@
+# LUMO server full example. Every supported field is shown.
+# Uncomment and adjust as needed.
+
+# Port that lumoc clients connect to (control and data connections).
+bindPort = 7000
+
+# HTTP virtual host port for "http" proxies (routed by Host header).
+# Leave unset/0 to disable.
+# vhostHTTPPort = 18090
+
+# HTTPS virtual host port for "https" proxies (routed by TLS SNI).
+# Leave unset/0 to disable.
+# vhostHTTPSPort = 18443
+
+[auth]
+# Shared secret. Clients must use the same value.
+# Authentication uses a challenge-response HMAC, so the token itself is
+# never transmitted.
+token = "change-me-to-a-long-random-string"
+
+[webServer]
+# Console listener. The dashboard is disabled when port is 0/unset.
+addr = "127.0.0.1"
+port = 7500
+user = "admin"
+password = "change-me"
