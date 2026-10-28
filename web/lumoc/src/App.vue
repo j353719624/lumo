@@ -254,7 +254,20 @@ function useTemplate(t: string) {
 
 async function copyText(text: string, msg: string) {
   try {
-    await navigator.clipboard.writeText(text)
+    // HTTP（非安全上下文）下 navigator.clipboard 不存在，退回 execCommand
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.setAttribute('readonly', '')
+      ta.style.cssText = 'position:fixed;top:-1000px;left:-1000px;opacity:0'
+      document.body.appendChild(ta)
+      ta.select()
+      const ok = document.execCommand('copy')
+      document.body.removeChild(ta)
+      if (!ok) throw new Error('copy failed')
+    }
     toast(msg)
   } catch {
     toast('复制失败，请手动选择', true)

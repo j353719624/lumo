@@ -349,7 +349,20 @@ function showToast(msg: string, bad = false) {
 
 async function copy(text: string, msg?: string) {
   try {
-    await navigator.clipboard.writeText(text)
+    // HTTP（非安全上下文）下 navigator.clipboard 不存在，退回 execCommand
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.setAttribute('readonly', '')
+      ta.style.cssText = 'position:fixed;top:-1000px;left:-1000px;opacity:0'
+      document.body.appendChild(ta)
+      ta.select()
+      const ok = document.execCommand('copy')
+      document.body.removeChild(ta)
+      if (!ok) throw new Error('copy failed')
+    }
     showToast(msg || t('copied'))
   } catch {
     showToast(t('copyFailed'), true)
