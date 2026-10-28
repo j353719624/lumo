@@ -18,22 +18,6 @@ body{
   margin:0;background:var(--bg);color:var(--tx);
   font:13px/1.45 var(--sans);-webkit-font-smoothing:antialiased;
 }
-/* 整页统一的氛围层：渐变 + 极淡网格，居中内容不出现「浮条」接缝 */
-body::before{
-  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
-  background:
-    radial-gradient(900px 620px at 30% 4%,rgba(90,123,255,.15),transparent 62%),
-    radial-gradient(800px 600px at 72% 100%,rgba(53,224,200,.10),transparent 58%);
-}
-body::after{
-  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
-  background-image:
-    linear-gradient(to right,rgba(255,255,255,.03) 1px,transparent 1px),
-    linear-gradient(to bottom,rgba(255,255,255,.03) 1px,transparent 1px);
-  background-size:64px 64px;
-  -webkit-mask-image:radial-gradient(135% 100% at 50% 10%,#000 0%,transparent 78%);
-  mask-image:radial-gradient(135% 100% at 50% 10%,#000 0%,transparent 78%);
-}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 input{font:inherit;color:inherit}
 a{color:inherit;text-decoration:none}
@@ -44,23 +28,35 @@ a{color:inherit;text-decoration:none}
    骨架：左品牌 / 右表单
    ============================================================ */
 .stage{
-  min-height:100vh;min-height:100dvh;
-  display:flex;align-items:center;justify-content:center;
-  gap:clamp(40px,6vw,104px);
-  padding:48px 28px 72px;
-  max-width:1160px;margin:0 auto;
-  position:relative;z-index:1;
+  display:grid;min-height:100vh;min-height:100dvh;
+  grid-template-columns:minmax(0,1.06fr) minmax(420px,.94fr);
 }
 
 /* ---------------- 左：品牌侧 ---------------- */
 .brandside{
-  position:relative;
-  display:flex;flex-direction:column;gap:24px;
-  width:min(520px,46vw);flex:0 1 auto;
+  position:relative;overflow:hidden;
+  display:flex;flex-direction:column;justify-content:space-between;gap:44px;
+  padding:52px 56px 52px 82px;
+  border-right:1px solid var(--line-2);
+  background:
+    radial-gradient(820px 560px at 6% 4%,rgba(90,123,255,.17),transparent 62%),
+    radial-gradient(680px 520px at 88% 98%,rgba(53,224,200,.11),transparent 58%),
+    var(--bg);
 }
-/* 极淡的网格由页面级 ::after 提供 */
-.brandside::before{content:none}
-.deco{display:none}
+/* 极淡的网格，暗示「隧道/工程」而非装饰 */
+.brandside::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:
+    linear-gradient(to right,rgba(255,255,255,.038) 1px,transparent 1px),
+    linear-gradient(to bottom,rgba(255,255,255,.038) 1px,transparent 1px);
+  background-size:64px 64px;
+  -webkit-mask-image:radial-gradient(118% 92% at 18% 12%,#000 0%,transparent 74%);
+          mask-image:radial-gradient(118% 92% at 18% 12%,#000 0%,transparent 74%);
+}
+.deco{
+  position:absolute;right:-150px;bottom:-200px;width:740px;height:740px;
+  pointer-events:none;user-select:none;z-index:0;
+}
 .brandside > *{position:relative;z-index:1}
 .brandside > .deco{position:absolute;z-index:0}
 
@@ -95,7 +91,7 @@ a{color:inherit;text-decoration:none}
 .feat span{font-size:11.5px;line-height:1.6;color:var(--tx-4)}
 
 /* 页脚状态 */
-.brandfoot{display:flex;align-items:center;gap:11px;flex-wrap:wrap;font-size:10.5px;color:var(--tx-5);margin-top:8px}
+.brandfoot{display:flex;align-items:center;gap:11px;flex-wrap:wrap;font-size:10.5px;color:var(--tx-5)}
 .pill{
   height:24px;padding:0 9px;border-radius:12px;display:inline-flex;align-items:center;gap:6px;
   background:#12281F;border:1px solid rgba(61,220,151,.3);color:var(--ok);font-size:10.5px;
@@ -106,8 +102,7 @@ a{color:inherit;text-decoration:none}
 
 /* ---------------- 右：表单侧 ---------------- */
 .formside{
-  display:flex;align-items:center;justify-content:center;
-  flex:0 0 auto;
+  display:grid;place-items:center;padding:40px 32px;background:var(--bg);
 }
 .panel{
   width:100%;max-width:400px;padding:32px;
@@ -224,20 +219,21 @@ a{color:inherit;text-decoration:none}
 /* ============================================================
    响应式
    ============================================================ */
-@media (max-width:960px){
-  .stage{flex-direction:column;align-items:flex-start;gap:30px;padding:36px 20px 56px}
-  .brandside{width:100%;max-width:560px;gap:16px}
-  .pitch{display:none}
-  .feats{display:none}
-  .brandfoot{display:none}
-  .formside{width:100%}
-  .formside .panel{width:100%;max-width:440px}
+@media (max-width:1000px){
+  .stage{grid-template-columns:1fr}
+  .brandside{
+    padding:24px 22px 20px;gap:0;justify-content:flex-start;
+    border-right:0;border-bottom:1px solid var(--line-2);
+  }
+  .brandside::before{-webkit-mask-image:radial-gradient(120% 140% at 50% 0%,#000,transparent 70%);
+                             mask-image:radial-gradient(120% 140% at 50% 0%,#000,transparent 70%)}
+  .deco{width:420px;height:420px;right:-140px;bottom:-190px;opacity:.55}
+  .pitch,.feats,.brandfoot{display:none}
+  .formside{padding:26px 18px 44px;align-items:start}
+  .panel{padding:24px;border-radius:18px;box-shadow:none;max-width:440px}
   .pitch-mobile{display:block}
 }
-@media (min-width:961px){
-  .pitch-mobile{display:none}
-  .brandside{transform:translateX(26px)}
-}
+@media (min-width:1001px){ .pitch-mobile{display:none} }
 .pitch-mobile{margin:10px 0 0;font-size:11.5px;line-height:1.7;color:var(--tx-4)}
 @media (max-width:420px){
   .panel{padding:20px}
