@@ -8,6 +8,7 @@ export interface ServerInfo {
   quicPort: number
   vhostHttpPort: number
   vhostHttpsPort: number
+  webPort: number
   subdomainHost: string
   allowPortsStr: string
   maxPoolCount: number
@@ -160,6 +161,7 @@ export async function serverInfo(): Promise<ServerInfo> {
     quicPort: pick(s, ['quicBindPort', 'quic_bind_port'], 0),
     vhostHttpPort: pick(s, ['vhostHTTPPort', 'vhost_http_port'], 0),
     vhostHttpsPort: pick(s, ['vhostHTTPSPort', 'vhost_https_port'], 0),
+    webPort: num(pick(s, ['webPort'], 0)),
     subdomainHost: pick(s, ['subdomainHost', 'subdomain_host'], ''),
     allowPortsStr: pick(s, ['allowPortsStr', 'allow_ports'], ''),
     maxPoolCount: pick(s, ['maxPoolCount', 'max_pool_count'], 0),

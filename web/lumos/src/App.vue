@@ -193,6 +193,7 @@ watch(info, (v) => {
   srvCfg.value.vhostHttpsPort = v.vhostHttpsPort
   srvCfg.value.subdomainHost = v.subdomainHost
   srvCfg.value.allowPortsStr = v.allowPortsStr
+  if ((v as any).webPort) srvCfg.value.webPort = (v as any).webPort
 })
 
 const clone = (o: any) => JSON.parse(JSON.stringify(o))

@@ -499,8 +499,13 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 	if req.AuthToken != "" {
 		s.cfg.AuthToken = req.AuthToken
 	}
-	s.cfg.Web.Port = req.WebPort
-	s.cfg.Web.Password = req.WebPassword
+	// 面板端口/密码：空值表示维持原值，避免误清空导致面板失联
+	if req.WebPort > 0 {
+		s.cfg.Web.Port = req.WebPort
+	}
+	if req.WebPassword != "" {
+		s.cfg.Web.Password = req.WebPassword
+	}
 
 	// 写回 toml
 	if s.cfgPath != "" {
