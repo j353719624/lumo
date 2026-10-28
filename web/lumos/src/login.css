@@ -234,7 +234,10 @@ a{color:inherit;text-decoration:none}
   .formside .panel{width:100%;max-width:440px}
   .pitch-mobile{display:block}
 }
-@media (min-width:961px){ .pitch-mobile{display:none} }
+@media (min-width:961px){
+  .pitch-mobile{display:none}
+  .brandside{transform:translateX(26px)}
+}
 .pitch-mobile{margin:10px 0 0;font-size:11.5px;line-height:1.7;color:var(--tx-4)}
 @media (max-width:420px){
   .panel{padding:20px}
