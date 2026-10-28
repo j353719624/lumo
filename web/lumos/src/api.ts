@@ -15,6 +15,7 @@ export interface ServerInfo {
   tlsForce: boolean
   startedAt: string
   pid: number
+  uptimeStr: string
   totalIn: number
   totalOut: number
   totalTrafficIn: number
@@ -164,6 +165,9 @@ export async function serverInfo(): Promise<ServerInfo> {
     maxPoolCount: pick(s, ['maxPoolCount', 'max_pool_count'], 0),
     heartbeatTimeout: pick(s, ['heartbeatTimeout', 'heart_beat_timeout'], 0),
     tlsForce: !!pick(s, ['tlsForce', 'tls_force'], false),
+    startedAt: pick(s, ['startedAt'], '') as string,
+    pid: num(pick(s, ['pid'], 0)),
+    uptimeStr: pick(s, ['uptimeStr'], '') as string,
     totalIn: num(pick(s, ['totalTrafficIn', 'total_traffic_in'], 0)),
     totalOut: num(pick(s, ['totalTrafficOut', 'total_traffic_out'], 0)),
     curConns: num(pick(s, ['curConns', 'cur_conns'], 0)),

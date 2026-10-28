@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { clock, formatBytes, formatRate, formatUptime } from 'lumo-shared'
+import { clock, formatBytes, formatRate } from 'lumo-shared'
 import {
   apiCfg, health, host, logs as fetchLogs, proxies as fetchProxies, serverInfo,
   type LogEntry, type ProxyItem, type ServerInfo,
@@ -16,7 +16,6 @@ const proxyList = ref<ProxyItem[]>([])
 const events = ref<LogEntry[]>([])
 const samplesUp = ref<number[]>([])
 const samplesDown = ref<number[]>([])
-const startedAt = Date.now()
 const connected = ref(false)
 const healthOk = ref<boolean | null>(null)
 const prevTotals = ref<{ in: number; out: number } | null>(null)
@@ -25,8 +24,6 @@ const filter = ref({ type: 'all', q: '', onlineOnly: false, page: 1 })
 const logLevel = ref<'ALL' | 'INFO' | 'WARN' | 'ERROR'>('ALL')
 const logLive = ref(true)
 
-const now = ref(Date.now())
-let nowTimer: number | undefined
 let pollTimer: number | undefined
 
 /* ---------------- 派生数据 ---------------- */
@@ -87,14 +84,7 @@ const sparkPaths = computed(() => {
   return { down: draw(samplesDown.value), up: draw(samplesUp.value) }
 })
 
-const uptime = computed(() => formatUptime(now.value - startedAt))
-const uptimeDays = computed(() => {
-  const ms = now.value - startedAt
-  const days = Math.floor(ms / 86400000)
-  const hours = Math.floor((ms % 86400000) / 3600000)
-  const mins = Math.floor((ms % 3600000) / 60000)
-  return `${days}天${hours}小时${mins}分`
-})
+const uptimeDays = computed(() => info.value?.uptimeStr || '—')
 const peakConns = ref(0)
 watch(() => info.value?.curConns, (v) => {
   if (v && v > peakConns.value) peakConns.value = v
@@ -323,14 +313,12 @@ function typeClass(t: string) {
 }
 
 onMounted(() => {
-  nowTimer = window.setInterval(() => { now.value = Date.now() }, 1000)
   poll()
   pollTimer = window.setInterval(poll, apiCfg.interval)
   window.addEventListener('click', closeMenu as EventListener)
   window.addEventListener('resize', closeMenu as EventListener)
 })
 onBeforeUnmount(() => {
-  clearInterval(nowTimer)
   clearInterval(pollTimer)
   window.removeEventListener('click', closeMenu as EventListener)
   window.removeEventListener('resize', closeMenu as EventListener)
