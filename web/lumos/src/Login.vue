@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref } from 'vue'
-import { t } from 'lumo-shared'
+import { locale, setLocale, t } from 'lumo-shared'
 
 const account = ref('')
 const password = ref('')
@@ -14,6 +14,12 @@ const twoFAStep = ref(false)
 const twoFATicket = ref('')
 const otpCode = ref('')
 const otpInput = ref<HTMLInputElement | null>(null)
+const langOpen = ref(false)
+
+function pickLang(l: 'zh' | 'en') {
+  setLocale(l)
+  langOpen.value = false
+}
 
 function showError(msg: string) {
   alertMsg.value = msg
@@ -112,8 +118,34 @@ try {
 </script>
 
 <template>
-  <div class="backdrop"></div>
-  <main class="stage">
+  <div class="app">
+    <header class="loginbar">
+      <div class="brandmark">
+        <svg width="32" height="32" viewBox="0 0 72 72" fill="none" aria-hidden="true">
+          <path d="M22 57V38C22 26.9 28.3 18.4 36 18.4C43.7 18.4 50 26.9 50 38V57" stroke="#5A7BFF" stroke-width="6.6" stroke-linecap="round"/>
+          <path d="M10 42H62" stroke="#35E0C8" stroke-width="4.4" stroke-linecap="round"/>
+          <circle cx="10" cy="42" r="3.9" fill="#35E0C8"/><circle cx="62" cy="42" r="3.9" fill="#35E0C8"/>
+        </svg>
+        <span class="wm">LUMO</span>
+        <span class="divider"></span>
+        <span class="cn">隧光</span>
+      </div>
+      <div class="langsel" :class="{ open: langOpen }">
+        <button class="langbtn" type="button" @click.stop="langOpen = !langOpen">
+          <span class="flag">{{ locale === 'zh' ? '🇨🇳' : '🇺🇸' }}</span>
+          <span>{{ locale === 'zh' ? '简体中文' : 'English' }}</span>
+          <svg class="caret" width="9" height="9" viewBox="0 0 10 10" fill="none">
+            <path d="M2 3.8L5 6.8L8 3.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div class="langmenu" v-if="langOpen">
+          <button type="button" :class="{ cur: locale === 'zh' }" @click="pickLang('zh')"><span>🇨🇳</span> 简体中文</button>
+          <button type="button" :class="{ cur: locale === 'en' }" @click="pickLang('en')"><span>🇺🇸</span> English</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="stage">
     <!-- 左：品牌 -->
     <section class="brandside">
       <svg class="deco" viewBox="0 0 720 720" fill="none" aria-hidden="true">
@@ -135,20 +167,9 @@ try {
         </defs>
       </svg>
 
-      <div class="lockup">
-        <svg width="30" height="30" viewBox="0 0 72 72" fill="none" aria-hidden="true">
-          <path d="M22 57V38C22 26.9 28.3 18.4 36 18.4C43.7 18.4 50 26.9 50 38V57" stroke="#5A7BFF" stroke-width="6.6" stroke-linecap="round"/>
-          <path d="M10 42H62" stroke="#35E0C8" stroke-width="4.4" stroke-linecap="round"/>
-          <circle cx="10" cy="42" r="3.9" fill="#35E0C8"/><circle cx="62" cy="42" r="3.9" fill="#35E0C8"/>
-        </svg>
-        <span class="wordmark">LUMO</span>
-        <span class="divider"></span>
-        <span class="cn">隧光</span>
-      </div>
-
       <div class="pitch">
-        <h1>让内网服务，<br>出现在<em>该出现的地方</em>。</h1>
-        <p>一条隧道，两端点亮。登录后即可管理全部连接：为每台设备建一套配置，端口映射、TLS 与令牌收在同一张表单里，打开开关就开始工作。</p>
+        <h1>{{ t('pitch.line1') }}<br>{{ t('pitch.line2pre') }}<em>{{ t('pitch.line2em') }}</em>{{ t('pitch.line2post') }}</h1>
+        <p>{{ t('pitch.sub') }}</p>
 
         <div class="feats">
           <div class="feat">
@@ -158,7 +179,7 @@ try {
                 <path d="M4.6 4.2A5.2 5.2 0 1 0 11.4 4.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
               </svg>
             </span>
-            <div><b>一键启停</b><span>每条配置独立连接，互不干扰，切换只点一次开关</span></div>
+            <div><b>{{ t('feat.1t') }}</b><span>{{ t('feat.1d') }}</span></div>
           </div>
           <div class="feat">
             <span class="ic">
@@ -168,7 +189,7 @@ try {
                 <circle cx="10.2" cy="10.6" r="1.7" fill="#151B26" stroke="currentColor" stroke-width="1.4"/>
               </svg>
             </span>
-            <div><b>配置即表单</b><span>端口映射可视化编辑，保存即时生效，无需重启进程</span></div>
+            <div><b>{{ t('feat.2t') }}</b><span>{{ t('feat.2d') }}</span></div>
           </div>
           <div class="feat">
             <span class="ic">
@@ -177,21 +198,12 @@ try {
                 <path d="M6.1 8L7.5 9.4L10 6.7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </span>
-            <div><b>令牌与 TLS</b><span>传输加密默认开启，认证令牌只留在本机</span></div>
+            <div><b>{{ t('feat.3t') }}</b><span>{{ t('feat.3d') }}</span></div>
           </div>
         </div>
       </div>
 
-      <div class="brandfoot">
-        <span class="pill"><span class="dot"></span>服务运行中</span>
-        <span>v0.1.0</span>
-        <span class="sep"></span>
-        <span>localhost:7500</span>
-        <span class="sep"></span>
-        <span>© 2026 LUMO</span>
-      </div>
-
-      <p class="pitch-mobile">让内网服务，出现在该出现的地方。</p>
+      <p class="pitch-mobile">{{ t('pitch.short') }}</p>
     </section>
 
     <!-- 右：登录表单 -->
@@ -288,7 +300,12 @@ try {
         </form>
       </div>
     </section>
-  </main>
+    </main>
+
+    <footer class="pagefoot">
+      <span>v0.1.0</span><span class="sep"></span><span>localhost:7500</span><span class="sep"></span><span>© 2026 LUMO</span>
+    </footer>
+  </div>
 </template>
 
 <style src="./login.css"></style>
