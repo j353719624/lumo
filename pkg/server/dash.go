@@ -495,7 +495,10 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 	s.cfg.BindPort = req.BindPort
 	s.cfg.VhostHTTPPort = req.VhostHTTPPort
 	s.cfg.VhostHTTPSPort = req.VhostHTTPSPort
-	s.cfg.AuthToken = req.AuthToken
+	// 令牌由客户端生成：面板不回显、提交空值表示维持原令牌不变
+	if req.AuthToken != "" {
+		s.cfg.AuthToken = req.AuthToken
+	}
 	s.cfg.Web.Port = req.WebPort
 	s.cfg.Web.Password = req.WebPassword
 

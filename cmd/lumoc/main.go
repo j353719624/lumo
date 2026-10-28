@@ -3,6 +3,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
@@ -17,6 +19,16 @@ import (
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "ui" {
 		runConsole(os.Args[2:])
+		return
+	}
+	if len(os.Args) > 1 && os.Args[1] == "token" {
+		// 认证令牌由客户端生成；两端填入同一令牌即可互通
+		tok, err := newToken()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Println(tok)
 		return
 	}
 	if len(os.Args) > 1 && os.Args[1] == "verify" {
@@ -45,6 +57,15 @@ func main() {
 	defer stop()
 	cl := client.New(cfg, *cfgPath)
 	_ = cl.Run(ctx)
+}
+
+// newToken returns a fresh 256-bit hex authentication token.
+func newToken() (string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
 }
 
 // runConsole serves the multi-connection console (`lumoc ui`).

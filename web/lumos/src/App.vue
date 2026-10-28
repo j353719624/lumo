@@ -208,6 +208,9 @@ async function saveServerConfig() {
     })
     const d = await res.json()
     if (res.ok) {
+      // 令牌仅用于“写入新值”：保存后立即从表单移除，避免任何回显
+      srvCfg.value.authToken = ''
+      if (savedCfg.value) savedCfg.value.authToken = ''
       showToast(d.restart ? '已保存并重启服务' : '已保存（token/面板密码热生效）')
       if (d.restart) setTimeout(() => location.reload(), 1500)
     } else {
@@ -606,7 +609,8 @@ function closeMenu(e: MouseEvent) {
         <div class="field"><label>{{ t('config.allowPorts') }}</label><input v-model="srvCfg.allowPortsStr" :placeholder="t('config.allowPortsPh')"></div>
         <div class="field"><label>{{ t('config.authToken') }}</label>
           <div style="position:relative">
-            <input v-model="srvCfg.authToken" :type="showToken ? 'text' : 'password'" autocomplete="off">
+            <input v-model="srvCfg.authToken" :type="showToken ? 'text' : 'password'" autocomplete="off"
+                   :placeholder="t('config.authTokenPh')">
             <button style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;cursor:pointer;color:var(--tx-3)" type="button" @click="showToken = !showToken">👁</button>
           </div>
         </div>

@@ -106,6 +106,7 @@ const zh: Dict = {
   'config.allowPorts': '允许端口段 allowPorts',
   'config.allowPortsPh': '不限制',
   'config.authToken': '认证令牌 auth.token',
+  'config.authTokenPh': '留空保持不变；粘贴 lumoc token 生成的令牌',
   // logs
   'logs.title': '运行事件',
   'logs.live': '实时刷新',
@@ -215,6 +216,7 @@ const en: Dict = {
   'config.allowPorts': 'Allowed ports',
   'config.allowPortsPh': 'Unrestricted',
   'config.authToken': 'Auth token',
+  'config.authTokenPh': 'Leave blank to keep; paste a token from "lumoc token"',
   'logs.title': 'Events',
   'logs.live': 'Live',
   'tfa.title': 'Account · Two-factor',
