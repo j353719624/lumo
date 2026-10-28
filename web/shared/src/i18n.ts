@@ -77,7 +77,7 @@ const zh: Dict = {
   'state.offline': '离线',
   'state.waiting': '等待',
   'empty': '没有匹配的代理',
-  'pager.info': '共 {n} 条 · 第 {p} / {t} 页',
+  'pager.info': '共 {0} 条 · 第 {1} / {2} 页',
   // config panel
   'config.title': '服务配置',
   'config.copy': '复制',
@@ -120,8 +120,8 @@ const zh: Dict = {
   'unit.proxies': '条',
   'unit.conns': '条',
   'unit.gb': 'GB',
-  'today.n': '+{n} 今日',
-  'peak.n': '峰值 {n}',
+  'today.n': '+{0} 今日',
+  'peak.n': '峰值 {0}',
   'console.name': '服务端控制台',
 }
 
@@ -175,7 +175,7 @@ const en: Dict = {
   'state.offline': 'Offline',
   'state.waiting': 'Waiting',
   'empty': 'No matching proxies',
-  'pager.info': '{n} items · page {p} / {t}',
+  'pager.info': '{0} items · page {1} / {2}',
   'config.title': 'Server config',
   'config.copy': 'Copy',
   'config.save': 'Save & restart',
@@ -214,8 +214,8 @@ const en: Dict = {
   'unit.proxies': '',
   'unit.conns': '',
   'unit.gb': 'GB',
-  'today.n': '+{n} today',
-  'peak.n': 'Peak {n}',
+  'today.n': '+{0} today',
+  'peak.n': 'Peak {0}',
   'console.name': 'Server console',
 }
 
