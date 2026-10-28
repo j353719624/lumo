@@ -18,6 +18,22 @@ body{
   margin:0;background:var(--bg);color:var(--tx);
   font:13px/1.45 var(--sans);-webkit-font-smoothing:antialiased;
 }
+/* 整页统一的氛围层：渐变 + 极淡网格，居中内容不出现「浮条」接缝 */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(900px 620px at 22% 6%,rgba(90,123,255,.16),transparent 62%),
+    radial-gradient(760px 560px at 78% 100%,rgba(53,224,200,.10),transparent 58%);
+}
+body::after{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(to right,rgba(255,255,255,.03) 1px,transparent 1px),
+    linear-gradient(to bottom,rgba(255,255,255,.03) 1px,transparent 1px);
+  background-size:64px 64px;
+  -webkit-mask-image:radial-gradient(120% 90% at 28% 10%,#000 0%,transparent 74%);
+  mask-image:radial-gradient(120% 90% at 28% 10%,#000 0%,transparent 74%);
+}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 input{font:inherit;color:inherit}
 a{color:inherit;text-decoration:none}
@@ -30,8 +46,7 @@ a{color:inherit;text-decoration:none}
 .stage{
   display:grid;min-height:100vh;min-height:100dvh;
   grid-template-columns:minmax(0,1.06fr) minmax(420px,.94fr);
-  max-width:1240px;margin:0 auto;
-  border-left:1px solid var(--line-2);border-right:1px solid var(--line-2);
+  max-width:1240px;margin:0 auto;position:relative;z-index:1;
 }
 
 /* ---------------- 左：品牌侧 ---------------- */
@@ -40,21 +55,9 @@ a{color:inherit;text-decoration:none}
   display:flex;flex-direction:column;justify-content:space-between;gap:44px;
   padding:52px 56px;
   border-right:1px solid var(--line-2);
-  background:
-    radial-gradient(820px 560px at 6% 4%,rgba(90,123,255,.17),transparent 62%),
-    radial-gradient(680px 520px at 88% 98%,rgba(53,224,200,.11),transparent 58%),
-    var(--bg);
 }
-/* 极淡的网格，暗示「隧道/工程」而非装饰 */
-.brandside::before{
-  content:"";position:absolute;inset:0;pointer-events:none;
-  background-image:
-    linear-gradient(to right,rgba(255,255,255,.038) 1px,transparent 1px),
-    linear-gradient(to bottom,rgba(255,255,255,.038) 1px,transparent 1px);
-  background-size:64px 64px;
-  -webkit-mask-image:radial-gradient(118% 92% at 18% 12%,#000 0%,transparent 74%);
-          mask-image:radial-gradient(118% 92% at 18% 12%,#000 0%,transparent 74%);
-}
+/* 极淡的网格由页面级 ::after 提供 */
+.brandside::before{content:none}
 .deco{
   position:absolute;right:-150px;bottom:-200px;width:740px;height:740px;
   pointer-events:none;user-select:none;z-index:0;
