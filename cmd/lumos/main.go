@@ -11,9 +11,14 @@ import (
 
 	"github.com/j353719624/lumo/pkg/config"
 	"github.com/j353719624/lumo/pkg/server"
+	"github.com/j353719624/lumo/pkg/version"
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "version" {
+		fmt.Println(version.Version)
+		return
+	}
 	if len(os.Args) > 1 && os.Args[1] == "verify" {
 		fs := flag.NewFlagSet("lumos verify", flag.ExitOnError)
 		cfgPath := fs.String("c", "lumos.toml", "configuration file")

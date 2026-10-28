@@ -40,6 +40,7 @@ type ClientConfig struct {
 	ServerAddr string
 	ServerPort int
 	AuthToken  string
+	TLSEnable  bool
 	Web        WebServer
 	Proxies    []ProxyConfig
 }
@@ -50,6 +51,7 @@ var ValidProxyTypes = map[string]bool{
 	"udp":   true,
 	"http":  true,
 	"https": true,
+	"sealed-tcp":  true,
 }
 
 // LoadServer reads and validates a lumos config file.

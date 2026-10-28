@@ -5,19 +5,22 @@ package server
 import (
 	"context"
 	"crypto/hmac"
+	"crypto/tls"
 	"encoding/hex"
 	"fmt"
-	"github.com/j353719624/lumo/pkg/auth"
+	"io"
 	"net"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/j353719624/lumo/pkg/auth"
 	"github.com/j353719624/lumo/pkg/config"
 	"github.com/j353719624/lumo/pkg/log"
 	"github.com/j353719624/lumo/pkg/proto"
 	"github.com/j353719624/lumo/pkg/relay"
+	"github.com/j353719624/lumo/pkg/tlsgen"
 	"github.com/j353719624/lumo/pkg/version"
 )
 
@@ -43,6 +46,7 @@ type Server struct {
 
 	webSessions *auth.Sessions
 	limiter     *auth.Limiter
+	tlsCert     *tls.Certificate
 }
 
 type pendEntry struct {
@@ -84,7 +88,7 @@ type proxyEnt struct {
 
 // New creates a Server from validated configuration.
 func New(cfg *config.ServerConfig) *Server {
-	return &Server{
+	s := &Server{
 		cfg:         cfg,
 		start:       time.Now(),
 		sessions:    map[string]*session{},
@@ -96,6 +100,11 @@ func New(cfg *config.ServerConfig) *Server {
 		webSessions: auth.NewSessions(7 * 24 * time.Hour),
 		limiter:     auth.NewLimiter(10 * time.Minute),
 	}
+	// Generate self-signed TLS certificate for transport encryption.
+	if cert, err := tlsgen.SelfSigned(); err == nil {
+		s.tlsCert = &cert
+	}
+	return s
 }
 
 // Run blocks until ctx is cancelled or the listener fails.
@@ -154,6 +163,25 @@ func (s *Server) Close() {
 }
 
 func (s *Server) handleConn(c net.Conn) {
+	_ = c.SetDeadline(time.Now().Add(15 * time.Second))
+
+	// 自动检测 TLS：首字节 0x16 = TLS ClientHello
+	tlsBuf := make([]byte, 1)
+	if _, err := io.ReadFull(c, tlsBuf); err != nil {
+		_ = c.Close()
+		return
+	}
+	if tlsBuf[0] == 0x16 && s.tlsCert != nil {
+		tlsConn := tls.Server(c, &tls.Config{Certificates: []tls.Certificate{*s.tlsCert}})
+		if err := tlsConn.Handshake(); err != nil {
+			_ = c.Close()
+			return
+		}
+		c = tlsConn
+	} else {
+		c = &bufferedConn{Conn: c, pre: tlsBuf}
+	}
+
 	_ = c.SetDeadline(time.Now().Add(15 * time.Second))
 	first, err := proto.Recv(c)
 	if err != nil {

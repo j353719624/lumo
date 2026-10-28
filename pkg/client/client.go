@@ -4,6 +4,7 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/hex"
 	"fmt"
 	"net"
@@ -146,10 +147,25 @@ func (c *Client) markAllOffline() {
 
 // serve runs one connection lifetime and returns when it breaks.
 func (c *Client) serve(ctx context.Context) error {
-	conn, err := net.DialTimeout("tcp", c.addr(), 10*time.Second)
+	rawConn, err := net.DialTimeout("tcp", c.addr(), 10*time.Second)
 	if err != nil {
 		return fmt.Errorf("dial %s: %w", c.addr(), err)
 	}
+	defer rawConn.Close()
+
+	// TLS 传输加密
+	var conn net.Conn
+	if c.cfg.TLSEnable {
+		tlsConn := tls.Client(rawConn, &tls.Config{InsecureSkipVerify: true})
+		if err := tlsConn.Handshake(); err != nil {
+			return fmt.Errorf("tls handshake: %w", err)
+		}
+		conn = tlsConn
+		c.logi("TLS transport enabled")
+	} else {
+		conn = rawConn
+	}
+
 	defer conn.Close()
 	c.mu.Lock()
 	c.ctrl = conn

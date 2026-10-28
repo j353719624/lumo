@@ -46,6 +46,7 @@ func (c *ConnConfig) toClientConfig() (*config.ClientConfig, error) {
 		ServerAddr: c.ServerAddr,
 		ServerPort: c.ServerPort,
 		AuthToken:  c.Token,
+		TLSEnable:  c.TLS,
 	}
 	safe := func(s string) string {
 		return strings.Map(func(r rune) rune {

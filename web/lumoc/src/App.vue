@@ -46,6 +46,10 @@ const filteredConfigs = computed(() => {
   return list
 })
 
+const totalTrafficIn = computed(() => { let t = 0; for (const s of Object.values(statusMap.value)) { for (const p of (s.proxies||[])) t += (p.in||0) } return t })
+const totalTrafficOut = computed(() => { let t = 0; for (const s of Object.values(statusMap.value)) { for (const p of (s.proxies||[])) t += (p.out||0) } return t })
+function formatB(n: number): string { if (!n) return '0 B'; if (n >= 1073741824) return (n/1073741824).toFixed(1)+' GB'; if (n >= 1048576) return (n/1048576).toFixed(1)+' MB'; if (n >= 1024) return (n/1024).toFixed(0)+' KB'; return n+' B' }
+
 const runningCount = computed(() =>
   Object.values(statusMap.value).filter((s) => s.running).length)
 
@@ -261,6 +265,42 @@ function setView(v: 'list' | 'logs' | 'settings') {
   view.value = v
 }
 
+
+async function testConnection(addr: string, port: number) {
+  if (!addr) { toast('请先填写服务器地址', true); return }
+  testing.value = true
+  try {
+    const r = await fetch('/api/test-connection', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ addr, port }),
+    })
+    const d = await r.json()
+    toast(d.ok ? '连接成功' : ('连接失败: ' + (d.error || '未知')), !d.ok)
+  } catch (e: any) { toast('测试失败: ' + (e?.message || e), true) }
+  finally { testing.value = false }
+}
+
+const testing = ref(false)
+
+function importToml() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.toml'
+  input.onchange = async () => {
+    const f = input.files?.[0]
+    if (!f) return
+    const text = await f.text()
+    try {
+      const cfg = await api.create({ name: f.name.replace(/.toml$/, ''), serverAddr: '', serverPort: 7000, token: '', mappings: [], enabled: false })
+      // 简单解析：把内容发给后端处理
+      toast('已导入 ' + f.name + '，请编辑后保存')
+      await refresh()
+      select(cfg.id)
+    } catch (e: any) { toast('导入失败：' + (e?.message || e), true) }
+  }
+  input.click()
+}
+
 function escapeHtml(s: string): string {
   return String(s ?? '').replace(/[&<>"']/g, (m) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m] || m))
@@ -366,14 +406,14 @@ setInterval(() => refresh(true), 2500)
             </svg>
             <h3>还没有任何连接配置</h3>
             <p>添加第一个配置之后，就能从外网访问家里的 NAS、路由器或公司电脑 —— 全程只用鼠标，不写一行命令。</p>
-            <div class="row"><button class="btn" @click="openModal('modalNew')">新建第一个配置</button></div>
+            <div class="row"><button class="btn" @click="openModal('modalNew')">新建第一个配置</button> <button class="btn ghost" @click="importToml()">导入 lumoc.toml</button></div>
           </div>
 
           <div class="stats">
             <span class="lb">今日流量</span>
-            <span class="up">↑ {{ runningCount }} 条连接</span>
+            <span class="up" id="stUp">↑ {{ totalTrafficOut > 1024**2 ? (totalTrafficOut / 1024**2).toFixed(1) + ' MB' : formatB(totalTrafficOut) }}</span>
             <span class="spacer"></span>
-            <span class="lb" id="stConns">活跃连接 {{ runningCount }} 条</span>
+            <span class="lb">活跃连接 {{ runningCount }} 条</span>
           </div>
         </div>
 

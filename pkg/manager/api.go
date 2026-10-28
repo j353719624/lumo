@@ -8,6 +8,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/j353719624/lumo/pkg/proto"
 	"github.com/j353719624/lumo/pkg/version"
@@ -134,6 +135,30 @@ func (m *Manager) apiLogout(w http.ResponseWriter, r *http.Request) {
 
 // consoleFS exposes the embedded client console assets.
 var consoleFS = http.FS(lumocweb.EmbedFS)
+
+// apiTestConnection tests TCP connectivity from the NAS to a target.
+func (m *Manager) apiTestConnection(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Addr string `json:"addr"`
+		Port int    `json:"port"`
+	}
+	if err := jsonDecode(r.Body, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad body"})
+		return
+	}
+	if req.Addr == "" || req.Port == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "addr and port required"})
+		return
+	}
+	addr := net.JoinHostPort(req.Addr, strconv.Itoa(req.Port))
+	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	conn.Close()
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "addr": addr})
+}
 
 // normalize fills generated fields and applies defaults to a submitted config.
 func normalize(c *ConnConfig) {
