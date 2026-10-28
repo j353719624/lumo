@@ -3,12 +3,15 @@ package server
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"net"
 	"net/http"
+	"os"
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/j353719624/lumo/pkg/config"
 	"github.com/j353719624/lumo/pkg/log"
@@ -27,6 +30,7 @@ func (s *Server) runDash() {
 	mux.HandleFunc("GET /login", s.loginPage)
 	mux.HandleFunc("POST /api/login", s.apiLogin)
 	mux.HandleFunc("GET /logout", s.apiLogout)
+	mux.Handle("POST /api/test-conn", s.guard(http.HandlerFunc(s.apiTestConn)))
 	mux.HandleFunc("/api/serverinfo", s.apiServerInfo)
 	mux.HandleFunc("POST /api/config", s.apiSaveConfig)
 	mux.HandleFunc("/api/proxies", s.apiProxies)
@@ -140,6 +144,16 @@ func (s *Server) apiLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
+func formatDuration(d time.Duration) string {
+	days := int(d.Hours()) / 24
+	hours := int(d.Hours()) % 24
+	mins := int(d.Minutes()) % 60
+	if days > 0 {
+		return fmt.Sprintf("%d天%d小时%d分", days, hours, mins)
+	}
+	return fmt.Sprintf("%d小时%d分", hours, mins)
+}
+
 func failJSON(w http.ResponseWriter, code int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
@@ -154,6 +168,26 @@ func writeOK(w http.ResponseWriter) {
 func jsonDecodeBody(r *http.Request, v any) error {
 	defer r.Body.Close()
 	return json.NewDecoder(r.Body).Decode(v)
+}
+
+// apiTestConn tests TCP connectivity from the server to a target.
+func (s *Server) apiTestConn(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Addr string `json:"addr"`
+		Port int    `json:"port"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, map[string]string{"error": "bad body"})
+		return
+	}
+	addr := fmt.Sprintf("%s:%d", req.Addr, req.Port)
+	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
+	if err != nil {
+		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	conn.Close()
+	writeJSON(w, map[string]any{"ok": true, "addr": addr})
 }
 
 func (s *Server) apiServerInfo(w http.ResponseWriter, _ *http.Request) {
@@ -185,6 +219,9 @@ func (s *Server) apiServerInfo(w http.ResponseWriter, _ *http.Request) {
 		"curConns":         s.connsNow.Load(),
 		"clientCounts":     clients,
 		"proxyTypeCount":   typeCount,
+		"pid":              os.Getpid(),
+		"startedAt":        s.start.Format("01-02 15:04:05"),
+		"uptimeStr":        formatDuration(time.Since(s.start)),
 	})
 }
 
