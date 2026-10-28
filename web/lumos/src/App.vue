@@ -465,11 +465,6 @@ function closeMenu(e: MouseEvent) {
           <button type="button" :class="{ cur: locale === 'en' }" @click="pickLang('en')"><span>🇺🇸</span> English</button>
         </div>
       </div>
-      <span class="pill" id="engine" :class="{ bad: !connected }">
-        <span class="dot" :class="{ on: connected }"></span>
-        <span>{{ connected ? t('engineRunning') : t('engineDown') }}</span>
-      </span>
-      <span class="ver">{{ info?.version || '—' }}</span>
       <button class="acctbtn" type="button" :title="t('accountSecurity')" @click="open2FA">
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
           <path d="M8 2.2L13 4.1V8.2C13 11.1 10.9 13.1 8 14.1C5.1 13.1 3 11.1 3 8.2V4.1L8 2.2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>

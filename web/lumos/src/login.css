@@ -30,6 +30,8 @@ a{color:inherit;text-decoration:none}
 .stage{
   display:grid;min-height:100vh;min-height:100dvh;
   grid-template-columns:minmax(0,1.06fr) minmax(420px,.94fr);
+  max-width:1240px;margin:0 auto;
+  border-left:1px solid var(--line-2);border-right:1px solid var(--line-2);
 }
 
 /* ---------------- 左：品牌侧 ---------------- */
