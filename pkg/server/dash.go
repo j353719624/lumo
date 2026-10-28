@@ -49,6 +49,11 @@ func (s *Server) runDash() {
 func (s *Server) guard(next http.Handler) http.Handler {
 	user, pass := s.cfg.Web.User, s.cfg.Web.Password
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 登录页自身与其静态资源无需认证，否则登录页的 JS/CSS 会被重定向导致白屏
+		if isPublicAsset(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
 		if s.authed(r, user, pass) {
 			next.ServeHTTP(w, r)
 			return
@@ -60,6 +65,11 @@ func (s *Server) guard(next http.Handler) http.Handler {
 		}
 		http.Redirect(w, r, "/login", http.StatusFound)
 	})
+}
+
+// isPublicAsset reports whether the path must be reachable without login.
+func isPublicAsset(p string) bool {
+	return p == "/login" || p == "/login.html" || strings.HasPrefix(p, "/assets/")
 }
 
 // authed checks the session cookie, then basic auth credentials.
