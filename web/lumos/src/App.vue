@@ -181,7 +181,7 @@ function normTime(t: string): string {
 const menu = ref<{ x: number; y: number; proxy: ProxyItem | null }>({ x: 0, y: 0, proxy: null })
 
 /* ---------------- 服务配置（可编辑） ---------------- */
-const srvCfg = ref({ bindPort: 7000, vhostHttpPort: 0, vhostHttpsPort: 0, authToken: '', subdomainHost: '', allowPortsStr: '', webPort: 7500, webPassword: '' })
+const srvCfg = ref({ bindPort: null as number | null, vhostHttpPort: 0, vhostHttpsPort: 0, authToken: '', subdomainHost: '', allowPortsStr: '', webPort: 0, webPassword: '' })
 const showToken = ref(false)
 const savedCfg = ref(null)
 const cfgLoaded = ref(false)
@@ -614,7 +614,7 @@ function closeMenu(e: MouseEvent) {
         <span class="spacer"></span>
         <button class="btn ghost sm" @click="copy(tomlSnippet(), 'lumos.toml ' + t('copied'))">{{ t('config.copy') }}</button>
       </div>
-      <div class="cbody">
+      <div class="cbody" v-if="cfgLoaded">
         <div class="field-row">
           <div class="field"><label>{{ t('config.bindPort') }}</label><input v-model.number="srvCfg.bindPort" type="number"></div>
           <div class="field"><label>{{ t('config.kcpPort') }}</label><input :value="t('config.kcpOff')" readonly disabled></div>
@@ -644,7 +644,8 @@ function closeMenu(e: MouseEvent) {
         </div>
         <div class="note">{{ locale === 'zh' ? '注意：端口类参数保存后需重启 lumos 才会生效' : 'Note: port changes take effect after a lumos restart' }}</div>
       </div>
-      <div class="cfoot">
+      <div class="cbody" v-else><div class="note">读取配置…</div></div>
+      <div class="cfoot" v-if="cfgLoaded">
         <button class="btn ghost sm" @click="resetCfg">{{ t('config.reset') }}</button>
         <span class="spacer"></span>
         <button class="btn sm" :disabled="savingCfg" @click="saveServerConfig">{{ savingCfg ? t('config.saving') : t('config.save') }}</button>
