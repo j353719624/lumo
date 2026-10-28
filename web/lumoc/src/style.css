@@ -266,3 +266,10 @@ input,select,textarea{font:inherit;color:inherit}
 .sechint{font-size:10px;color:#3E4859;letter-spacing:0}
 .secadd{height:22px;padding:0 7px;border-radius:6px;font-size:11px;color:var(--accent)}
 .secadd:hover{background:#1B2540}
+
+/* 令牌输入：默认掩码，眼睛切换 */
+.token-wrap{position:relative}
+.token-wrap input{width:100%;padding-right:38px}
+.token-wrap .eye-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  display:grid;place-items:center;padding:4px;background:none;border:0;color:var(--tx-3);cursor:pointer}
+.token-wrap .eye-btn:hover{color:var(--tx)}
