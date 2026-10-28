@@ -365,10 +365,10 @@ function closeMenu(e: MouseEvent) {
   </header>
 
   <main class="layout">
-    <!-- ① 顶部状态区 -->
+    <!-- 顶部状态区 -->
     <section class="band">
       <article class="card status-card">
-        <div class="clabel"><span>① 运行状态</span><span class="health">{{ connected ? `healthz ${healthOk === false ? '—' : '200'}` : 'healthz —' }}</span></div>
+        <div class="clabel"><span>运行状态</span><span class="health">{{ connected ? `healthz ${healthOk === false ? '—' : '200'}` : 'healthz —' }}</span></div>
         <div class="smain"><span class="sdot" :class="{ bad: !connected }"></span><b>{{ connected ? '服务运行正常' : '与 lumos 断开连接' }}</b></div>
         <div class="uptime">已稳定运行 {{ uptimeDays }}</div>
         <div class="pid">上次重启 {{ info?.startedAt || '—' }} · PID {{ info?.pid || '—' }}</div>
@@ -411,10 +411,10 @@ function closeMenu(e: MouseEvent) {
       </article>
     </section>
 
-    <!-- ③ 代理与客户端 -->
+    <!-- 代理与客户端 -->
     <section class="card panel" id="proxies">
       <div class="phead">
-        <h2>③ 代理与客户端</h2>
+        <h2>代理与客户端</h2>
         <span class="chip">{{ onlineCount }} 在线</span>
         <span class="spacer"></span>
         <label class="search">
@@ -467,10 +467,10 @@ function closeMenu(e: MouseEvent) {
       </div>
     </section>
 
-    <!-- ② 服务配置 -->
+    <!-- 服务配置 -->
     <aside class="card panel" id="config">
       <div class="phead">
-        <h2>② 服务配置</h2>
+        <h2>服务配置</h2>
         <span class="chip">lumos.toml</span>
         <span class="spacer"></span>
         <button class="btn ghost sm" @click="copy(tomlSnippet(), 'lumos.toml 片段已复制')">复制</button>
@@ -511,10 +511,10 @@ function closeMenu(e: MouseEvent) {
       </div>
     </aside>
 
-    <!-- ④ 日志 -->
+    <!-- 日志 -->
     <section class="card panel" id="logs">
       <div class="phead">
-        <h2>④ 运行事件</h2>
+        <h2>运行事件</h2>
         <span class="chip" :style="{ color: logLive ? '#3DDC97' : '#6C788E' }">{{ logLive ? 'LIVE' : 'PAUSED' }}</span>
         <span class="spacer"></span>
         <div class="tabs" style="height:auto;border:0;padding:0;gap:6px">
