@@ -481,8 +481,6 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 		VhostHTTPPort  int    `json:"vhostHttpPort"`
 		VhostHTTPSPort int    `json:"vhostHttpsPort"`
 		AuthToken      string `json:"authToken"`
-		WebPort        int    `json:"webPort"`
-		WebPassword    string `json:"webPassword"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -491,6 +489,18 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.BindPort < 1 || req.BindPort > 65535 {
+		failJSON(w, http.StatusBadRequest, "bindPort 必须在 1-65535 之间")
+		return
+	}
+	for name, port := range map[string]int{
+		"vhostHttpPort": req.VhostHTTPPort, "vhostHttpsPort": req.VhostHTTPSPort,
+	} {
+		if port != 0 && (port < 1 || port > 65535) {
+			failJSON(w, http.StatusBadRequest, name+" 必须在 1-65535 之间（0 表示不修改）")
+			return
+		}
+	}
 	oldBind := s.cfg.BindPort
 	s.cfg.BindPort = req.BindPort
 	s.cfg.VhostHTTPPort = req.VhostHTTPPort
@@ -498,13 +508,6 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 	// 令牌由客户端生成：面板不回显、提交空值表示维持原令牌不变
 	if req.AuthToken != "" {
 		s.cfg.AuthToken = req.AuthToken
-	}
-	// 面板端口/密码：空值表示维持原值，避免误清空导致面板失联
-	if req.WebPort > 0 {
-		s.cfg.Web.Port = req.WebPort
-	}
-	if req.WebPassword != "" {
-		s.cfg.Web.Password = req.WebPassword
 	}
 
 	// 写回 toml

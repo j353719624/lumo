@@ -205,7 +205,7 @@ async function saveServerConfig() {
     const res = await fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(srvCfg.value),
+      body: JSON.stringify({ ...srvCfg.value, webPort: undefined, webPassword: undefined }),
     })
     const d = await res.json()
     if (res.ok) {
