@@ -17,6 +17,7 @@ const events = ref<LogEntry[]>([])
 const samplesUp = ref<number[]>([])
 const samplesDown = ref<number[]>([])
 const connected = ref(false)
+const booted = ref(false)
 const healthOk = ref<boolean | null>(null)
 const prevTotals = ref<{ in: number; out: number } | null>(null)
 
@@ -133,6 +134,7 @@ async function poll() {
     if (err?.status === 401) { location.href = '/login'; return }
     connected.value = false
     healthOk.value = null
+    booted.value = true
     pushEvent('ERROR', `拉取失败：${err?.message || err}（${apiCfg.base || location.origin}）`)
     return
   }
@@ -158,6 +160,7 @@ async function poll() {
   // 服务端运行事件（环形缓冲）
   const remote = await fetchLogs('ALL', 80)
   events.value = mergeEvents(remote, events.value)
+  booted.value = true
 }
 
 function mergeEvents(remote: LogEntry[], local: LogEntry[]): LogEntry[] {
@@ -501,7 +504,12 @@ function closeMenu(e: MouseEvent) {
     </div>
   </header>
 
-  <main class="layout">
+  <div class="boot" v-if="!booted">
+    <span class="spinner"></span>
+    <span>正在读取服务端状态…</span>
+  </div>
+
+  <main class="layout" v-if="booted">
     <!-- 顶部状态区 -->
     <section class="band" id="band">
       <article class="card status-card">
