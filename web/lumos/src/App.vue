@@ -184,10 +184,12 @@ const menu = ref<{ x: number; y: number; proxy: ProxyItem | null }>({ x: 0, y: 0
 const srvCfg = ref({ bindPort: 7000, vhostHttpPort: 0, vhostHttpsPort: 0, authToken: '', subdomainHost: '', allowPortsStr: '', webPort: 7500, webPassword: '' })
 const showToken = ref(false)
 const savedCfg = ref(null)
+const cfgLoaded = ref(false)
 const savingCfg = ref(false)
 
 watch(info, (v) => {
-  if (!v || srvCfg.value.authToken) return
+  if (!v || cfgLoaded.value) return
+  cfgLoaded.value = true
   srvCfg.value.bindPort = v.bindPort
   srvCfg.value.vhostHttpPort = v.vhostHttpPort
   srvCfg.value.vhostHttpsPort = v.vhostHttpsPort
