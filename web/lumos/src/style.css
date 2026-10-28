@@ -186,10 +186,10 @@ a{color:inherit;text-decoration:none}
 .switch[aria-checked="true"]::after{transform:translateX(12px);background:#fff}
 
 .table{flex:1 1 auto;min-height:0;overflow:auto}
-.phead-row,.prow{display:grid;gap:10px;align-items:center;padding:0 16px;
-  grid-template-columns:minmax(0,1fr) 54px 112px 190px 100px 76px 34px}
+.phead-row,.prow{display:grid;gap:16px;align-items:center;padding:0 18px;
+  grid-template-columns:minmax(0,2.2fr) 84px minmax(0,1.35fr) minmax(0,1.45fr) minmax(0,1.05fr) 92px 34px}
 .phead-row{height:30px;background:#10161F;position:sticky;top:0;z-index:2;
-  font-size:9.5px;letter-spacing:.8px;color:var(--tx-5);font-weight:500}
+  font-size:10px;letter-spacing:.9px;color:var(--tx-5);font-weight:500}
 .prow{height:44px;border-bottom:1px solid var(--line-2);font-size:12px}
 .prow:hover{background:#151B26}
 .c-name{font:500 12px/1 var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -271,7 +271,7 @@ a{color:inherit;text-decoration:none}
 }
 @media (max-width:1180px){
   .layout{grid-template-columns:minmax(0,1fr) 340px}
-  .phead-row,.prow{grid-template-columns:minmax(0,1fr) 50px 176px 92px 72px 30px}
+  .phead-row,.prow{grid-template-columns:minmax(0,1.5fr) 60px minmax(0,1.2fr) minmax(0,1fr) 76px 30px}
   .c-client{display:none}
   .layout{grid-template-columns:1fr;
     grid-template-areas:"band" "rate" "proxies" "config" "logs";
