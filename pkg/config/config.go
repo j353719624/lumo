@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/j353719624/lumo/pkg/toml"
 )
@@ -18,6 +19,7 @@ type WebServer struct {
 
 // ServerConfig is the lumos (server) configuration.
 type ServerConfig struct {
+	ConfigPath     string
 	BindPort       int
 	VhostHTTPPort  int
 	VhostHTTPSPort int
@@ -227,4 +229,24 @@ func getStrs(m map[string]any, key string) []string {
 		}
 	}
 	return out
+}
+
+// SaveServer writes a ServerConfig back to a toml file.
+func SaveServer(path string, c *ServerConfig) error {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("bindPort = %d\n", c.BindPort))
+	if c.VhostHTTPPort > 0 {
+		b.WriteString(fmt.Sprintf("vhostHTTPPort = %d\n", c.VhostHTTPPort))
+	}
+	if c.VhostHTTPSPort > 0 {
+		b.WriteString(fmt.Sprintf("vhostHTTPSPort = %d\n", c.VhostHTTPSPort))
+	}
+	b.WriteString("\n[auth]\n")
+	b.WriteString(fmt.Sprintf("token = %q\n", c.AuthToken))
+	b.WriteString("\n[webServer]\n")
+	b.WriteString(fmt.Sprintf("addr = %q\n", c.Web.Addr))
+	b.WriteString(fmt.Sprintf("port = %d\n", c.Web.Port))
+	b.WriteString(fmt.Sprintf("user = %q\n", c.Web.User))
+	b.WriteString(fmt.Sprintf("password = %q\n", c.Web.Password))
+	return os.WriteFile(path, []byte(b.String()), 0600)
 }

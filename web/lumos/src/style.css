@@ -52,7 +52,7 @@ a{color:inherit;text-decoration:none}
   grid-template-areas:"band band" "proxies config" "logs logs"}
 #band{grid-area:band}
 #proxies{grid-area:proxies}
-#config{grid-area:config}
+#config{grid-area:config;align-self:start;display:flex;flex-direction:column}
 #logs{grid-area:logs}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-card);min-height:0}
 

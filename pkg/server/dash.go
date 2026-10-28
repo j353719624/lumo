@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/j353719624/lumo/pkg/config"
 	"github.com/j353719624/lumo/pkg/log"
 	"github.com/j353719624/lumo/pkg/version"
 	lumosweb "github.com/j353719624/lumo/web/lumos"
@@ -27,6 +28,7 @@ func (s *Server) runDash() {
 	mux.HandleFunc("POST /api/login", s.apiLogin)
 	mux.HandleFunc("GET /logout", s.apiLogout)
 	mux.HandleFunc("/api/serverinfo", s.apiServerInfo)
+	mux.HandleFunc("POST /api/config", s.apiSaveConfig)
 	mux.HandleFunc("/api/proxies", s.apiProxies)
 	mux.HandleFunc("/api/logs", s.apiLogs)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -245,4 +247,38 @@ func serveConsole(fsys http.FileSystem) http.Handler {
 		}
 		fsrv.ServeHTTP(w, r)
 	})
+}
+
+// apiSaveConfig saves the updated server config and reports what needs restart.
+func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		BindPort       int    `json:"bindPort"`
+		VhostHTTPPort  int    `json:"vhostHttpPort"`
+		VhostHTTPSPort int    `json:"vhostHttpsPort"`
+		AuthToken      string `json:"authToken"`
+		WebPort        int    `json:"webPort"`
+		WebPassword    string `json:"webPassword"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "bad body"})
+		return
+	}
+
+	oldBind := s.cfg.BindPort
+	s.cfg.BindPort = req.BindPort
+	s.cfg.VhostHTTPPort = req.VhostHTTPPort
+	s.cfg.VhostHTTPSPort = req.VhostHTTPSPort
+	s.cfg.AuthToken = req.AuthToken
+	s.cfg.Web.Port = req.WebPort
+	s.cfg.Web.Password = req.WebPassword
+
+	// 写回 toml
+	if s.cfgPath != "" {
+		_ = config.SaveServer(s.cfgPath, s.cfg)
+	}
+
+	needsRestart := oldBind != req.BindPort
+	writeJSON(w, map[string]any{"ok": true, "restart": needsRestart})
 }

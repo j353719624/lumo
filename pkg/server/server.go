@@ -47,6 +47,7 @@ type Server struct {
 	webSessions *auth.Sessions
 	limiter     *auth.Limiter
 	tlsCert     *tls.Certificate
+	cfgPath     string
 }
 
 type pendEntry struct {
@@ -99,6 +100,7 @@ func New(cfg *config.ServerConfig) *Server {
 		pending:     map[string]pendEntry{},
 		webSessions: auth.NewSessions(7 * 24 * time.Hour),
 		limiter:     auth.NewLimiter(10 * time.Minute),
+		cfgPath:     cfg.ConfigPath,
 	}
 	// Generate self-signed TLS certificate for transport encryption.
 	if cert, err := tlsgen.SelfSigned(); err == nil {

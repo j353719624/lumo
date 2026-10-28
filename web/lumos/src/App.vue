@@ -178,6 +178,43 @@ function normTime(t: string): string {
 
 /* ---------------- 交互 ---------------- */
 const menu = ref<{ x: number; y: number; proxy: ProxyItem | null }>({ x: 0, y: 0, proxy: null })
+
+/* ---------------- 服务配置（可编辑） ---------------- */
+const srvCfg = ref({ bindPort: 7000, vhostHttpPort: 0, vhostHttpsPort: 0, authToken: '', webPort: 7500, webPassword: '' })
+const savingCfg = ref(false)
+
+watch(info, (v) => {
+  if (!v || srvCfg.value.authToken) return
+  srvCfg.value.bindPort = v.bindPort
+  srvCfg.value.vhostHttpPort = v.vhostHttpPort
+  srvCfg.value.vhostHttpsPort = v.vhostHttpsPort
+})
+
+async function saveServerConfig() {
+  savingCfg.value = true
+  try {
+    const res = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(srvCfg.value),
+    })
+    const d = await res.json()
+    if (res.ok) {
+      showToast(d.restart ? '已保存并重启服务' : '已保存（token/面板密码热生效）')
+      if (d.restart) setTimeout(() => location.reload(), 1500)
+    } else {
+      showToast(d.error || '保存失败', true)
+    }
+  } catch (e: any) {
+    showToast('保存失败：' + (e?.message || e), true)
+  } finally {
+    savingCfg.value = false
+  }
+}
+
+function logout() {
+  fetch('/logout').then(() => { location.href = '/login' })
+}
 const toast = ref<{ msg: string; bad: boolean } | null>(null)
 let toastTimer: number | undefined
 
@@ -300,7 +337,7 @@ function closeMenu(e: MouseEvent) {
         <span>{{ connected ? '服务运行中' : '连接失败' }}</span>
       </span>
       <span class="ver">{{ info?.version || '—' }}</span>
-      <span class="avatar">A</span>
+      <span class="avatar" style="cursor:pointer" title="退出登录" @click="logout">A</span>
     </div>
   </header>
 
@@ -417,35 +454,23 @@ function closeMenu(e: MouseEvent) {
       </div>
       <div class="cbody">
         <div class="field-row">
-          <div class="field"><label>监听端口 bindPort</label><input :value="info?.bindPort || '—'" readonly></div>
-          <div class="field"><label>KCP 端口</label><input :value="info?.kcpPort || '未启用'" readonly></div>
+          <div class="field"><label>监听端口 bindPort</label><input v-model.number="srvCfg.bindPort" type="number"></div>
+          <div class="field"><label>HTTP 虚拟主机</label><input v-model.number="srvCfg.vhostHttpPort" type="number" placeholder="0 = 禁用"></div>
         </div>
         <div class="field-row">
-          <div class="field"><label>HTTP 虚拟主机</label><input :value="info?.vhostHttpPort || '未启用'" readonly></div>
-          <div class="field"><label>HTTPS 虚拟主机</label><input :value="info?.vhostHttpsPort || '未启用'" readonly></div>
+          <div class="field"><label>HTTPS 虚拟主机</label><input v-model.number="srvCfg.vhostHttpsPort" type="number" placeholder="0 = 禁用"></div>
+          <div class="field"><label>认证令牌 auth.token</label><input v-model="srvCfg.authToken" type="password" autocomplete="off"></div>
         </div>
         <div class="field-row">
-          <div class="field"><label>QUIC 端口</label><input :value="info?.quicPort || '未启用'" readonly></div>
-          <div class="field"><label>最大连接池</label><input :value="info?.maxPoolCount || '—'" readonly></div>
+          <div class="field"><label>面板端口 webServer.port</label><input v-model.number="srvCfg.webPort" type="number"></div>
+          <div class="field"><label>面板密码</label><input v-model="srvCfg.webPassword" type="password" autocomplete="off"></div>
         </div>
-        <div class="field"><label>子域名根 subDomainHost</label><input :value="info?.subdomainHost || '未设置'" readonly></div>
-        <div class="field"><label>允许端口范围 allowPorts</label><input :value="info?.allowPortsStr || '不限制'" readonly></div>
-        <div class="sw-list">
-          <label class="switch-row">
-            <span class="switch" role="switch" :aria-checked="!!info?.tlsForce ? 'true' : 'false'" tabindex="-1"></span>
-            TLS 强制
-          </label>
-          <span class="switch-row" style="cursor:default">
-            <span class="switch" role="switch" aria-checked="true" tabindex="-1"></span>
-            TCP 多路复用
-          </span>
-        </div>
-        <div class="note">注意：lumos 无热加载接口，端口类参数修改后需重启进程才会生效。</div>
+        <div class="note" style="color:var(--tx-4)">bindPort / vhost 端口修改后需重启进程；token / 面板密码保存后热生效。</div>
       </div>
       <div class="cfoot">
         <button class="btn ghost sm" @click="poll(); showToast('已重新读取配置')">重新读取</button>
         <span class="spacer"></span>
-        <button class="btn sm" @click="copy(tomlSnippet(), 'lumos.toml 片段已复制')">复制 lumos.toml</button>
+        <button class="btn sm" :disabled="savingCfg" @click="saveServerConfig">{{ savingCfg ? '保存中…' : '保存并应用' }}</button>
       </div>
     </aside>
 
