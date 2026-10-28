@@ -223,6 +223,20 @@ func (s *Server) Close() {
 	}
 }
 
+// DropAllSessions closes every client session, forcing clients to reconnect
+// with the current configuration (used after server-side setting changes).
+func (s *Server) DropAllSessions(reason string) {
+	s.mu.Lock()
+	sessions := make([]*session, 0, len(s.sessions))
+	for _, ses := range s.sessions {
+		sessions = append(sessions, ses)
+	}
+	s.mu.Unlock()
+	for _, ses := range sessions {
+		ses.drop(reason)
+	}
+}
+
 func (s *Server) handleConn(c net.Conn) {
 	_ = c.SetDeadline(time.Now().Add(15 * time.Second))
 

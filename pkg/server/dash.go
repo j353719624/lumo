@@ -506,6 +506,7 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 	oldVhostHTTP := s.cfg.VhostHTTPPort
 	oldVhostHTTPS := s.cfg.VhostHTTPSPort
 	oldBind := s.cfg.BindPort
+	oldToken := s.cfg.AuthToken
 	if req.BindPort != oldBind {
 		if err := s.Rebind(req.BindPort); err != nil {
 			failJSON(w, http.StatusBadRequest, "切换监听端口失败："+err.Error())
@@ -529,6 +530,11 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 	needsRestart := false // 隧道端口已热切换；vhost 端口改动需要重启
 	if req.VhostHTTPPort != oldVhostHTTP || req.VhostHTTPSPort != oldVhostHTTPS {
 		needsRestart = true
+	}
+	// 任何影响连接的服务端变更：立刻断开全部客户端，强制用新配置重连
+	tokenChanged := req.AuthToken != "" && req.AuthToken != oldToken
+	if req.BindPort != oldBind || needsRestart || tokenChanged {
+		go s.DropAllSessions("服务端配置已更新，请重新连接")
 	}
 	writeJSON(w, map[string]any{"ok": true, "restart": needsRestart})
 }
