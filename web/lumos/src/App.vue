@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { clock, formatBytes, formatRate } from 'lumo-shared'
+import { clock, formatBytes, formatRate, locale, setLocale, t } from 'lumo-shared'
 import {
   apiCfg, health, host, logs as fetchLogs, proxies as fetchProxies, serverInfo,
   type LogEntry, type ProxyItem, type ServerInfo,
@@ -59,7 +59,7 @@ const page = computed(() => Math.min(filter.value.page, pageCount.value))
 const pageSlice = computed(() =>
   filteredProxies.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE))
 const pageInfo = computed(() =>
-  `共 ${filteredProxies.value.length} 条 · 第 ${page.value} / ${pageCount.value} 页`)
+  t('pager.info', String(filteredProxies.value.length), String(page.value), String(pageCount.value)))
 const pagerPages = computed(() => Array.from({ length: Math.min(pageCount.value, 5) }, (_, i) => i + 1))
 
 const visibleLogs = computed(() =>
@@ -228,6 +228,113 @@ function resetCfg() {
 function logout() {
   fetch('/logout').then(() => { location.href = '/login' })
 }
+
+/* ---------------- 语言切换 ---------------- */
+const langOpen = ref(false)
+function pickLang(l: 'zh' | 'en') {
+  setLocale(l)
+  langOpen.value = false
+}
+
+/* ---------------- 两步验证（2FA） ---------------- */
+const tfaOpen = ref(false)
+const tfaEnabled = ref(false)
+const tfaBusy = ref(false)
+const tfaSecret = ref('')
+const tfaUri = ref('')
+const tfaQr = ref('')
+const tfaCode = ref('')
+const tfaMsg = ref<{ ok: boolean; text: string } | null>(null)
+
+async function open2FA() {
+  langOpen.value = false
+  tfaOpen.value = true
+  tfaMsg.value = null
+  tfaCode.value = ''
+  tfaSecret.value = ''
+  tfaUri.value = ''
+  tfaQr.value = ''
+  try {
+    const res = await fetch('/api/profile/2fa')
+    const d = await res.json()
+    tfaEnabled.value = !!d.enabled
+    if (res.ok && !d.enabled) await loadSetup()
+  } catch {
+    tfaMsg.value = { ok: false, text: 'Network error' }
+  }
+}
+
+async function loadSetup() {
+  try {
+    const res = await fetch('/api/profile/2fa/setup', { method: 'POST' })
+    const d = await res.json()
+    if (res.ok) {
+      tfaSecret.value = d.secret
+      tfaUri.value = d.uri
+      tfaQr.value = d.qr
+    } else {
+      tfaMsg.value = { ok: false, text: d.error || 'setup failed' }
+    }
+  } catch {
+    tfaMsg.value = { ok: false, text: 'Network error' }
+  }
+}
+
+async function bind2FA() {
+  if (tfaBusy.value) return
+  if (!/^\d{6}$/.test(tfaCode.value.trim())) {
+    tfaMsg.value = { ok: false, text: t('tfa.codePh') }
+    return
+  }
+  tfaBusy.value = true
+  try {
+    const res = await fetch('/api/profile/2fa/enable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: tfaSecret.value, code: tfaCode.value.trim() }),
+    })
+    const d = await res.json()
+    if (res.ok) {
+      tfaEnabled.value = true
+      tfaMsg.value = { ok: true, text: t('tfa.bound') }
+    } else {
+      tfaMsg.value = { ok: false, text: d.error || 'failed' }
+    }
+  } catch {
+    tfaMsg.value = { ok: false, text: 'Network error' }
+  } finally {
+    tfaBusy.value = false
+  }
+}
+
+async function unbind2FA() {
+  if (tfaBusy.value) return
+  if (!/^\d{6}$/.test(tfaCode.value.trim())) {
+    tfaMsg.value = { ok: false, text: t('tfa.codePh') }
+    return
+  }
+  tfaBusy.value = true
+  try {
+    const res = await fetch('/api/profile/2fa/disable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: tfaCode.value.trim() }),
+    })
+    const d = await res.json()
+    if (res.ok) {
+      tfaEnabled.value = false
+      tfaCode.value = ''
+      tfaMsg.value = { ok: true, text: t('tfa.unbound') }
+      await loadSetup()
+    } else {
+      tfaMsg.value = { ok: false, text: d.error || 'failed' }
+    }
+  } catch {
+    tfaMsg.value = { ok: false, text: 'Network error' }
+  } finally {
+    tfaBusy.value = false
+  }
+}
 const toast = ref<{ msg: string; bad: boolean } | null>(null)
 let toastTimer: number | undefined
 
@@ -240,9 +347,9 @@ function showToast(msg: string, bad = false) {
 async function copy(text: string, msg?: string) {
   try {
     await navigator.clipboard.writeText(text)
-    showToast(msg || '已复制')
+    showToast(msg || t('copied'))
   } catch {
-    showToast('复制失败，请手动选择文本', true)
+    showToast(t('copyFailed'), true)
   }
 }
 
@@ -289,7 +396,7 @@ function setLogLevel(l: string) {
 
 function viewRaw(p: ProxyItem) {
   console.log('[' + p.name + ']', JSON.stringify(p, null, 2))
-  copy(JSON.stringify(p, null, 2), '原始 JSON 已复制，也打印在控制台')
+  copy(JSON.stringify(p, null, 2), 'Raw JSON copied')
   menu.value.proxy = null
 }
 function toggleOnlineOnly() {
@@ -324,8 +431,9 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', closeMenu as EventListener)
 })
 function closeMenu(e: MouseEvent) {
-  const t = e.target as HTMLElement
-  if (!t.closest('#menu') && !t.closest('.more')) menu.value.proxy = null
+  const target = e.target as HTMLElement
+  if (!target.closest('#menu') && !target.closest('.more')) menu.value.proxy = null
+  if (!target.closest('.langsel')) langOpen.value = false
 }
 </script>
 
@@ -340,15 +448,42 @@ function closeMenu(e: MouseEvent) {
       </svg>
       <span class="wordmark">LUMO</span>
       <span class="badge">SERVER</span>
-      <span class="pagename">服务端控制台</span>
+      <span class="pagename">{{ t('console.name') }}</span>
     </div>
     <div class="top-right">
+      <span class="welcome">{{ t('welcome') }} <b>LUMO</b></span>
+      <div class="langsel" :class="{ open: langOpen }">
+        <button class="langbtn" type="button" @click.stop="langOpen = !langOpen">
+          <span class="flag">{{ locale === 'zh' ? '🇨🇳' : '🇺🇸' }}</span>
+          <span>{{ locale === 'zh' ? '简体中文' : 'English' }}</span>
+          <svg class="caret" width="9" height="9" viewBox="0 0 10 10" fill="none">
+            <path d="M2 3.8L5 6.8L8 3.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div class="langmenu" v-if="langOpen">
+          <button type="button" :class="{ cur: locale === 'zh' }" @click="pickLang('zh')"><span>🇨🇳</span> 简体中文</button>
+          <button type="button" :class="{ cur: locale === 'en' }" @click="pickLang('en')"><span>🇺🇸</span> English</button>
+        </div>
+      </div>
       <span class="pill" id="engine" :class="{ bad: !connected }">
         <span class="dot" :class="{ on: connected }"></span>
-        <span>{{ connected ? '服务运行中' : '连接失败' }}</span>
+        <span>{{ connected ? t('engineRunning') : t('engineDown') }}</span>
       </span>
       <span class="ver">{{ info?.version || '—' }}</span>
-      <span class="avatar" style="cursor:pointer" title="退出登录" @click="logout">A</span>
+      <button class="acctbtn" type="button" :title="t('accountSecurity')" @click="open2FA">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+          <path d="M8 2.2L13 4.1V8.2C13 11.1 10.9 13.1 8 14.1C5.1 13.1 3 11.1 3 8.2V4.1L8 2.2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+          <path d="M6.1 8L7.5 9.4L10 6.7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>{{ t('accountSecurity') }}</span>
+      </button>
+      <button class="exitbtn" type="button" @click="logout">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+          <path d="M10 2.5H4.5A1.5 1.5 0 0 0 3 4V12A1.5 1.5 0 0 0 4.5 13.5H10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M7 8H13.5M13.5 8L11 5.8M13.5 8L11 10.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>{{ t('logout') }}</span>
+      </button>
     </div>
   </header>
 
@@ -356,37 +491,37 @@ function closeMenu(e: MouseEvent) {
     <!-- 顶部状态区 -->
     <section class="band" id="band">
       <article class="card status-card">
-        <div class="clabel"><span>运行状态</span><span class="health">{{ connected ? `healthz ${healthOk === false ? '—' : '200'}` : 'healthz —' }}</span></div>
-        <div class="smain"><span class="sdot" :class="{ bad: !connected }"></span><b>{{ connected ? '服务运行正常' : '与 lumos 断开连接' }}</b></div>
-        <div class="uptime">已稳定运行 {{ uptimeDays }}</div>
-        <div class="pid">上次重启 {{ info?.startedAt || '—' }} · PID {{ info?.pid || '—' }}</div>
+        <div class="clabel"><span>{{ t('status.title') }}</span><span class="health">{{ connected ? `healthz ${healthOk === false ? '—' : '200'}` : 'healthz —' }}</span></div>
+        <div class="smain"><span class="sdot" :class="{ bad: !connected }"></span><b>{{ connected ? t('status.ok') : t('status.down') }}</b></div>
+        <div class="uptime">{{ t('status.uptime') }} {{ uptimeDays }}</div>
+        <div class="pid">{{ t('status.lastRestart') }} {{ info?.startedAt || '—' }} · PID {{ info?.pid || '—' }}</div>
       </article>
 
       <article class="card kpi-card">
         <div class="kpi">
-          <div class="k-label">在线客户端</div>
-          <div class="k-val"><b>{{ info?.clientCounts ?? '—' }}</b><span class="k-unit">台</span></div>
-          <div class="k-sub" style="color:var(--ok)">+{{ clientNames.length }} 今日</div>
+          <div class="k-label">{{ t('kpi.clients') }}</div>
+          <div class="k-val"><b>{{ info?.clientCounts ?? '—' }}</b><span class="k-unit">{{ t('unit.clients') }}</span></div>
+          <div class="k-sub" style="color:var(--ok)">{{ t('today.n', clientNames.length) }}</div>
         </div>
         <div class="kpi">
-          <div class="k-label">在线代理</div>
-          <div class="k-val"><b>{{ onlineCount || proxyList.length }}</b><span class="k-unit">条</span></div>
+          <div class="k-label">{{ t('kpi.proxies') }}</div>
+          <div class="k-val"><b>{{ onlineCount || proxyList.length }}</b><span class="k-unit">{{ t('unit.proxies') }}</span></div>
           <div class="k-sub">{{ proxyTypeParts.join(' · ') || `共 ${proxyList.length} 条` }}</div>
         </div>
         <div class="kpi">
-          <div class="k-label">当前连接</div>
-          <div class="k-val"><b>{{ info?.curConns ?? '—' }}</b><span class="k-unit">条</span></div>
-          <div class="k-sub">峰值 {{ peakConns }}</div>
+          <div class="k-label">{{ t('kpi.conns') }}</div>
+          <div class="k-val"><b>{{ info?.curConns ?? '—' }}</b><span class="k-unit">{{ t('unit.conns') }}</span></div>
+          <div class="k-sub">{{ t('peak.n', peakConns) }}</div>
         </div>
         <div class="kpi">
-          <div class="k-label">今日流量</div>
+          <div class="k-label">{{ t('kpi.traffic') }}</div>
           <div class="k-val"><b>{{ ((Number(info?.totalIn) + Number(info?.totalOut)) / 1024 ** 3).toFixed(1) || '0.0' }}</b><span class="k-unit">GB</span></div>
           <div class="k-sub">↑ {{ formatBytes(info?.totalIn || 0) }} · ↓ {{ formatBytes(info?.totalOut || 0) }}</div>
         </div>
       </article>
 
       <article class="card rate-card">
-        <div class="clabel"><span>实时速率</span><span class="health unk">2s 采样</span></div>
+        <div class="clabel"><span>{{ t('rate.title') }}</span><span class="health unk">{{ t('rate.sampling') }}</span></div>
         <div class="rate-vals">
           <span class="up">{{ rateUp }}</span>
           <span class="down">{{ rateDown }}</span>
@@ -402,47 +537,47 @@ function closeMenu(e: MouseEvent) {
     <!-- 代理与客户端 -->
     <section class="card panel" id="proxies">
       <div class="phead">
-        <h2>代理与客户端</h2>
-        <span class="chip">{{ onlineCount }} 在线</span>
+        <h2>{{ t('proxies.title') }}</h2>
+        <span class="chip">{{ onlineCount }} {{ t('proxies.online') }}</span>
         <span class="spacer"></span>
         <label class="search">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
             <circle cx="7" cy="7" r="4.6" stroke="#5D6A80" stroke-width="1.6"/>
             <path d="M10.4 10.4L13.4 13.4" stroke="#5D6A80" stroke-width="1.6" stroke-linecap="round"/>
           </svg>
-          <input v-model="filter.q" type="search" placeholder="搜索代理 / 客户端 / 入口" autocomplete="off">
+          <input v-model="filter.q" type="search" :placeholder="t('proxies.search')" autocomplete="off">
         </label>
-        <button class="btn ghost sm" @click="poll(); showToast('已刷新')">刷新</button>
+        <button class="btn ghost sm" @click="poll(); showToast(t('refreshed'))">{{ t('proxies.refresh') }}</button>
       </div>
 
       <div class="tabs" role="tablist">
-        <button v-for="t in ['all', 'tcp', 'http', 'udp', 'sealed-tcp']" :key="t"
-                class="tab" role="tab" :data-type="t"
-                :aria-selected="filter.type === t" @click="setFilterType(t)">
-          {{ t === 'all' ? '全部' : t.toUpperCase() }} <span>{{ typeCounts[t] || 0 }}</span>
+        <button v-for="tp in ['all', 'tcp', 'http', 'udp', 'sealed-tcp']" :key="tp"
+                class="tab" role="tab" :data-type="tp"
+                :aria-selected="filter.type === tp" @click="setFilterType(tp)">
+          {{ tp === 'all' ? t('proxies.all') : tp.toUpperCase() }} <span>{{ typeCounts[tp] || 0 }}</span>
         </button>
         <span class="spacer"></span>
         <label class="switch-row" @click="toggleOnlineOnly">
           <span class="switch" role="switch" :aria-checked="filter.onlineOnly ? 'true' : 'false'" tabindex="0"></span>
-          只看在线
+          {{ t('proxies.onlineOnly') }}
         </label>
       </div>
 
       <div class="table">
         <div class="phead-row">
-          <span>代理名称</span><span>类型</span><span class="c-client">所属客户端</span>
-          <span>公网入口</span><span class="c-traffic">今日流量</span><span>状态</span><span></span>
+          <span>{{ t('col.name') }}</span><span>{{ t('col.type') }}</span><span class="c-client">{{ t('col.client') }}</span>
+          <span>{{ t('col.entry') }}</span><span class="c-traffic">{{ t('col.traffic') }}</span><span>{{ t('col.status') }}</span><span></span>
         </div>
         <div id="rows">
-          <div v-if="!pageSlice.length" class="lempty">没有匹配的代理</div>
+          <div v-if="!pageSlice.length" class="lempty">{{ t('empty') }}</div>
           <div v-for="p in pageSlice" :key="p.name" class="prow" :class="{ offline: !p.online }">
             <span class="c-name" :title="p.name">{{ p.name }}</span>
             <span class="c-type" :class="typeClass(p.type)">{{ p.type.toUpperCase() }}</span>
             <span class="c-client" :title="p.client">{{ p.client }}</span>
             <span class="c-entry" :title="p.entry">{{ p.entry }}</span>
             <span class="c-traffic">{{ p.trafficIn + p.trafficOut ? formatBytes(p.trafficIn + p.trafficOut) : '—' }}</span>
-            <span class="state-pill" :class="p.online ? 'on' : p.waiting ? 'wait' : 'off'">{{ p.online ? '在线' : p.waiting ? '等待' : '离线' }}</span>
-            <button class="more" aria-label="更多" @click.stop="openMenu($event, p)">⋯</button>
+            <span class="state-pill" :class="p.online ? 'on' : p.waiting ? 'wait' : 'off'">{{ p.online ? t('state.online') : p.waiting ? t('state.waiting') : t('state.offline') }}</span>
+            <button class="more" aria-label="more" @click.stop="openMenu($event, p)">⋯</button>
           </div>
         </div>
       </div>
@@ -458,23 +593,23 @@ function closeMenu(e: MouseEvent) {
     <!-- 服务配置 -->
     <aside class="card panel" id="config">
       <div class="phead">
-        <h2>服务配置</h2>
+        <h2>{{ t('config.title') }}</h2>
         <span class="chip">lumos.toml</span>
         <span class="spacer"></span>
-        <button class="btn ghost sm" @click="copy(tomlSnippet(), 'lumos.toml 片段已复制')">复制</button>
+        <button class="btn ghost sm" @click="copy(tomlSnippet(), 'lumos.toml ' + t('copied'))">{{ t('config.copy') }}</button>
       </div>
       <div class="cbody">
         <div class="field-row">
-          <div class="field"><label>监听端口 bindPort</label><input v-model.number="srvCfg.bindPort" type="number"></div>
-          <div class="field"><label>KCP 端口</label><input value="未启用" readonly disabled></div>
+          <div class="field"><label>{{ t('config.bindPort') }}</label><input v-model.number="srvCfg.bindPort" type="number"></div>
+          <div class="field"><label>{{ t('config.kcpPort') }}</label><input :value="t('config.kcpOff')" readonly disabled></div>
         </div>
         <div class="field-row">
-          <div class="field"><label>HTTP 虚拟主机</label><input v-model.number="srvCfg.vhostHttpPort" type="number" placeholder="0"></div>
-          <div class="field"><label>HTTPS 虚拟主机</label><input v-model.number="srvCfg.vhostHttpsPort" type="number" placeholder="0"></div>
+          <div class="field"><label>{{ t('config.vhostHttp') }}</label><input v-model.number="srvCfg.vhostHttpPort" type="number" placeholder="0"></div>
+          <div class="field"><label>{{ t('config.vhostHttps') }}</label><input v-model.number="srvCfg.vhostHttpsPort" type="number" placeholder="0"></div>
         </div>
-        <div class="field"><label>子域名根 subDomainHost</label><input v-model="srvCfg.subdomainHost" placeholder="未设置"></div>
-        <div class="field"><label>允许端口范围 allowPorts</label><input v-model="srvCfg.allowPortsStr" placeholder="不限制"></div>
-        <div class="field"><label>认证令牌 auth.token</label>
+        <div class="field"><label>{{ t('config.subdomain') }}</label><input v-model="srvCfg.subdomainHost" :placeholder="t('config.subdomainPh')"></div>
+        <div class="field"><label>{{ t('config.allowPorts') }}</label><input v-model="srvCfg.allowPortsStr" :placeholder="t('config.allowPortsPh')"></div>
+        <div class="field"><label>{{ t('config.authToken') }}</label>
           <div style="position:relative">
             <input v-model="srvCfg.authToken" :type="showToken ? 'text' : 'password'" autocomplete="off">
             <button style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;cursor:pointer;color:var(--tx-3)" type="button" @click="showToken = !showToken">👁</button>
@@ -483,26 +618,26 @@ function closeMenu(e: MouseEvent) {
         <div class="sw-list">
           <label class="switch-row">
             <span class="switch on" role="switch" aria-checked="true" tabindex="-1"></span>
-            TLS 强制
+            TLS {{ locale === 'zh' ? '强制' : 'enforced' }}
           </label>
           <span class="switch-row" style="cursor:default">
             <span class="switch on" role="switch" aria-checked="true" tabindex="-1"></span>
-            TCP 多路复用
+            TCP {{ locale === 'zh' ? '多路复用' : 'multiplexing' }}
           </span>
         </div>
-        <div class="note">注意：端口类参数保存后需重启 lumos 才会生效</div>
+        <div class="note">{{ locale === 'zh' ? '注意：端口类参数保存后需重启 lumos 才会生效' : 'Note: port changes take effect after a lumos restart' }}</div>
       </div>
       <div class="cfoot">
-        <button class="btn ghost sm" @click="resetCfg">还原</button>
+        <button class="btn ghost sm" @click="resetCfg">{{ t('config.reset') }}</button>
         <span class="spacer"></span>
-        <button class="btn sm" :disabled="savingCfg" @click="saveServerConfig">{{ savingCfg ? '保存中…' : '保存并重启' }}</button>
+        <button class="btn sm" :disabled="savingCfg" @click="saveServerConfig">{{ savingCfg ? t('config.saving') : t('config.save') }}</button>
       </div>
     </aside>
 
     <!-- 日志 -->
     <section class="card panel" id="logs">
       <div class="phead">
-        <h2>运行事件</h2>
+        <h2>{{ t('logs.title') }}</h2>
         <span class="chip" :style="{ color: logLive ? '#3DDC97' : '#6C788E' }">{{ logLive ? 'LIVE' : 'PAUSED' }}</span>
         <span class="spacer"></span>
         <div class="tabs" style="height:auto;border:0;padding:0;gap:6px">
@@ -511,11 +646,11 @@ function closeMenu(e: MouseEvent) {
         </div>
         <label class="switch-row" style="margin-left:6px" @click="toggleLogLive">
           <span class="switch" role="switch" :aria-checked="logLive ? 'true' : 'false'" tabindex="0"></span>
-          实时刷新
+          {{ t('logs.live') }}
         </label>
       </div>
       <div class="lbody" ref="logBody">
-        <div v-if="!visibleLogs.length" class="lempty">等待事件…</div>
+        <div v-if="!visibleLogs.length" class="lempty">{{ locale === 'zh' ? '等待事件…' : 'Waiting for events…' }}</div>
         <div v-for="(e, i) in visibleLogs" :key="i" class="lline" :class="{ warn: e.level === 'WARN', error: e.level === 'ERROR' }">
           <span class="ts">{{ e.time }}</span>
           <span class="lv" :class="'lv-' + e.level">{{ e.level }}</span>
@@ -526,12 +661,60 @@ function closeMenu(e: MouseEvent) {
   </main>
 
   <div class="menu" id="menu" v-if="menu.proxy" :style="{ left: menu.x + 'px', top: menu.y + 'px' }">
-    <button @click="copy(menu.proxy.name, '已复制名称'); menu.proxy = null">复制代理名称</button>
-    <button @click="copy(menu.proxy.entry, '已复制入口'); menu.proxy = null">复制公网入口</button>
+    <button @click="copy(menu.proxy.name, t('copied')); menu.proxy = null">{{ locale === 'zh' ? '复制代理名称' : 'Copy proxy name' }}</button>
+    <button @click="copy(menu.proxy.entry, t('copied')); menu.proxy = null">{{ locale === 'zh' ? '复制公网入口' : 'Copy public entry' }}</button>
     <hr>
-    <button @click="menu.proxy && viewRaw(menu.proxy)">查看原始数据</button>
+    <button @click="menu.proxy && viewRaw(menu.proxy)">{{ locale === 'zh' ? '查看原始数据' : 'View raw data' }}</button>
   </div>
   <div class="toast" :class="{ show: toast, bad: toast?.bad }"><span class="dot"></span><span>{{ toast?.msg }}</span></div>
+
+  <!-- 账号安全 / 两步验证 -->
+  <div class="modal-mask" v-if="tfaOpen" @click.self="tfaOpen = false">
+    <div class="modal tfa">
+      <header>
+        <h3>{{ t('tfa.title') }}</h3>
+        <button class="x" type="button" @click="tfaOpen = false">✕</button>
+      </header>
+      <p class="tdesc">{{ t('tfa.desc') }}</p>
+
+      <template v-if="tfaEnabled">
+        <p class="tnote ok">{{ t('tfa.enabled') }}</p>
+        <div class="tfield">
+          <label>{{ t('tfa.code') }}</label>
+          <input v-model="tfaCode" type="text" inputmode="numeric" maxlength="6"
+                 :placeholder="t('tfa.codePh')" autocomplete="one-time-code">
+        </div>
+        <div class="tactions">
+          <button class="btn ghost sm" type="button" @click="tfaOpen = false">{{ t('tfa.close') }}</button>
+          <button class="btn danger sm" type="button" :disabled="tfaBusy" @click="unbind2FA">{{ t('tfa.confirmUnbind') }}</button>
+        </div>
+      </template>
+
+      <template v-else>
+        <p class="tnote">{{ t('tfa.disabled') }}</p>
+        <div class="tqr" v-if="tfaQr">
+          <img :src="tfaQr" alt="TOTP QR" width="168" height="168">
+        </div>
+        <div class="tfield" v-if="tfaSecret">
+          <label>{{ t('tfa.scanTip') }}</label>
+          <div class="secret-row">
+            <code>{{ tfaSecret }}</code>
+            <button class="btn ghost sm" type="button" @click="copy(tfaSecret, t('copied'))">{{ t('config.copy') }}</button>
+          </div>
+        </div>
+        <div class="tfield">
+          <label>{{ t('tfa.code') }}</label>
+          <input v-model="tfaCode" type="text" inputmode="numeric" maxlength="6"
+                 :placeholder="t('tfa.codePh')" autocomplete="one-time-code">
+        </div>
+        <p class="tmsg" v-if="tfaMsg" :class="{ ok: tfaMsg.ok }">{{ tfaMsg.text }}</p>
+        <div class="tactions">
+          <button class="btn ghost sm" type="button" @click="tfaOpen = false">{{ t('tfa.close') }}</button>
+          <button class="btn sm" type="button" :disabled="tfaBusy" @click="bind2FA">{{ tfaBusy ? '…' : t('tfa.confirmBind') }}</button>
+        </div>
+      </template>
+    </div>
+  </div>
 </template>
 
 <style src="./style.css"></style>

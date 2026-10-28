@@ -203,23 +203,13 @@ a{color:inherit;text-decoration:none}
 .success a{margin-left:auto;color:var(--ok);font-weight:600;white-space:nowrap}
 .success a:hover{text-decoration:underline;text-underline-offset:3px}
 
-/* 或 / 备用入口 */
-.or{display:flex;align-items:center;gap:12px;margin:22px 0 14px;font-size:10.5px;color:var(--tx-5)}
-.or::before,.or::after{content:"";height:1px;flex:1;background:var(--line-2)}
-.alt{
-  width:100%;height:42px;border-radius:10px;
-  border:1px solid var(--line-3);color:var(--tx-2);font-size:12px;
-  display:flex;align-items:center;justify-content:center;gap:8px;
-  transition:background .16s,border-color .16s,color .16s;
+/* 2FA 返回按钮 */
+.linkback{
+  width:100%;margin-top:12px;height:32px;
+  background:none;border:0;color:var(--tx-4);font-size:11.5px;cursor:pointer;
 }
-.alt:hover{background:#171E29;border-color:#39455C;color:var(--tx)}
+.linkback:hover{color:var(--tx-2)}
 
-/* 卡脚 */
-.panelfoot{
-  margin-top:24px;padding-top:18px;border-top:1px solid var(--line-2);
-  text-align:center;font-size:11px;line-height:1.7;color:var(--tx-4);
-}
-.panelfoot .link{font-size:11px}
 .hint{
   margin-top:14px;text-align:center;
   font:10px/1.7 var(--mono);color:#3E4859;letter-spacing:.3px;

@@ -11,10 +11,11 @@ import (
 
 // WebServer configures the embedded admin dashboard.
 type WebServer struct {
-	Addr     string
-	Port     int
-	User     string
-	Password string
+	Addr       string
+	Port       int
+	User       string
+	Password   string
+	TOTPSecret string // base32; empty disables two-factor login
 }
 
 // ServerConfig is the lumos (server) configuration.
@@ -66,7 +67,7 @@ func LoadServer(path string) (*ServerConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
-	c := &ServerConfig{}
+	c := &ServerConfig{ConfigPath: path}
 	c.BindPort = getInt(root, "bindPort", 7000)
 	c.VhostHTTPPort = getInt(root, "vhostHTTPPort", 0)
 	c.VhostHTTPSPort = getInt(root, "vhostHTTPSPort", 0)
@@ -184,6 +185,7 @@ func loadWeb(root map[string]any, def WebServer) WebServer {
 		w.Port = getInt(t, "port", 0)
 		w.User = getStr(t, "user", "admin")
 		w.Password = getStr(t, "password", "admin")
+		w.TOTPSecret = getStr(t, "totpSecret", "")
 	}
 	return w
 }
@@ -248,5 +250,8 @@ func SaveServer(path string, c *ServerConfig) error {
 	b.WriteString(fmt.Sprintf("port = %d\n", c.Web.Port))
 	b.WriteString(fmt.Sprintf("user = %q\n", c.Web.User))
 	b.WriteString(fmt.Sprintf("password = %q\n", c.Web.Password))
+	if c.Web.TOTPSecret != "" {
+		b.WriteString(fmt.Sprintf("totpSecret = %q\n", c.Web.TOTPSecret))
+	}
 	return os.WriteFile(path, []byte(b.String()), 0600)
 }

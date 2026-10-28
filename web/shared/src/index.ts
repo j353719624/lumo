@@ -26,3 +26,5 @@ export function formatUptime(ms: number): string {
 export function clock(d: Date = new Date()): string {
   return d.toTimeString().slice(0, 8);
 }
+
+export * from "./i18n";

@@ -1,7 +1,10 @@
 package server
 
 import (
+	"crypto/rand"
 	"crypto/subtle"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -11,15 +14,57 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/j353719624/lumo/pkg/config"
 	"github.com/j353719624/lumo/pkg/log"
+	"github.com/j353719624/lumo/pkg/qrcode"
+	"github.com/j353719624/lumo/pkg/totp"
 	"github.com/j353719624/lumo/pkg/version"
 	lumosweb "github.com/j353719624/lumo/web/lumos"
 )
 
 const sessionCookie = "lumo_session"
+
+// pending two-factor login tickets (ticket -> expiry)
+var (
+	twoFAMu        sync.Mutex
+	twoFATickets   = map[string]time.Time{}
+	twoFATicketTTL = 2 * time.Minute
+)
+
+func issue2FATicket() (string, error) {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	ticket := hex.EncodeToString(buf)
+	twoFAMu.Lock()
+	// opportunistic cleanup of expired tickets
+	now := time.Now()
+	for k, exp := range twoFATickets {
+		if exp.Before(now) {
+			delete(twoFATickets, k)
+		}
+	}
+	twoFATickets[ticket] = now.Add(twoFATicketTTL)
+	twoFAMu.Unlock()
+	return ticket, nil
+}
+
+// consume2FATicket reports whether the ticket is valid and single-use.
+func consume2FATicket(ticket string) bool {
+	twoFAMu.Lock()
+	defer twoFAMu.Unlock()
+	exp, ok := twoFATickets[ticket]
+	if !ok || exp.Before(time.Now()) {
+		delete(twoFATickets, ticket)
+		return false
+	}
+	delete(twoFATickets, ticket)
+	return true
+}
 
 // runDash serves the control console and its API using the contract
 // expected by assets/api.js. Pages redirect to /login when the visitor has
@@ -29,7 +74,12 @@ func (s *Server) runDash() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /login", s.loginPage)
 	mux.HandleFunc("POST /api/login", s.apiLogin)
+	mux.HandleFunc("POST /api/login/2fa", s.apiLogin2FA)
 	mux.HandleFunc("GET /logout", s.apiLogout)
+	mux.HandleFunc("/api/profile/2fa", s.api2FAStatus)
+	mux.HandleFunc("POST /api/profile/2fa/setup", s.api2FASetup)
+	mux.HandleFunc("POST /api/profile/2fa/enable", s.api2FAEnable)
+	mux.HandleFunc("POST /api/profile/2fa/disable", s.api2FADisable)
 	mux.Handle("POST /api/test-conn", s.guard(http.HandlerFunc(s.apiTestConn)))
 	mux.HandleFunc("/api/serverinfo", s.apiServerInfo)
 	mux.HandleFunc("POST /api/config", s.apiSaveConfig)
@@ -127,6 +177,45 @@ func (s *Server) apiLogin(w http.ResponseWriter, r *http.Request) {
 		failJSON(w, http.StatusUnauthorized, "账号或密码不正确")
 		return
 	}
+	// 二次验证已启用：先发短期票据，凭票据 + 动态码换会话
+	if totp.Valid(s.cfg.Web.TOTPSecret) {
+		ticket, err := issue2FATicket()
+		if err != nil {
+			failJSON(w, http.StatusInternalServerError, "无法创建验证会话")
+			return
+		}
+		writeJSON(w, map[string]any{"need2fa": true, "ticket": ticket})
+		return
+	}
+	s.limiter.Reset(origin)
+	http.SetCookie(w, &http.Cookie{
+		Name: sessionCookie, Value: s.webSessions.Issue(), Path: "/",
+		HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 7 * 24 * 3600,
+	})
+	writeOK(w)
+}
+
+// apiLogin2FA completes a login whose password step passed: the short-lived
+// ticket is exchanged for a session after the authenticator code verifies.
+func (s *Server) apiLogin2FA(w http.ResponseWriter, r *http.Request) {
+	origin, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if s.limiter.Locked(origin) {
+		failJSON(w, http.StatusTooManyRequests, "尝试次数过多，请 10 分钟后再试")
+		return
+	}
+	var req struct {
+		Ticket string `json:"ticket"`
+		Code   string `json:"code"`
+	}
+	if err := jsonDecodeBody(r, &req); err != nil {
+		failJSON(w, http.StatusBadRequest, "bad request body")
+		return
+	}
+	if !consume2FATicket(req.Ticket) || !totp.Verify(s.cfg.Web.TOTPSecret, req.Code, time.Now()) {
+		s.limiter.Fail(origin)
+		failJSON(w, http.StatusUnauthorized, "动态验证码不正确或已过期")
+		return
+	}
 	s.limiter.Reset(origin)
 	http.SetCookie(w, &http.Cookie{
 		Name: sessionCookie, Value: s.webSessions.Issue(), Path: "/",
@@ -142,6 +231,93 @@ func (s *Server) apiLogout(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Path: "/", MaxAge: -1})
 	http.Redirect(w, r, "/login", http.StatusFound)
+}
+
+// api2FAStatus reports whether two-factor login is enabled.
+func (s *Server) api2FAStatus(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, map[string]any{"enabled": totp.Valid(s.cfg.Web.TOTPSecret)})
+}
+
+// api2FASetup generates a fresh enrollment secret; nothing is stored until
+// enable succeeds, so a half-finished bind leaves the account unchanged.
+func (s *Server) api2FASetup(w http.ResponseWriter, r *http.Request) {
+	secret, err := totp.Generate()
+	if err != nil {
+		failJSON(w, http.StatusInternalServerError, "密钥生成失败")
+		return
+	}
+	uri := totp.URI(s.cfg.Web.User, secret)
+	svg := qrcode.SVG(uri, qrcode.M, 200)
+	if svg == "" {
+		failJSON(w, http.StatusInternalServerError, "二维码生成失败")
+		return
+	}
+	writeJSON(w, map[string]any{
+		"secret": secret,
+		"uri":    uri,
+		"qr":     "data:image/svg+xml;base64," + base64.StdEncoding.EncodeToString([]byte(svg)),
+	})
+}
+
+// api2FAEnable binds the secret after the user proves possession of the
+// authenticator by entering a current code.
+func (s *Server) api2FAEnable(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Secret string `json:"secret"`
+		Code   string `json:"code"`
+	}
+	if err := jsonDecodeBody(r, &req); err != nil {
+		failJSON(w, http.StatusBadRequest, "bad request body")
+		return
+	}
+	if !totp.Valid(req.Secret) {
+		failJSON(w, http.StatusBadRequest, "密钥格式不正确")
+		return
+	}
+	if !totp.Verify(req.Secret, req.Code, time.Now()) {
+		failJSON(w, http.StatusUnauthorized, "动态验证码不正确，请输入令牌 App 当前显示的 6 位数字")
+		return
+	}
+	if s.cfgPath == "" {
+		failJSON(w, http.StatusInternalServerError, "未找到配置文件，无法保存")
+		return
+	}
+	s.cfg.Web.TOTPSecret = req.Secret
+	if err := config.SaveServer(s.cfgPath, s.cfg); err != nil {
+		s.cfg.Web.TOTPSecret = ""
+		failJSON(w, http.StatusInternalServerError, "保存配置失败："+err.Error())
+		return
+	}
+	writeOK(w)
+}
+
+// api2FADisable clears the binding after confirming a current code.
+func (s *Server) api2FADisable(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Code string `json:"code"`
+	}
+	if err := jsonDecodeBody(r, &req); err != nil {
+		failJSON(w, http.StatusBadRequest, "bad request body")
+		return
+	}
+	if !totp.Valid(s.cfg.Web.TOTPSecret) {
+		failJSON(w, http.StatusBadRequest, "尚未启用二次验证")
+		return
+	}
+	if !totp.Verify(s.cfg.Web.TOTPSecret, req.Code, time.Now()) {
+		failJSON(w, http.StatusUnauthorized, "动态验证码不正确")
+		return
+	}
+	if s.cfgPath == "" {
+		failJSON(w, http.StatusInternalServerError, "未找到配置文件，无法保存")
+		return
+	}
+	s.cfg.Web.TOTPSecret = ""
+	if err := config.SaveServer(s.cfgPath, s.cfg); err != nil {
+		failJSON(w, http.StatusInternalServerError, "保存配置失败："+err.Error())
+		return
+	}
+	writeOK(w)
 }
 
 func formatDuration(d time.Duration) string {

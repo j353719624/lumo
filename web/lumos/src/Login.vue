@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
+import { t } from 'lumo-shared'
 
 const account = ref('')
 const password = ref('')
@@ -9,6 +10,10 @@ const state = ref<'idle' | 'loading' | 'done'>('idle')
 const alertMsg = ref('')
 const alertShow = ref(false)
 const successShow = ref(false)
+const twoFAStep = ref(false)
+const twoFATicket = ref('')
+const otpCode = ref('')
+const otpInput = ref<HTMLInputElement | null>(null)
 
 function showError(msg: string) {
   alertMsg.value = msg
@@ -22,45 +27,82 @@ function clearError() {
   alertShow.value = false
 }
 
+function backToPassword() {
+  twoFAStep.value = false
+  twoFATicket.value = ''
+  otpCode.value = ''
+  clearError()
+  state.value = 'idle'
+}
+
 async function submit() {
   if (state.value !== 'idle') return
 
   const acc = account.value.trim()
   const pass = password.value
 
-  if (!acc) { showError('请输入账号，可以是邮箱或用户名'); return }
-  if (acc.includes('@') && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(acc)) {
-    showError('邮箱格式看起来不对，请检查 @ 前后的内容'); return
+  if (!twoFAStep.value) {
+    if (!acc) { showError(t('login.account') + '?'); return }
+    if (!pass) { showError(t('login.password') + '?'); return }
+  } else if (!/^\d{6}$/.test(otpCode.value.trim())) {
+    showError(t('login.need2fa')); return
   }
-  if (!pass) { showError('请输入密码'); return }
-  if (pass.length < 6) { showError('密码至少 6 位'); return }
 
   clearError()
   state.value = 'loading'
 
   try {
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ account: acc, password: pass }),
-    })
-    const d = await res.json()
-    if (res.ok) {
-      try {
-        if (remember.value) localStorage.setItem('lumo.remember', acc)
-        else localStorage.removeItem('lumo.remember')
-      } catch { /* localStorage 不可用时忽略 */ }
-      state.value = 'done'
-      successShow.value = true
-      setTimeout(() => { location.href = '/' }, 350)
-    } else {
+    if (!twoFAStep.value) {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account: acc, password: pass }),
+      })
+      const d = await res.json()
+      if (res.ok && d.need2fa) {
+        twoFAStep.value = true
+        twoFATicket.value = d.ticket || ''
+        state.value = 'idle'
+        clearError()
+        await nextTick()
+        otpInput.value?.focus()
+        return
+      }
+      if (res.ok) {
+        finish(acc)
+        return
+      }
       state.value = 'idle'
-      showError(d.error || '账号或密码不正确。连续 5 次失败会锁定 10 分钟')
+      showError(d.error || '×')
+    } else {
+      const res = await fetch('/api/login/2fa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticket: twoFATicket.value, code: otpCode.value.trim() }),
+      })
+      const d = await res.json()
+      if (res.ok) {
+        finish(acc)
+        return
+      }
+      state.value = 'idle'
+      otpCode.value = ''
+      showError(d.error || '×')
     }
   } catch {
     state.value = 'idle'
-    showError('无法连接本地服务，请确认进程正在运行')
+    showError('Network error')
   }
+}
+
+function finish(acc: string) {
+  try {
+    if (remember.value) localStorage.setItem('lumo.remember', acc)
+    else localStorage.removeItem('lumo.remember')
+  } catch { /* localStorage 不可用时忽略 */ }
+  state.value = 'done'
+  successShow.value = true
+  setTimeout(() => { location.href = '/' }, 350)
 }
 
 try {
@@ -155,12 +197,12 @@ try {
     <!-- 右：登录表单 -->
     <section class="formside">
       <div class="panel">
-        <h2>登录</h2>
-        <p class="sub">内网穿透服务端</p>
+        <h2>{{ t('login.title') }}</h2>
+        <p class="sub">{{ t('login.sub') }}</p>
 
         <form @submit.prevent="submit" novalidate>
           <div class="field">
-            <label for="acc">账号</label>
+            <label for="acc">{{ t('login.account') }}</label>
             <div class="ctrl">
               <span class="lead">
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
@@ -174,7 +216,7 @@ try {
           </div>
 
           <div class="field">
-            <label for="pwd">密码</label>
+            <label for="pwd">{{ t('login.password') }}</label>
             <div class="ctrl has-eye">
               <span class="lead">
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
@@ -198,13 +240,26 @@ try {
             </div>
           </div>
 
-          <div class="row">
+          <div class="row" v-if="!twoFAStep">
             <label class="remember">
               <input type="checkbox" v-model="remember">
               <span class="sw"></span>
-              <span>记住这台设备</span>
+              <span>{{ t('login.remember') }}</span>
             </label>
-            <a class="link" href="#" @click.prevent="showError('密码重置需要管理员在服务端执行，或使用访问令牌登录')">忘记密码？</a>
+          </div>
+
+          <div class="field" v-if="twoFAStep">
+            <label for="otp">{{ t('login.2fa') }}</label>
+            <div class="ctrl">
+              <span class="lead">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                  <rect x="3" y="2.5" width="10" height="11" rx="2" stroke="currentColor" stroke-width="1.4"/>
+                  <path d="M6 12.8H10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+              </span>
+              <input id="otp" ref="otpInput" v-model="otpCode" type="text" inputmode="numeric"
+                     maxlength="6" :placeholder="t('login.2faPlaceholder')" autocomplete="one-time-code">
+            </div>
           </div>
 
           <div class="alert" :class="{ show: alertShow }" role="alert" aria-live="polite">
@@ -213,7 +268,7 @@ try {
               <path d="M8 4.9V8.7" stroke="#FF5F73" stroke-width="1.6" stroke-linecap="round"/>
               <circle cx="8" cy="11.1" r=".95" fill="#FF5F73"/>
             </svg>
-            <span>{{ alertMsg || '账号或密码不正确' }}</span>
+            <span>{{ alertMsg || t('login.need2fa') }}</span>
           </div>
 
           <div class="success" :class="{ show: successShow }">
@@ -221,29 +276,16 @@ try {
               <circle cx="8" cy="8" r="6.4" stroke="#3DDC97" stroke-width="1.4"/>
               <path d="M5.2 8.2L7.1 10.1L10.8 6.2" stroke="#3DDC97" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            <span>验证通过</span>
-            <a href="/">进入控制台 →</a>
+            <span>{{ t('login.success') }}</span>
+            <a href="/">{{ t('login.enter') }}</a>
           </div>
 
           <button class="submit" type="submit" :data-state="state" :disabled="state !== 'idle'">
             <span class="spinner" aria-hidden="true"></span>
-            <span class="label">{{ state === 'loading' ? '正在验证…' : state === 'done' ? '已登录' : '登录' }}</span>
+            <span class="label">{{ state === 'loading' ? t('login.loading') : state === 'done' ? t('login.done') : twoFAStep ? t('login.verify') : t('login.submit') }}</span>
           </button>
+          <button v-if="twoFAStep" class="linkback" type="button" @click="backToPassword">{{ t('login.back') }}</button>
         </form>
-
-        <div class="or">或</div>
-
-        <button class="alt" type="button" @click="showError('访问令牌登录：粘贴服务端生成的 token 即可，无需密码')">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <circle cx="5.6" cy="10.4" r="2.6" stroke="currentColor" stroke-width="1.4"/>
-            <path d="M7.5 8.5L12.6 3.4M10.6 5.4L12.2 7M12 4L13.6 5.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          </svg>
-          使用访问令牌登录
-        </button>
-
-        <div class="panelfoot">
-          还没有账号？<a class="link" href="#" @click.prevent="showError('请让管理员在服务端配置中为你创建账号')">联系管理员开通</a>
-        </div>
       </div>
     </section>
   </main>

@@ -1,0 +1,230 @@
+// Reactive locale + dictionary for the lumos and lumoc consoles.
+// t() reads locale.value so Vue templates re-render on language switch.
+
+export type Locale = 'zh' | 'en'
+
+const stored = (() => {
+  try {
+    const v = localStorage.getItem('lumo.locale')
+    if (v === 'en' || v === 'zh') return v as Locale
+  } catch { /* ignore */ }
+  return navigator.language?.toLowerCase().startsWith('zh') ? 'zh' : 'zh'
+})()
+
+import { ref } from 'vue'
+
+export const locale = ref<Locale>(stored)
+
+export function setLocale(l: Locale) {
+  locale.value = l
+  try { localStorage.setItem('lumo.locale', l) } catch { /* ignore */ }
+}
+
+type DictValue = string | ((n: any) => string)
+type Dict = Record<string, DictValue>
+
+const zh: Dict = {
+  // header
+  'welcome': '欢迎使用',
+  'logout': '退出',
+  'accountSecurity': '账号安全',
+  'engineRunning': '服务运行中',
+  'engineDown': '连接失败',
+  // login
+  'login.title': '登录',
+  'login.sub': '内网穿透服务端',
+  'login.account': '账号',
+  'login.password': '密码',
+  'login.remember': '记住这台设备',
+  'login.submit': '登录',
+  'login.loading': '正在验证…',
+  'login.done': '已登录',
+  'login.success': '验证通过',
+  'login.enter': '进入控制台 →',
+  'login.need2fa': '请输入手机令牌上的 6 位动态验证码',
+  'login.2fa': '动态验证码',
+  'login.2faPlaceholder': '6 位数字',
+  'login.verify': '验证并登录',
+  'login.back': '返回重新登录',
+  // band
+  'status.title': '运行状态',
+  'status.ok': '服务运行正常',
+  'status.down': '与 lumos 断开连接',
+  'status.uptime': '已稳定运行',
+  'status.lastRestart': '上次重启',
+  'kpi.clients': '在线客户端',
+  'kpi.proxies': '在线代理',
+  'kpi.conns': '当前连接',
+  'kpi.traffic': '今日流量',
+  'kpi.clientsSub': (n: number) => `共 ${n} 个客户端在建`,
+  'kpi.connsAvg': (n: string) => `平均 ${n} 条 / 代理`,
+  'rate.title': '实时速率',
+  'rate.sampling': '2s 采样',
+  // panels
+  'proxies.title': '代理与客户端',
+  'proxies.online': '在线',
+  'proxies.search': '搜索代理 / 客户端 / 入口',
+  'proxies.refresh': '刷新',
+  'proxies.all': '全部',
+  'proxies.onlineOnly': '只看在线',
+  'col.name': '代理名称',
+  'col.type': '类型',
+  'col.client': '所属客户端',
+  'col.entry': '公网入口',
+  'col.traffic': '今日流量',
+  'col.status': '状态',
+  'state.online': '在线',
+  'state.offline': '离线',
+  'state.waiting': '等待',
+  'empty': '没有匹配的代理',
+  'pager.info': '共 {n} 条 · 第 {p} / {t} 页',
+  // config panel
+  'config.title': '服务配置',
+  'config.copy': '复制',
+  'config.save': '保存并重启',
+  'config.saving': '保存中…',
+  'config.reset': '还原',
+  'config.bindPort': '监听端口 bindPort',
+  'config.kcpPort': 'KCP 端口',
+  'config.kcpOff': '未启用',
+  'config.vhostHttp': 'HTTP 虚拟主机',
+  'config.vhostHttps': 'HTTPS 虚拟主机',
+  'config.subdomain': '子域名 subDomainHost',
+  'config.subdomainPh': '未设置',
+  'config.allowPorts': '允许端口段 allowPorts',
+  'config.allowPortsPh': '不限制',
+  'config.authToken': '认证令牌 auth.token',
+  // logs
+  'logs.title': '运行事件',
+  'logs.live': '实时刷新',
+  // 2FA modal
+  'tfa.title': '账号安全 · 两步验证',
+  'tfa.desc': '启用后，登录除密码外还需输入手机令牌 App 上的 6 位动态验证码（Google / Microsoft Authenticator 等均支持）。',
+  'tfa.enabled': '已启用：登录时需要输入动态验证码。',
+  'tfa.disabled': '未启用。使用手机令牌 App 扫描下方二维码，或手动输入密钥，然后输入 App 显示的动态码完成绑定。',
+  'tfa.setup': '绑定手机令牌',
+  'tfa.scanTip': '使用令牌 App 扫码，或手动输入密钥：',
+  'tfa.code': '动态验证码',
+  'tfa.codePh': '输入 App 当前显示的 6 位数字',
+  'tfa.confirmBind': '确认绑定',
+  'tfa.unbind': '解除绑定',
+  'tfa.confirmUnbind': '确认解绑',
+  'tfa.close': '关闭',
+  'tfa.bound': '绑定成功，下次登录需要动态验证码',
+  'tfa.unbound': '已解除绑定',
+  // misc
+  'copied': '已复制',
+  'copyFailed': '复制失败，请手动选择文本',
+  'refreshed': '已刷新',
+  'unit.clients': '台',
+  'unit.proxies': '条',
+  'unit.conns': '条',
+  'unit.gb': 'GB',
+  'today.n': '+{n} 今日',
+  'peak.n': '峰值 {n}',
+  'console.name': '服务端控制台',
+}
+
+const en: Dict = {
+  'welcome': 'Welcome to',
+  'logout': 'Sign out',
+  'accountSecurity': 'Account',
+  'engineRunning': 'Service running',
+  'engineDown': 'Connection lost',
+  'login.title': 'Sign in',
+  'login.sub': 'Tunnel server console',
+  'login.account': 'Account',
+  'login.password': 'Password',
+  'login.remember': 'Remember this device',
+  'login.submit': 'Sign in',
+  'login.loading': 'Verifying…',
+  'login.done': 'Signed in',
+  'login.success': 'Verified',
+  'login.enter': 'Open console →',
+  'login.need2fa': 'Enter the 6-digit code from your authenticator app',
+  'login.2fa': 'One-time code',
+  'login.2faPlaceholder': '6 digits',
+  'login.verify': 'Verify & sign in',
+  'login.back': 'Back to sign in',
+  'status.title': 'Status',
+  'status.ok': 'Service healthy',
+  'status.down': 'Disconnected from lumos',
+  'status.uptime': 'Uptime',
+  'status.lastRestart': 'Last restart',
+  'kpi.clients': 'Clients online',
+  'kpi.proxies': 'Proxies online',
+  'kpi.conns': 'Connections',
+  'kpi.traffic': 'Traffic today',
+  'kpi.clientsSub': (n: number) => `${n} active client(s)`,
+  'kpi.connsAvg': (n: string) => `${n} conns / proxy avg`,
+  'rate.title': 'Live rate',
+  'rate.sampling': '2s sampling',
+  'proxies.title': 'Proxies & clients',
+  'proxies.online': 'online',
+  'proxies.search': 'Search proxy / client / entry',
+  'proxies.refresh': 'Refresh',
+  'proxies.all': 'All',
+  'proxies.onlineOnly': 'Online only',
+  'col.name': 'Proxy',
+  'col.type': 'Type',
+  'col.client': 'Client',
+  'col.entry': 'Public entry',
+  'col.traffic': 'Traffic today',
+  'col.status': 'Status',
+  'state.online': 'Online',
+  'state.offline': 'Offline',
+  'state.waiting': 'Waiting',
+  'empty': 'No matching proxies',
+  'pager.info': '{n} items · page {p} / {t}',
+  'config.title': 'Server config',
+  'config.copy': 'Copy',
+  'config.save': 'Save & restart',
+  'config.saving': 'Saving…',
+  'config.reset': 'Reset',
+  'config.bindPort': 'Bind port',
+  'config.kcpPort': 'KCP port',
+  'config.kcpOff': 'Disabled',
+  'config.vhostHttp': 'HTTP vhost port',
+  'config.vhostHttps': 'HTTPS vhost port',
+  'config.subdomain': 'Subdomain host',
+  'config.subdomainPh': 'Not set',
+  'config.allowPorts': 'Allowed ports',
+  'config.allowPortsPh': 'Unrestricted',
+  'config.authToken': 'Auth token',
+  'logs.title': 'Events',
+  'logs.live': 'Live',
+  'tfa.title': 'Account · Two-factor',
+  'tfa.desc': 'Once enabled, signing in requires a 6-digit code from an authenticator app (Google / Microsoft Authenticator, etc.) in addition to the password.',
+  'tfa.enabled': 'Enabled: a one-time code is required at sign-in.',
+  'tfa.disabled': 'Not enabled. Scan the QR code with your authenticator app (or type the secret), then enter the current code to bind.',
+  'tfa.setup': 'Bind authenticator',
+  'tfa.scanTip': 'Scan with your authenticator app, or enter the key manually:',
+  'tfa.code': 'One-time code',
+  'tfa.codePh': '6 digits shown in the app',
+  'tfa.confirmBind': 'Bind',
+  'tfa.unbind': 'Unbind',
+  'tfa.confirmUnbind': 'Confirm unbind',
+  'tfa.close': 'Close',
+  'tfa.bound': 'Bound. A one-time code will be required at next sign-in.',
+  'tfa.unbound': 'Two-factor disabled.',
+  'copied': 'Copied',
+  'copyFailed': 'Copy failed; please select the text manually',
+  'refreshed': 'Refreshed',
+  'unit.clients': '',
+  'unit.proxies': '',
+  'unit.conns': '',
+  'unit.gb': 'GB',
+  'today.n': '+{n} today',
+  'peak.n': 'Peak {n}',
+  'console.name': 'Server console',
+}
+
+const dicts: Record<Locale, Dict> = { zh, en }
+
+export function t(key: string, ...args: (number | string)[]): string {
+  const v = dicts[locale.value][key] ?? dicts.zh[key] ?? key
+  if (typeof v === 'function') return (v as (n: any) => string)(args[0])
+  let s = v as string
+  args.forEach((a, i) => { s = s.replace(`{${i}}`, String(a)) })
+  return s
+}

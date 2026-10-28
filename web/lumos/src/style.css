@@ -45,6 +45,65 @@ a{color:inherit;text-decoration:none}
 .ibtn{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;color:var(--tx-3)}
 .ibtn:hover{background:#171E29;color:var(--tx)}
 
+/* 顶部控制条：欢迎语 / 语言下拉 / 账号 / 退出 */
+.welcome{font-size:12px;color:var(--tx-3)}
+.welcome b{color:var(--tx);font-weight:700}
+.langsel{position:relative}
+.langbtn{
+  height:28px;padding:0 10px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;
+  background:var(--grad);border:0;color:#0B0E14;font-size:11.5px;font-weight:600;cursor:pointer;
+}
+.langbtn .caret{opacity:.8}
+.langmenu{
+  position:absolute;right:0;top:calc(100% + 6px);min-width:132px;z-index:60;
+  background:#141B29;border:1px solid var(--line-3);border-radius:8px;padding:4px;
+  box-shadow:0 12px 30px rgba(0,0,0,.45);
+}
+.langmenu button{
+  width:100%;height:30px;padding:0 10px;border-radius:6px;display:flex;align-items:center;gap:8px;
+  background:none;border:0;color:var(--tx-2);font-size:11.5px;cursor:pointer;text-align:left;
+}
+.langmenu button:hover{background:#1B2540;color:var(--tx)}
+.langmenu button.cur{color:var(--ok)}
+.langmenu button span{font-size:13px}
+.acctbtn,.exitbtn{
+  height:28px;padding:0 11px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;
+  background:#141B29;border:1px solid var(--line-3);color:var(--tx-2);font-size:11.5px;cursor:pointer;
+  transition:color .15s,border-color .15s,background .15s;
+}
+.acctbtn:hover{color:var(--accent-soft);border-color:#39455C}
+.exitbtn{color:#E5707E;border-color:rgba(255,95,115,.25)}
+.exitbtn:hover{color:#FF5F73;border-color:rgba(255,95,115,.5);background:#2A1418}
+
+/* 弹窗 */
+.modal-mask{position:fixed;inset:0;z-index:80;background:rgba(5,8,14,.62);backdrop-filter:blur(3px);
+  display:grid;place-items:center}
+.modal{width:min(420px,calc(100vw - 40px));background:#101724;border:1px solid var(--line-3);
+  border-radius:14px;padding:18px 20px 20px;box-shadow:0 24px 60px rgba(0,0,0,.55)}
+.modal header{display:flex;align-items:center;margin-bottom:8px}
+.modal h3{font-size:14px;font-weight:700}
+.modal .x{margin-left:auto;width:26px;height:26px;border-radius:7px;background:none;border:0;
+  color:var(--tx-4);cursor:pointer;font-size:12px}
+.modal .x:hover{background:#1B2540;color:var(--tx)}
+.tdesc{font-size:11px;line-height:1.8;color:var(--tx-4);margin-bottom:10px}
+.tnote{font-size:11px;line-height:1.7;color:var(--tx-3);margin-bottom:10px}
+.tnote.ok{color:var(--ok)}
+.tqr{display:grid;place-items:center;padding:6px 0 10px}
+.tqr img{background:#fff;border-radius:10px;padding:6px}
+.tfield{margin-bottom:10px}
+.tfield label{display:block;font-size:10.5px;color:var(--tx-4);margin-bottom:5px}
+.tfield input{width:100%;height:36px;border-radius:9px;border:1px solid var(--line-3);
+  background:#0B111C;color:var(--tx);padding:0 12px;font-size:13px;letter-spacing:2px}
+.tfield input:focus{outline:none;border-color:#3E5A8C}
+.secret-row{display:flex;align-items:center;gap:8px}
+.secret-row code{flex:1;font:10.5px/1.6 var(--mono);color:var(--teal);word-break:break-all;
+  background:#0B111C;border:1px solid var(--line-3);border-radius:8px;padding:7px 10px}
+.tmsg{font-size:11px;margin:2px 0 8px;color:#FF8B96}
+.tmsg.ok{color:var(--ok)}
+.tactions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+.btn.danger{background:#2A1418;border-color:rgba(255,95,115,.4);color:#FF5F73}
+.btn.danger:hover{background:#3A1A20}
+
 /* ---------------- 骨架 ---------------- */
 .layout{display:grid;gap:14px;padding:18px 24px 20px;height:calc(100vh - 60px);
   grid-template-columns:minmax(0,1fr) 400px;

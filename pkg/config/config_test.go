@@ -94,3 +94,19 @@ localPort = 80
 		t.Error("expected remotePort validation error")
 	}
 }
+
+func TestLoadServerKeepsConfigPath(t *testing.T) {
+	dir := t.TempDir()
+	p := dir + "/lumos.toml"
+	content := "bindPort = 7000\n[auth]\ntoken = \"t\"\n[webServer]\naddr = \"127.0.0.1\"\nport = 7500\nuser = \"admin\"\npassword = \"pw\"\n"
+	if err := os.WriteFile(p, []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := LoadServer(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.ConfigPath != p {
+		t.Fatalf("ConfigPath = %q, want %q (needed so the console can persist changes)", c.ConfigPath, p)
+	}
+}
