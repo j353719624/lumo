@@ -785,8 +785,8 @@ function closeMenu(e: MouseEvent) {
                  :placeholder="t('login.2faPlaceholder')" autocomplete="one-time-code">
         </div>
         <div class="tactions">
-          <button class="btn ghost sm" type="button" @click="tfaOpen = false">{{ t('c.n.cancel') }}</button>
-          <button class="btn danger sm" type="button" :disabled="tfaBusy" @click="unbind2FA">{{ t('c.tfa.disable') }}</button>
+          <button class="btn ghost" type="button" @click="tfaOpen = false">{{ t('c.n.cancel') }}</button>
+          <button class="btn danger" type="button" :disabled="tfaBusy" @click="unbind2FA">{{ t('c.tfa.disable') }}</button>
         </div>
       </template>
 
@@ -803,7 +803,7 @@ function closeMenu(e: MouseEvent) {
         <p class="tmsg" v-if="tfaMsg" :class="{ ok: tfaMsg.ok }">{{ tfaMsg.text }}</p>
         <div class="tactions">
           <button class="btn ghost sm" type="button" @click="tfaOpen = false">{{ t('c.n.cancel') }}</button>
-          <button class="btn sm" type="button" :disabled="tfaBusy" @click="bind2FA">{{ tfaBusy ? '…' : t('c.tfa.enable') }}</button>
+          <button class="btn" type="button" :disabled="tfaBusy" @click="bind2FA">{{ tfaBusy ? '…' : t('c.tfa.enable') }}</button>
         </div>
       </template>
     </div>

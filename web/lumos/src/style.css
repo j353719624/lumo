@@ -86,24 +86,30 @@ a{color:inherit;text-decoration:none}
 .modal .x{margin-left:auto;width:26px;height:26px;border-radius:7px;background:none;border:0;
   color:var(--tx-4);cursor:pointer;font-size:12px}
 .modal .x:hover{background:#1B2540;color:var(--tx)}
-.tdesc{font-size:11px;line-height:1.8;color:var(--tx-4);margin-bottom:10px}
-.tnote{font-size:11px;line-height:1.7;color:var(--tx-3);margin-bottom:10px}
-.tnote.ok{color:var(--ok)}
-.tqr{display:grid;place-items:center;padding:6px 0 10px}
-.tqr img{background:#fff;border-radius:10px;padding:6px}
-.tfield{margin-bottom:10px}
-.tfield label{display:block;font-size:10.5px;color:var(--tx-4);margin-bottom:5px}
-.tfield input{width:100%;height:36px;border-radius:9px;border:1px solid var(--line-3);
-  background:#0B111C;color:var(--tx);padding:0 12px;font-size:13px;letter-spacing:2px}
-.tfield input:focus{outline:none;border-color:#3E5A8C}
-.secret-row{display:flex;align-items:center;gap:8px}
-.secret-row code{flex:1;font:10.5px/1.6 var(--mono);color:var(--teal);word-break:break-all;
-  background:#0B111C;border:1px solid var(--line-3);border-radius:8px;padding:7px 10px}
-.tmsg{font-size:11px;margin:2px 0 8px;color:#FF8B96}
-.tmsg.ok{color:var(--ok)}
-.tactions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
-.btn.danger{background:#2A1418;border-color:rgba(255,95,115,.4);color:#FF5F73}
-.btn.danger:hover{background:#3A1A20}
+/* 2FA 弹窗：与客户端 modal.sm 同规格 */
+.modal.tfa{width:432px;max-width:calc(100vw - 40px);border-radius:20px;padding:26px;
+  display:flex;flex-direction:column;gap:15px}
+.modal.tfa header{align-items:flex-start;margin-bottom:0}
+.modal.tfa h3{font-size:17px}
+.modal.tfa header .thd p{font-size:11.5px;line-height:1.6;color:var(--tx-3)}
+.modal.tfa .x{width:26px;height:26px;border-radius:8px;font-size:12px}
+.modal.tfa .tnote{font-size:10.5px;line-height:1.6;color:var(--tx-5);margin:2px 0 0}
+.modal.tfa .tfield{margin-bottom:0;display:flex;flex-direction:column;gap:6px}
+.modal.tfa .tfield label{font-size:11px;color:var(--tx-3)}
+.modal.tfa .tfield input{height:38px;border-radius:10px;border:1px solid var(--line);
+  background:var(--panel-2);color:var(--tx);padding:0 11px;font-size:12.5px;letter-spacing:2px}
+.modal.tfa .tfield input:focus{outline:none;border-color:rgba(90,123,255,.6)}
+.modal.tfa .tqr{display:grid;place-items:center;padding:0}
+.modal.tfa .tqr img{background:#fff;border-radius:10px;padding:6px}
+.modal.tfa .tmsg{font-size:11px;margin:0;color:#FF8B96}
+.modal.tfa .tmsg.ok{color:var(--ok)}
+.modal.tfa .tactions{display:flex;align-items:center;justify-content:flex-end;gap:10px;
+  padding-top:10px;border-top:1px solid var(--line)}
+.modal.tfa .tactions .btn{height:34px;padding:0 14px;border-radius:10px;font-size:12.5px;font-weight:600}
+.modal.tfa .tactions .btn.ghost{background:none;color:var(--tx-2);border:1px solid var(--line-3);font-weight:400}
+.modal.tfa .tactions .btn.ghost:hover{background:#171E29;color:var(--tx)}
+.modal.tfa .tactions .btn.danger{background:#D93F4A;border:0;color:#fff}
+.modal.tfa .tactions .btn.danger:hover{background:#E44C57}
 
 /* ---------------- 骨架 ---------------- */
 .layout{display:grid;gap:14px;padding:18px 24px 20px;height:calc(100vh - 60px);
