@@ -445,6 +445,11 @@ function setView(v: 'list' | 'logs') {
   view.value = v
 }
 
+async function logout() {
+  try { await fetch('/logout') } catch { /* ignore */ }
+  location.href = '/login'
+}
+
 function openSection(s: 'overview' | 'server' | 'mappings' | 'visitors' | 'files') {
   view.value = 'list'
   detailSection.value = s
@@ -559,6 +564,7 @@ setInterval(() => refresh(true), 2500)
         <div class="topuser">
           <span class="topav">A</span>
           <span class="topnm">admin</span>
+          <button class="exitbtn" type="button" @click="logout">退出</button>
         </div>
       </div>
 

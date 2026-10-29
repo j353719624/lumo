@@ -260,3 +260,20 @@ html[data-theme="light"] .err{background:#FBE7E9;border-color:rgba(217,63,74,.35
 html[data-theme="light"] .ok{background:#E3F5EC;border-color:rgba(15,157,106,.35);color:#0B7A51}
 html[data-theme="light"] .alt:hover{background:#E9EEF6;border-color:#B8C4D6}
 html[data-theme="light"] .foot .sep{background:#DCE3EE}
+
+/* ---------------- 品牌侧文案与特性 ---------------- */
+.pitch h1{margin:0;font-size:24px;line-height:1.35;font-weight:700;letter-spacing:-.4px;text-wrap:balance}
+.pitch h1 em{font-style:normal;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.pitch p{margin:12px 0 0;max-width:280px;font-size:11.5px;line-height:1.7;color:var(--tx-3)}
+.feats{display:flex;flex-direction:column;gap:12px;margin-top:20px;width:100%}
+.feat{display:flex;align-items:flex-start;gap:10px;text-align:left}
+.feat .ic{width:26px;height:26px;flex:0 0 auto;border-radius:8px;display:grid;place-items:center;
+  background:var(--panel-2);border:1px solid var(--line);color:var(--accent-soft)}
+.feat b{display:block;font-size:11.5px;font-weight:600;margin-bottom:1px}
+.feat span{font-size:10.5px;line-height:1.5;color:var(--tx-4)}
+.brandfoot{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:10px;color:var(--tx-5);margin-top:6px}
+.pill{height:22px;padding:0 8px;border-radius:11px;display:inline-flex;align-items:center;gap:6px;
+  background:#E3F5EC;border:1px solid rgba(15,157,106,.35);color:#0F9D6A;font-size:10px}
+html[data-theme="dark"] .pill{background:#12281F;border-color:rgba(61,220,151,.3);color:var(--ok)}
+.pill .dot{width:5px;height:5px;border-radius:3px;background:currentColor;box-shadow:0 0 8px 1px rgba(61,220,151,.55)}
+.sep{width:1px;height:10px;background:#2A3346}

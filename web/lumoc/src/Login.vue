@@ -92,9 +92,51 @@ try {
           <circle cx="62" cy="42" r="3.8" fill="#35E0C8"/>
         </svg>
         <div class="brandname">LUMO</div>
-        <div class="brandcn">隧光</div>
+        <div class="brandcn">隧光 · 客户端</div>
         <span class="hairline"></span>
-        <div class="brandtag">内网穿透客户端</div>
+        <div class="brandtag">把内网服务带在身边</div>
+
+        <div class="pitch">
+          <h1>连接，<br>像在本地一样。</h1>
+          <p>一条隧道，两端点亮：为每台设备建一套配置，端口映射、密钥与压缩收在同一张表单里。</p>
+        </div>
+
+        <div class="feats">
+          <div class="feat">
+            <span class="ic">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <rect x="2" y="2" width="12" height="5" rx="1.2" stroke="currentColor" stroke-width="1.4"/>
+                <rect x="2" y="9" width="12" height="5" rx="1.2" stroke="currentColor" stroke-width="1.4"/>
+              </svg>
+            </span>
+            <div><b>本地引擎</b><span>单进程托管全部连接，开机自启</span></div>
+          </div>
+          <div class="feat">
+            <span class="ic">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2.2L13 4.1V8.2C13 11.1 10.9 13.1 8 14.1C5.1 13.1 3 11.1 3 8.2V4.1L8 2.2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+                <path d="M6.1 8L7.5 9.4L10 6.7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <div><b>安全访问</b><span>sealed-tcp / sealed-udp / PUNCH 密钥直连</span></div>
+          </div>
+          <div class="feat">
+            <span class="ic">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M2.2 5.4H13.8M2.2 10.6H13.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                <circle cx="6" cy="5.4" r="1.7" fill="currentColor" stroke="currentColor" stroke-width="1.4"/>
+                <circle cx="10.2" cy="10.6" r="1.7" fill="currentColor" stroke="currentColor" stroke-width="1.4"/>
+              </svg>
+            </span>
+            <div><b>多种协议</b><span>TCP / UDP / HTTP(S) / MUX</span></div>
+          </div>
+        </div>
+
+        <div class="brandfoot">
+          <span class="pill"><span class="dot"></span>引擎就绪</span>
+          <span class="sep"></span>
+          <span>登录后即可管理全部隧道</span>
+        </div>
       </aside>
 
       <!-- 右：表单 -->
