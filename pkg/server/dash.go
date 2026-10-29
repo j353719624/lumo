@@ -98,7 +98,7 @@ func (s *Server) runDash() {
 	addr := s.cfg.Web.Addr + ":" + strconv.Itoa(s.cfg.Web.Port)
 	srv := &http.Server{Addr: addr, Handler: mux}
 	s.dashSrv = srv
-	log.Infof("dashboard listening on http://%s (user %s)", addr, s.cfg.Web.User)
+	log.Infof("dashboard listening on :%d (user %s)", s.cfg.Web.Port, s.cfg.Web.User)
 	if err := srv.ListenAndServe(); err != nil && !s.closed.Load() {
 		log.Errorf("dashboard: %v", err)
 	}

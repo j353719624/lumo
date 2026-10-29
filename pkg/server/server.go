@@ -503,7 +503,7 @@ func (s *session) drop(reason string) {
 	if s.closed.Swap(true) {
 		return
 	}
-	log.Infof("client %q disconnected: %s", s.display(), reason)
+	log.Infof("client %q disconnected: %s", s.display(), log.StripAddrs(reason))
 	s.srv.mu.Lock()
 	for name, ent := range s.names {
 		s.srv.removeProxyLocked(name, ent)
@@ -794,7 +794,7 @@ func (s *Server) handlePunchAddr(ses *session, m proto.Msg) {
 	ent := s.proxies[name]
 	if ent != nil && ent.owner == ses && ent.kind == "punch" {
 		ent.punchAddr = addr
-		log.Infof("punch %q: punch address %s", name, addr)
+		log.Infof("punch %q: punch address %s", name, log.MaskAddr(addr))
 	}
 	s.mu.Unlock()
 }
@@ -822,7 +822,7 @@ func (s *Server) handlePunchPunch(ses *session, m proto.Msg) {
 		_ = ses.send(proto.Msg{"type": "punch_fail", "name": name, "error": "service side not ready"})
 		return
 	}
-	log.Infof("punch %q: pairing visitor %s with service %s", name, visitorAddr, peerAddr)
+	log.Infof("punch %q: pairing visitor %s with service %s", name, log.MaskAddr(visitorAddr), log.MaskAddr(peerAddr))
 	conv := randomConv()
 	if err := svc.send(proto.Msg{"type": "punch_peer", "name": name, "conv": conv, "addr": visitorAddr}); err != nil {
 		_ = ses.send(proto.Msg{"type": "punch_fail", "name": name, "error": "service side unreachable"})

@@ -142,7 +142,7 @@ func (c *Client) Run(ctx context.Context) error {
 	if len(c.cfg.Visitors) > 0 {
 		go c.runVisitors(ctx)
 	}
-	c.logi("lumoc %s starting (server %s)", version.Version, c.addr())
+	c.logi("lumoc %s starting (server %s)", version.Version, log.MaskAddr(c.addr()))
 	backoff := time.Second
 	for {
 		if ctx.Err() != nil {
@@ -201,7 +201,7 @@ func (c *Client) serve(ctx context.Context) error {
 			return fmt.Errorf("kcp control stream: %w", err)
 		}
 		conn = ctrl
-		c.logi("KCP transport enabled (udp %s)", kaddr)
+		c.logi("KCP transport enabled (udp %s)", log.MaskAddr(kaddr))
 	} else {
 		rawConn, err := net.DialTimeout("tcp", c.addr(), 10*time.Second)
 		if err != nil {
@@ -263,7 +263,7 @@ func (c *Client) serve(ctx context.Context) error {
 	c.mu.Lock()
 	c.lastErr = ""
 	c.mu.Unlock()
-	c.logi("connected to %s", c.addr())
+	c.logi("connected to %s", log.MaskAddr(c.addr()))
 
 	// The read loop must run before registration: reg replies are only
 	// delivered through it, and registerAll blocks on those replies.
