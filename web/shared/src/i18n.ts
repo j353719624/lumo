@@ -135,7 +135,6 @@ const zh: Dict = {
   'unit.gb': 'GB',
   'today.n': '+{0} 今日',
   'peak.n': '峰值 {0}',
-  'console.name': '服务端控制台',
   // client console
   'c.nav.workspace': '工作区',
   'c.nav.overview': '概览',
@@ -422,7 +421,6 @@ const en: Dict = {
   'unit.gb': 'GB',
   'today.n': '+{0} today',
   'peak.n': 'Peak {0}',
-  'console.name': 'Server console',
   // client console
   'c.nav.workspace': 'Workspace',
   'c.nav.overview': 'Overview',

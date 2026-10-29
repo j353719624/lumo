@@ -531,7 +531,6 @@ function closeMenu(e: MouseEvent) {
       </svg>
       <span class="wordmark">LUMO</span>
       <span class="badge">SERVER</span>
-      <span class="pagename">{{ t('console.name') }}</span>
     </div>
     <div class="top-right">
       <span class="welcome">{{ t('welcome') }} <b>LUMO</b></span>
