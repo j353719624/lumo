@@ -488,6 +488,22 @@ func (s *session) readLoop() {
 			s.srv.handleReg(s, m)
 		case "unreg":
 			s.srv.handleUnreg(s, m)
+		case "list-services":
+			// 访问端自动发现：列出其它会话注册的 sealed-tcp/sealed-udp 服务（含 sk，
+			// 能通过令牌认证的会话视为可信）
+			items := []map[string]any{}
+			s.srv.mu.Lock()
+			for n, ent := range s.srv.proxies {
+				if ent.owner == s {
+					continue
+				}
+				if ent.kind == "sealed-tcp" || ent.kind == "sealed-udp" {
+					items = append(items, map[string]any{"name": n, "sk": ent.sk, "type": ent.kind})
+				}
+			}
+			s.srv.mu.Unlock()
+			_ = proto.Send(s.conn, proto.Msg{"type": "services", "services": items})
+
 		case "punch_addr":
 			s.srv.handlePunchAddr(s, m)
 		case "punch_punch":
