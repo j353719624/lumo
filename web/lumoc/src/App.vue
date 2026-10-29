@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { api, type ConnConfig, type ConnStatus, type EngineInfo, type Mapping } from './api'
+import { applyTheme, type Theme } from './theme'
 
 /* ---------------- 状态 ---------------- */
 const configs = ref<ConnConfig[]>([])
@@ -10,6 +11,12 @@ const selectedId = ref<string | null>(null)
 const draft = ref<ConnConfig | null>(null)
 const showToken = ref(false)
 const filter = ref<'all' | 'on' | 'off'>('all')
+const theme = ref<Theme>((document.documentElement.dataset.theme as Theme) || 'dark')
+function toggleTheme() {
+  theme.value = theme.value === 'dark' ? 'light' : 'dark'
+  applyTheme(theme.value)
+}
+
 const q = ref('')
 const view = ref<'list' | 'logs' | 'settings'>('list')
 const pendingDelete = ref<ConnConfig | null>(null)
@@ -400,6 +407,10 @@ setInterval(() => refresh(true), 2500)
           <p>{{ view === 'list' ? (configs.length ? `共 ${configs.length} 个配置 · ${enabledCount} 个正在运行` : '还没有配置') : view === 'logs' ? '本地引擎的实时运行事件' : '引擎与运行环境' }}</p>
         </div>
         <span class="spacer"></span>
+        <button class="themebtn" :title="theme === 'dark' ? '日间模式' : '黑夜模式'" @click="toggleTheme">
+          <svg v-if="theme === 'dark'" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3.2" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.2V3M8 13V14.8M1.2 8H3M13 8H14.8M3.2 3.2L4.5 4.5M11.5 11.5L12.8 12.8M12.8 3.2L11.5 4.5M4.5 11.5L3.2 12.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          <svg v-else width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M13.4 9.6A5.8 5.8 0 0 1 6.4 2.6A5.8 5.8 0 1 0 13.4 9.6Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        </button>
         <label class="search">
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.6" stroke="#5D6A80" stroke-width="1.6"/><path d="M10.4 10.4L13.4 13.4" stroke="#5D6A80" stroke-width="1.6" stroke-linecap="round"/></svg>
           <input v-model="q" type="search" placeholder="搜索配置" autocomplete="off">

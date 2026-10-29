@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { clock, formatBytes, formatRate, locale, setLocale, t } from 'lumo-shared'
+import { applyTheme, type Theme } from './theme'
 import {
   apiCfg, health, host, logs as fetchLogs, proxies as fetchProxies, serverInfo,
   type LogEntry, type ProxyItem, type ServerInfo,
@@ -10,6 +11,12 @@ import {
 const PAGE_SIZE = 6
 const MAX_EVENTS = 200
 const MAX_SAMPLES = 60
+
+const theme = ref<Theme>((document.documentElement.dataset.theme as Theme) || 'dark')
+function toggleTheme() {
+  theme.value = theme.value === 'dark' ? 'light' : 'dark'
+  applyTheme(theme.value)
+}
 
 const info = ref<ServerInfo | null>(null)
 const proxyList = ref<ProxyItem[]>([])
@@ -475,6 +482,10 @@ function closeMenu(e: MouseEvent) {
     </div>
     <div class="top-right">
       <span class="welcome">{{ t('welcome') }} <b>LUMO</b></span>
+      <button class="themebtn" :title="theme === 'dark' ? '日间模式' : '黑夜模式'" @click="toggleTheme">
+        <svg v-if="theme === 'dark'" width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3.2" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.2V3M8 13V14.8M1.2 8H3M13 8H14.8M3.2 3.2L4.5 4.5M11.5 11.5L12.8 12.8M12.8 3.2L11.5 4.5M4.5 11.5L3.2 12.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        <svg v-else width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M13.4 9.6A5.8 5.8 0 0 1 6.4 2.6A5.8 5.8 0 1 0 13.4 9.6Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+      </button>
       <div class="langsel" :class="{ open: langOpen }">
         <button class="langbtn" type="button" @click.stop="langOpen = !langOpen">
           <span class="flag">{{ locale === 'zh' ? '🇨🇳' : '🇺🇸' }}</span>
@@ -590,8 +601,8 @@ function closeMenu(e: MouseEvent) {
 
       <div class="table">
         <div class="phead-row">
-          <span>{{ t('col.name') }}</span><span>{{ t('col.type') }}</span><span class="c-client">{{ t('col.client') }}</span>
-          <span>{{ t('col.entry') }}</span><span class="c-traffic">{{ t('col.traffic') }}</span><span>{{ t('col.status') }}</span><span></span>
+          <span>{{ t('col.name') }}</span><span>{{ t('col.type') }}</span><span>{{ t('col.client') }}</span>
+          <span>{{ t('col.entry') }}</span><span>{{ t('col.traffic') }}</span><span>{{ t('col.status') }}</span><span></span>
         </div>
         <div id="rows">
           <div v-if="!pageSlice.length" class="lempty">{{ t('empty') }}</div>

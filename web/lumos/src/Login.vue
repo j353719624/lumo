@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { nextTick, ref } from 'vue'
 import { locale, setLocale, t } from 'lumo-shared'
+import { applyTheme, type Theme } from './theme'
+
+const theme = ref<Theme>((document.documentElement.dataset.theme as Theme) || 'dark')
+function toggleTheme() {
+  theme.value = theme.value === 'dark' ? 'light' : 'dark'
+  applyTheme(theme.value)
+}
 
 const account = ref('')
 const password = ref('')
@@ -118,6 +125,10 @@ try {
 </script>
 
 <template>
+  <button class="themefab" type="button" :title="theme === 'dark' ? '日间模式' : '黑夜模式'" @click="toggleTheme">
+    <svg v-if="theme === 'dark'" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3.2" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.2V3M8 13V14.8M1.2 8H3M13 8H14.8M3.2 3.2L4.5 4.5M11.5 11.5L12.8 12.8M12.8 3.2L11.5 4.5M4.5 11.5L3.2 12.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    <svg v-else width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M13.4 9.6A5.8 5.8 0 0 1 6.4 2.6A5.8 5.8 0 1 0 13.4 9.6Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+  </button>
   <div class="app">
     <header class="loginbar">
       <div class="brandmark">
