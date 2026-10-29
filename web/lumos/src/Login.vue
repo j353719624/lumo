@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { nextTick, ref } from 'vue'
 import { locale, setLocale, t } from 'lumo-shared'
-import { applyTheme, type Theme } from './theme'
+import { applyThemePref, type Theme } from './theme'
 
 const theme = ref<Theme>((document.documentElement.dataset.theme as Theme) || 'dark')
 function toggleTheme() {
   theme.value = theme.value === 'dark' ? 'light' : 'dark'
-  applyTheme(theme.value)
+  applyThemePref(theme.value)
 }
 
 const account = ref('')

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { api, type ConnConfig, type ConnStatus, type EngineInfo, type Mapping } from './api'
-import { applyTheme, type Theme } from './theme'
+import { applyThemePref, getThemePref, type Theme, type ThemePref } from './theme'
 
 /* ---------------- 状态 ---------------- */
 const configs = ref<ConnConfig[]>([])
@@ -12,9 +12,13 @@ const draft = ref<ConnConfig | null>(null)
 const showToken = ref(false)
 const filter = ref<'all' | 'on' | 'off'>('all')
 const theme = ref<Theme>((document.documentElement.dataset.theme as Theme) || 'dark')
+const themePref = ref<ThemePref>(getThemePref())
+function setThemePref(p: ThemePref) {
+  themePref.value = p
+  theme.value = applyThemePref(p)
+}
 function toggleTheme() {
-  theme.value = theme.value === 'dark' ? 'light' : 'dark'
-  applyTheme(theme.value)
+  setThemePref(theme.value === 'dark' ? 'light' : 'dark')
 }
 
 const q = ref('')
@@ -571,11 +575,19 @@ setInterval(() => refresh(true), 2500)
       <!-- 设置视图 -->
       <div class="setpage" v-show="view === 'settings'">
         <div class="setcard">
+          <div class="kv"><span>外观主题</span>
+            <div class="seg">
+              <button :aria-pressed="themePref === 'auto'" @click="setThemePref('auto')">跟随系统</button>
+              <button :aria-pressed="themePref === 'light'" @click="setThemePref('light')">日间</button>
+              <button :aria-pressed="themePref === 'dark'" @click="setThemePref('dark')">黑夜</button>
+            </div>
+          </div>
+          <p class="setnote">「跟随系统」会随操作系统的浅色/深色设置自动切换；右上角的按钮可快速临时切换。</p>
+        </div>
+        <div class="setcard">
           <div class="kv"><span>运行模式</span><b>单进程托管全部连接</b></div>
           <div class="kv"><span>隧道引擎</span><b>{{ info?.engineBin || '—' }}</b></div>
           <div class="kv"><span>数据位置</span><b>{{ info?.dataDir || '—' }}</b></div>
-        </div>
-        <div class="setcard">
           <div class="kv"><span>版本</span><b>v{{ info?.version || '—' }}</b></div>
         </div>
       </div>

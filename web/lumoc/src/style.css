@@ -209,6 +209,11 @@ input,select,textarea{font:inherit;color:inherit}
 .setcard .kv{display:flex;justify-content:space-between;gap:12px;font-size:12px}
 .setcard .kv span{color:var(--tx-3)}
 .setcard .kv b{font:11px/1 var(--mono);font-weight:400;color:#C7D2E4;word-break:break-all;text-align:right}
+.seg{display:inline-flex;gap:4px;padding:3px;border-radius:9px;background:var(--panel-2);border:1px solid var(--line)}
+.seg button{height:26px;padding:0 10px;border-radius:7px;font-size:11px;color:var(--tx-3)}
+.seg button[aria-pressed="true"]{background:var(--panel);color:var(--tx);box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.seg button:hover{color:var(--tx)}
+.setnote{margin:2px 0 0;font-size:10.5px;line-height:1.6;color:var(--tx-5)}
 
 .toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,14px);z-index:90;
   display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:10px;background:#151B26;
@@ -327,6 +332,8 @@ html[data-theme="light"] .warnbox{background:#F7F9FC}
 html[data-theme="light"] .logline{color:#4C586B}
 html[data-theme="light"] .logline.err{color:#C0394B}
 html[data-theme="light"] .setcard .kv b{color:#2B3A50}
+html[data-theme="light"] .seg{background:#F2F5FA}
+html[data-theme="light"] .seg button[aria-pressed="true"]{background:#FFFFFF;box-shadow:0 1px 3px rgba(23,32,46,.15)}
 html[data-theme="light"] .toast{background:#FFFFFF;box-shadow:0 18px 44px rgba(23,32,46,.18)}
 html[data-theme="light"] .menu{background:#FFFFFF;box-shadow:0 18px 44px rgba(23,32,46,.18)}
 html[data-theme="light"] .menu button:hover{background:#EEF2FB}

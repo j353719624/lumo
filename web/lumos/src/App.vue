@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { clock, formatBytes, formatRate, locale, setLocale, t } from 'lumo-shared'
-import { applyTheme, type Theme } from './theme'
+import { applyThemePref, getThemePref, type Theme, type ThemePref } from './theme'
 import {
   apiCfg, health, host, logs as fetchLogs, proxies as fetchProxies, serverInfo,
   type LogEntry, type ProxyItem, type ServerInfo,
@@ -13,9 +13,13 @@ const MAX_EVENTS = 200
 const MAX_SAMPLES = 60
 
 const theme = ref<Theme>((document.documentElement.dataset.theme as Theme) || 'dark')
+const themePref = ref<ThemePref>(getThemePref())
+function setThemePref(p: ThemePref) {
+  themePref.value = p
+  theme.value = applyThemePref(p)
+}
 function toggleTheme() {
-  theme.value = theme.value === 'dark' ? 'light' : 'dark'
-  applyTheme(theme.value)
+  setThemePref(theme.value === 'dark' ? 'light' : 'dark')
 }
 
 const info = ref<ServerInfo | null>(null)
