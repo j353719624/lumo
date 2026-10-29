@@ -29,7 +29,7 @@ func (s *Server) handleReg(ses *session, m proto.Msg) {
 		return
 	}
 	switch kind {
-	case "tcp", "udp", "http", "https", "mux", "sealed-tcp", "sealed-udp":
+	case "tcp", "udp", "http", "https", "mux", "sealed-tcp", "sealed-udp", "punch":
 	default:
 		reply(false, "unsupported proxy kind "+kind)
 		return
@@ -120,7 +120,7 @@ func (s *Server) setupProxyLocked(ent *proxyEnt) error {
 		}
 		s.usedPort[ent.remotePort] = true
 		ent.udpLn = ln
-	case "sealed-tcp", "sealed-udp":
+	case "sealed-tcp", "sealed-udp", "punch":
 		if ent.sk == "" {
 			return fmt.Errorf("sk is required for %s proxies", ent.kind)
 		}

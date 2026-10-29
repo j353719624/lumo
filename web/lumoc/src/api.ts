@@ -14,6 +14,7 @@ export interface Mapping {
   bandwidth?: string
   httpUser?: string
   httpPass?: string
+  compress?: boolean
   sk?: string
 }
 
@@ -25,6 +26,7 @@ export interface ConnConfig {
   token: string
   protocol?: string
   kcpPort?: number
+  protocolVersion?: number
   tls: boolean
   enabled: boolean
   autoReconnect?: boolean

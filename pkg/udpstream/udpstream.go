@@ -331,6 +331,9 @@ type Session struct {
 	lastRx atomic.Int64
 	pkts   chan wirePkt
 	wg     sync.WaitGroup
+	// hsDone fires once the SYN/SYNACK handshake completes (punch mode).
+	hsDone chan struct{}
+	hsOnce sync.Once
 }
 
 func (s *Session) newStreamLocked(id uint8) *stream {
@@ -398,6 +401,22 @@ func (s *Session) Control() net.Conn {
 }
 
 // Close tears the session down.
+// Punch sends SYN probes to the peer for a few seconds so a NAT'd listener
+// opens its pinhole; the pump answers the peer's SYN with SYNACK meanwhile.
+func (s *Session) Punch(tries int, interval time.Duration) {
+	syn := wirePkt{conv: s.conv, cmd: cmdSYN}
+	for i := 0; i < tries; i++ {
+		if s.dead.Load() || s.closed.Load() {
+			return
+		}
+		_ = s.send(syn)
+		time.Sleep(interval)
+	}
+}
+
+// Dead reports whether the session has been torn down.
+func (s *Session) Dead() bool { return s.dead.Load() || s.closed.Load() }
+
 func (s *Session) Close() error {
 	if s.closed.Swap(true) {
 		return nil
@@ -450,6 +469,9 @@ func (s *Session) pump() {
 		}
 		select {
 		case p := <-s.pkts:
+			if os.Getenv("LUMO_UDP_DEBUG") != "" {
+				fmt.Fprintf(os.Stderr, "[udpdbg] conv=%d serv=%v rx cmd=%d stream=%d\n", s.conv, s.isServ, p.cmd, p.stream)
+			}
 			s.lastRx.Store(time.Now().UnixNano())
 			switch p.cmd {
 			case cmdPSH:
@@ -458,6 +480,15 @@ func (s *Session) pump() {
 				s.rxACK(p)
 			case cmdPING:
 				// 仅保活
+			case cmdSYN:
+				// 打洞模式：服务侧（或已建立会话）收到 SYN 就回 SYNACK
+				if s.isServ {
+					_ = s.send(wirePkt{conv: s.conv, cmd: cmdSYNACK})
+				}
+			case cmdSYNACK:
+				if s.hsDone != nil {
+					s.hsOnce.Do(func() { close(s.hsDone) })
+				}
 			}
 		case <-t.C:
 			s.retransmit()
@@ -737,6 +768,78 @@ func (l *Listener) readLoop() {
 		default: // 会话处理过慢，丢弃数据报（可靠层会重传）
 		}
 	}
+}
+
+// Adopt builds a server-side session on a UDP socket whose NAT mapping is
+// already open (STUN punch). Inbound SYNs are answered from the pump.
+func Adopt(pc *net.UDPConn, remote *net.UDPAddr, conv uint32) *Session {
+	s := &Session{
+		pc:      pc,
+		remote:  remote,
+		conv:    conv,
+		isServ:  true,
+		streams: map[uint8]*stream{},
+		pkts:    make(chan wirePkt, 512),
+		onNewFn: func(s *Session, id uint8) {},
+	}
+	s.start()
+	return s
+}
+
+// DialOn runs the dial half of the handshake on an existing socket, sending
+// SYNs until the peer answers or the timeout expires.
+func DialOn(pc *net.UDPConn, remote *net.UDPAddr, conv uint32, timeout time.Duration) (*Session, error) {
+	s := &Session{
+		pc:      pc,
+		remote:  remote,
+		conv:    conv,
+		streams: map[uint8]*stream{},
+		pkts:    make(chan wirePkt, 512),
+		onNewFn: func(s *Session, id uint8) {},
+		hsDone:  make(chan struct{}),
+	}
+	s.start()
+	syn := wirePkt{conv: conv, cmd: cmdSYN}
+	deadline := time.Now().Add(timeout)
+	for {
+		_ = s.send(syn)
+		select {
+		case <-s.hsDone:
+			return s, nil
+		case <-time.After(200 * time.Millisecond):
+		}
+		if time.Now().After(deadline) {
+			s.Close()
+			return nil, fmt.Errorf("udpstream: punch handshake timed out")
+		}
+	}
+}
+
+// start launches the pump and the socket reader for an adopted socket.
+func (s *Session) start() {
+	s.wg.Add(2)
+	go s.pump()
+	go func() {
+		defer s.wg.Done()
+		buf := make([]byte, 65536)
+		for {
+			if s.dead.Load() || s.closed.Load() {
+				return
+			}
+			n, _, err := s.pc.ReadFromUDP(buf)
+			if err != nil {
+				return
+			}
+			p, err := decodePkt(buf[:n])
+			if err != nil || p.conv != s.conv {
+				continue
+			}
+			select {
+			case s.pkts <- p:
+			default:
+			}
+		}
+	}()
 }
 
 // AcceptSession waits for a new client session.

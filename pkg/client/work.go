@@ -47,13 +47,26 @@ func (c *Client) handleWork(m proto.Msg) {
 		c.loge("proxy %q: dial for work connection: %v", name, err)
 		return
 	}
-	if err := proto.Send(dc, proto.Msg{"type": "data", "name": name, "cid": m.Str("cid")}); err != nil {
+	pv := c.cfg.ProtocolVersion
+	if pv <= 0 {
+		pv = 2
+	}
+	announce := proto.Msg{"type": "data", "name": name, "cid": m.Str("cid")}
+	useCompress := p.Compress && pv >= 2
+	if useCompress {
+		announce["compress"] = true
+	}
+	// 公告必须是明文：先发，再在后续数据上启用压缩
+	if err := proto.Send(dc, announce); err != nil {
 		c.loge("proxy %q: announce data connection: %v", name, err)
 		_ = dc.Close()
 		return
 	}
+	if useCompress {
+		dc = relay.CompressConn(dc)
+	}
 	switch p.Type {
-	case "tcp", "https", "sealed-tcp":
+	case "tcp", "https", "sealed-tcp", "punch":
 		c.rawRelay(name, dc, local, cnt, bw)
 	case "http":
 		c.httpRelay(name, dc, local, cnt, bw)
@@ -255,7 +268,9 @@ func (c *Client) runVisitors(ctx context.Context) {
 		v := c.cfg.Visitors[i]
 		go func(v config.VisitorConfig) {
 			var err error
-			if v.Type == "udp" {
+			if v.Type == "punch" {
+				err = c.visitorPunch(ctx, v)
+			} else if v.Type == "udp" {
 				err = c.runVisitorUDP(ctx, v)
 			} else {
 				err = c.runVisitorTCP(ctx, v)

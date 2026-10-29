@@ -292,6 +292,8 @@ async function createAndConnect() {
     }
   }
 
+  const compress = ((document.querySelector('#nMap .mcompress') as HTMLInputElement)?.checked) || false
+  if (compress) mapping.compress = true
   const startNowVal = startNow.value
 
   try {
@@ -585,6 +587,14 @@ setInterval(() => refresh(true), 2500)
                 </select>
               </div>
             </div>
+            <div class="field-row">
+              <div class="field"><label>协议世代</label>
+                <select :value="draft.protocolVersion || 2" @change="draft.protocolVersion = Number(($event.target as HTMLSelectElement).value)">
+                  <option :value="2">v2（支持压缩通道）</option>
+                  <option :value="1">v1（旧版兼容）</option>
+                </select>
+              </div>
+            </div>
             <div class="field" v-if="draft.protocol === 'kcp'"><label>KCP 端口（服务端 UDP）</label><input v-model.number="draft.kcpPort" class="mono" type="number" min="1" max="65535" placeholder="如 47011"></div>
             <div class="field"><label>认证令牌 · auth.token</label>
               <div class="token-wrap">
@@ -609,16 +619,18 @@ setInterval(() => refresh(true), 2500)
                   <option value="tcp">TCP</option><option value="udp">UDP</option>
                   <option value="http">HTTP</option><option value="https">HTTPS</option>
                   <option value="sealed-tcp">sealed-tcp</option><option value="sealed-udp">sealed-udp</option>
+                  <option value="punch">PUNCH（P2P 打洞）</option>
                   <option value="mux">MUX</option>
                 </select>
                 <input class="local" :value="(m.localIP || '127.0.0.1') + ':' + (m.localPort || '')" aria-label="本地地址" @input="updateLocal(m, ($event.target as HTMLInputElement).value)">
                 <div class="mapto">
                   <span style="color:#5A7BFF">→</span>
                   <input class="remote" :value="(m.type === 'http' || m.type === 'https' || m.type === 'mux') ? ((m.domains && m.domains.length ? m.domains : (m.domain ? [m.domain] : [])).join(', ')) : (m.remotePort || '')"
-                         :placeholder="(m.type === 'http' || m.type === 'https' || m.type === 'mux') ? '域名，多个用逗号分隔' : (m.type === 'sealed-tcp' || m.type === 'sealed-udp') ? '无需公网端口' : '公网端口'"
-                         :disabled="m.type === 'sealed-tcp' || m.type === 'sealed-udp'" aria-label="公网入口"
+                         :placeholder="(m.type === 'http' || m.type === 'https' || m.type === 'mux') ? '域名，多个用逗号分隔' : (m.type === 'sealed-tcp' || m.type === 'sealed-udp' || m.type === 'punch') ? '无需公网端口' : '公网端口'"
+                         :disabled="m.type === 'sealed-tcp' || m.type === 'sealed-udp' || m.type === 'punch'" aria-label="公网入口"
                          @input="updateRemote(m, ($event.target as HTMLInputElement).value)">
-                  <input v-if="m.type === 'sealed-tcp' || m.type === 'sealed-udp'" class="msk" v-model="m.sk" placeholder="密钥 sk" aria-label="密钥">
+                  <input v-if="m.type === 'sealed-tcp' || m.type === 'sealed-udp' || m.type === 'punch'" class="msk" v-model="m.sk" placeholder="密钥 sk" aria-label="密钥">
+                  <label class="cmpbox" title="压缩隧道数据"><input type="checkbox" v-model="m.compress"> 压缩</label>
                   <button class="del" aria-label="删除这条映射" @click="removeMapping(idx)">
                     <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3.5 4.5H12.5M6.5 4.5V3.2H9.5V4.5M5 4.5L5.6 12.6H10.4L11 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   </button>
@@ -746,13 +758,15 @@ setInterval(() => refresh(true), 2500)
           <option value="tcp">TCP</option><option value="udp">UDP</option>
           <option value="http">HTTP</option><option value="https">HTTPS</option>
           <option value="sealed-tcp">sealed-tcp</option><option value="sealed-udp">sealed-udp</option>
+          <option value="punch">PUNCH（P2P 打洞）</option>
           <option value="mux">MUX</option>
         </select>
         <input class="local" placeholder="127.0.0.1:5000">
         <div class="mapto"><span style="color:#5A7BFF">→</span>
-          <input class="remote" :placeholder="(nType === 'http' || nType === 'https' || nType === 'mux') ? '域名，多个用逗号分隔' : (nType === 'sealed-tcp' || nType === 'sealed-udp') ? '无需公网端口' : '15000'" :disabled="nType === 'sealed-tcp' || nType === 'sealed-udp'">
+          <input class="remote" :placeholder="(nType === 'http' || nType === 'https' || nType === 'mux') ? '域名，多个用逗号分隔' : (nType === 'sealed-tcp' || nType === 'sealed-udp' || nType === 'punch') ? '无需公网端口' : '15000'" :disabled="nType === 'sealed-tcp' || nType === 'sealed-udp' || nType === 'punch'">
         </div>
-        <input v-if="nType === 'sealed-tcp' || nType === 'sealed-udp'" class="msk" placeholder="密钥 sk">
+        <input v-if="nType === 'sealed-tcp' || nType === 'sealed-udp' || nType === 'punch'" class="msk" placeholder="密钥 sk">
+        <label class="cmpbox" title="压缩隧道数据"><input class="mcompress" type="checkbox"> 压缩</label>
         <div v-if="nType === 'http' || nType === 'https'" class="maptoadv">
           <input class="paths" placeholder="访问路径 /,/api">
           <input class="bw" placeholder="限速 如 1MB">

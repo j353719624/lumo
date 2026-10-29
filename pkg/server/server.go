@@ -6,7 +6,9 @@ import (
 	"bufio"
 	"context"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/tls"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -93,6 +95,7 @@ type proxyEnt struct {
 	subPaths   []string
 	httpUser   string
 	httpPass   string
+	punchAddr   string
 	owner      *session
 	since      time.Time
 
@@ -450,6 +453,10 @@ func (s *session) readLoop() {
 			s.srv.handleReg(s, m)
 		case "unreg":
 			s.srv.handleUnreg(s, m)
+		case "punch_addr":
+			s.srv.handlePunchAddr(s, m)
+		case "punch_punch":
+			s.srv.handlePunchPunch(s, m)
 		default:
 			log.Debugf("session %s: ignoring message type %q", s.id, m.Str("type"))
 		}
@@ -479,6 +486,9 @@ func (s *Server) handleData(c net.Conn, m proto.Msg) {
 		return
 	}
 	cid := m.Str("cid")
+	if v, _ := m["compress"].(bool); v {
+		c = relay.CompressConn(c)
+	}
 	s.pendMu.Lock()
 	pe, ok := s.pending[cid]
 	if ok {
@@ -500,7 +510,7 @@ func (s *Server) handleVisitorData(c net.Conn, name, sk string) {
 	s.mu.Lock()
 	ent := s.proxies[name]
 	s.mu.Unlock()
-	if ent == nil || (ent.kind != "sealed-tcp" && ent.kind != "sealed-udp") {
+	if ent == nil || (ent.kind != "sealed-tcp" && ent.kind != "sealed-udp" && ent.kind != "punch") {
 		log.Warnf("visitor data for unknown proxy %q rejected", name)
 		_ = c.Close()
 		return
@@ -692,4 +702,61 @@ func withoutEnt(list []*proxyEnt, ent *proxyEnt) []*proxyEnt {
 		}
 	}
 	return out
+}
+
+// handlePunchAddr records the reflexive UDP address a service client punched
+// out for its punch proxy.
+func (s *Server) handlePunchAddr(ses *session, m proto.Msg) {
+	name := m.Str("name")
+	addr := m.Str("addr")
+	s.mu.Lock()
+	ent := s.proxies[name]
+	if ent != nil && ent.owner == ses && ent.kind == "punch" {
+		ent.punchAddr = addr
+		log.Infof("punch %q: punch address %s", name, addr)
+	}
+	s.mu.Unlock()
+}
+
+// handlePunchPunch pairs a visitor with an punch service client: both sides get
+// the other's punched address plus a shared session number, then punch.
+func (s *Server) handlePunchPunch(ses *session, m proto.Msg) {
+	name := m.Str("name")
+	sk := m.Str("sk")
+	visitorAddr := m.Str("addr")
+	s.mu.Lock()
+	ent := s.proxies[name]
+	ok := ent != nil && ent.kind == "punch" && ent.sk != "" && ent.sk == sk && ent.punchAddr != "" && !ent.dead.Load()
+	var svc *session
+	if ok {
+		svc = ent.owner
+	}
+	peerAddr := ""
+	if ok {
+		peerAddr = ent.punchAddr
+	}
+	s.mu.Unlock()
+	if !ok {
+		log.Warnf("punch %q: punch refused (service side not ready)", name)
+		_ = ses.send(proto.Msg{"type": "punch_fail", "name": name, "error": "service side not ready"})
+		return
+	}
+	log.Infof("punch %q: pairing visitor %s with service %s", name, visitorAddr, peerAddr)
+	conv := randomConv()
+	if err := svc.send(proto.Msg{"type": "punch_peer", "name": name, "conv": conv, "addr": visitorAddr}); err != nil {
+		_ = ses.send(proto.Msg{"type": "punch_fail", "name": name, "error": "service side unreachable"})
+		return
+	}
+	_ = ses.send(proto.Msg{"type": "punch_peer", "name": name, "conv": conv, "addr": peerAddr})
+}
+
+// randomConv returns a non-zero session number for a punched punch session.
+func randomConv() int {
+	var b [4]byte
+	_, _ = rand.Read(b[:])
+	v := int(binary.BigEndian.Uint32(b[:]))
+	if v == 0 {
+		v = 1
+	}
+	return v
 }

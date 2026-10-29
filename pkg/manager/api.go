@@ -368,6 +368,9 @@ func renderToml(cfg ConnConfig) string {
 	if cfg.Protocol == "kcp" {
 		L = append(L, `protocol = "kcp"`, "kcpPort = "+strconv.Itoa(cfg.KCPPort))
 	}
+	if cfg.ProtocolVer > 0 && cfg.ProtocolVer != 2 {
+		L = append(L, "protocolVersion = "+strconv.Itoa(cfg.ProtocolVer))
+	}
 	L = append(L,
 		"",
 		"[auth]",
@@ -392,6 +395,9 @@ func renderToml(cfg ConnConfig) string {
 		if mp.HTTPUser != "" {
 			L = append(L, `httpUser = "`+esc(mp.HTTPUser)+`"`, `httpPass = "`+esc(mp.HTTPPass)+`"`)
 		}
+		if mp.Compress {
+			L = append(L, "compress = true")
+		}
 		if mp.Type == "http" || mp.Type == "https" || mp.Type == "mux" {
 			ds := mp.Domains
 			if len(ds) == 0 && mp.Domain != "" {
@@ -409,7 +415,7 @@ func renderToml(cfg ConnConfig) string {
 				}
 				L = append(L, "subPaths = ["+strings.Join(qp, ", ")+"]")
 			}
-		} else if mp.Type == "sealed-tcp" || mp.Type == "sealed-udp" {
+		} else if mp.Type == "sealed-tcp" || mp.Type == "sealed-udp" || mp.Type == "punch" {
 			L = append(L, `sk = "`+esc(mp.SK)+`"`)
 		} else {
 			L = append(L, "remotePort = "+strconv.Itoa(mp.RemotePort))
@@ -484,6 +490,7 @@ func (m *Manager) apiTomlSave(w http.ResponseWriter, r *http.Request) {
 	next.ServerPort = parsed.ServerPort
 	next.Protocol = parsed.Protocol
 	next.KCPPort = parsed.KCPPort
+	next.ProtocolVer = parsed.ProtocolVersion
 	next.Token = parsed.AuthToken
 	next.Mappings = nil
 	for _, p := range parsed.Proxies {
@@ -496,7 +503,7 @@ func (m *Manager) apiTomlSave(w http.ResponseWriter, r *http.Request) {
 			LocalIP: p.LocalIP, LocalPort: p.LocalPort,
 			RemotePort: p.RemotePort, SK: p.SK,
 			SubPaths: p.SubPaths, Bandwidth: p.Bandwidth,
-			HTTPUser: p.HTTPUser, HTTPPass: p.HTTPPass,
+			HTTPUser: p.HTTPUser, HTTPPass: p.HTTPPass, Compress: p.Compress,
 		}
 		if len(p.CustomDomains) > 0 {
 			mp.Domains = p.CustomDomains

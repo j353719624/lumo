@@ -372,6 +372,8 @@ html[data-theme="light"] .secadd:hover{background:#E4EAFC}
 .maptoadv .paths{flex:1 1 130px}
 .maptoadv .bw{flex:0 0 110px}
 .maptoadv .auth{flex:0 0 170px}
+.cmpbox{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:var(--tx-3);cursor:pointer;flex:0 0 auto}
+.cmpbox input{width:13px;height:13px;accent-color:var(--accent)}
 html[data-theme="light"] .maptoadv input{background:#FFFFFF}
 html[data-theme="light"] .logrow .lm{color:#4C586B}
 html[data-theme="light"] .logrow.warn .lm{color:#8A5B00}

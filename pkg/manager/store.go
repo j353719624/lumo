@@ -28,6 +28,7 @@ type Mapping struct {
 	HTTPUser   string   `json:"httpUser,omitempty"`
 	HTTPPass   string   `json:"httpPass,omitempty"`
 	SK         string   `json:"sk,omitempty"`
+	Compress   bool     `json:"compress,omitempty"`
 }
 
 func (m Mapping) active() bool { return m.Enabled == nil || *m.Enabled }
@@ -40,6 +41,7 @@ type ConnConfig struct {
 	ServerPort    int       `json:"serverPort"`
 	Token         string    `json:"token"`
 	Protocol      string    `json:"protocol,omitempty"`
+	ProtocolVer   int       `json:"protocolVersion,omitempty"`
 	KCPPort       int       `json:"kcpPort,omitempty"`
 	TLS           bool      `json:"tls"`
 	Enabled       bool      `json:"enabled"`
@@ -51,13 +53,14 @@ type ConnConfig struct {
 // toClientConfig converts the stored form into engine configuration.
 func (c *ConnConfig) toClientConfig() (*config.ClientConfig, error) {
 	out := &config.ClientConfig{
-		Name:       c.Name,
-		ServerAddr: c.ServerAddr,
-		ServerPort: c.ServerPort,
-		Protocol:   c.Protocol,
-		KCPPort:    c.KCPPort,
-		AuthToken:  c.Token,
-		TLSEnable:  c.TLS,
+		Name:            c.Name,
+		ServerAddr:      c.ServerAddr,
+		ServerPort:      c.ServerPort,
+		Protocol:        c.Protocol,
+		KCPPort:         c.KCPPort,
+		ProtocolVersion: c.ProtocolVer,
+		AuthToken:       c.Token,
+		TLSEnable:       c.TLS,
 	}
 	safe := func(s string) string {
 		return strings.Map(func(r rune) rune {
@@ -93,6 +96,7 @@ func (c *ConnConfig) toClientConfig() (*config.ClientConfig, error) {
 		p.Bandwidth = m.Bandwidth
 		p.HTTPUser = m.HTTPUser
 		p.HTTPPass = m.HTTPPass
+		p.Compress = m.Compress
 		out.Proxies = append(out.Proxies, p)
 	}
 	if err := out.Validate(); err != nil {

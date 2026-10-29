@@ -41,6 +41,11 @@ type Client struct {
 	// usess is the multiplexed KCP session when Protocol is "kcp".
 	usess *udpstream.Session
 
+	punchMu      sync.Mutex
+	punchSvc     map[string]*punchService
+	punchSess    map[string]*udpstream.Session
+	punchWaiters map[string]chan proto.Msg
+
 	pendMu  sync.Mutex
 	pending map[string]chan proto.Msg
 
@@ -59,13 +64,16 @@ type ProxyState struct {
 // New creates a Client from validated configuration.
 func New(cfg *config.ClientConfig, cfgPath string) *Client {
 	c := &Client{
-		cfg:     cfg,
-		cfgPath: cfgPath,
-		id:      proto.RandomHex(8),
-		proxies: map[string]*config.ProxyConfig{},
-		state:   map[string]*ProxyState{},
-		stats:   map[string]*relay.Counters{},
-		pending: map[string]chan proto.Msg{},
+		cfg:         cfg,
+		cfgPath:     cfgPath,
+		id:          proto.RandomHex(8),
+		proxies:     map[string]*config.ProxyConfig{},
+		state:       map[string]*ProxyState{},
+		stats:       map[string]*relay.Counters{},
+		pending:     map[string]chan proto.Msg{},
+		punchSvc:     map[string]*punchService{},
+		punchSess:    map[string]*udpstream.Session{},
+		punchWaiters: map[string]chan proto.Msg{},
 	}
 	for i := range cfg.Proxies {
 		p := cfg.Proxies[i]
@@ -229,6 +237,11 @@ func (c *Client) serve(ctx context.Context) error {
 	if c.cfg.Name != "" {
 		hello["name"] = c.cfg.Name
 	}
+	pv := c.cfg.ProtocolVersion
+	if pv <= 0 {
+		pv = 2
+	}
+	hello["pv"] = pv
 	if err := proto.Send(conn, hello); err != nil {
 		return fmt.Errorf("send hello: %w", err)
 	}
@@ -263,6 +276,14 @@ func (c *Client) serve(ctx context.Context) error {
 	}
 	// 注册被拒的代理（典型：KCP 旧会话尚未超时，名字还被占着）持续重试
 	go c.retryFailedRegistrations(serveCtx, conn)
+	// PUNCH 服务侧：维持打洞 socket 并上报公网地址
+	c.mu.Lock()
+	for name, p := range c.proxies {
+		if p.Type == "punch" {
+			go c.runPunchService(serveCtx, name)
+		}
+	}
+	c.mu.Unlock()
 
 	pingTicker := time.NewTicker(20 * time.Second)
 	defer pingTicker.Stop()
@@ -297,6 +318,8 @@ func (c *Client) readLoop(ctx context.Context, conn net.Conn) error {
 		switch m.Str("type") {
 		case "work":
 			go c.handleWork(m)
+		case "punch_peer", "punch_fail":
+			c.handlePunchMessage(m)
 		case "reg_ok", "reg_err", "unreg_ok", "unreg_err":
 			c.deliver(m)
 		case "pong":

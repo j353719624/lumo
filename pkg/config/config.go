@@ -48,6 +48,8 @@ type ProxyConfig struct {
 	// HTTPUser/HTTPPass enable HTTP Basic Auth on the public http entry.
 	HTTPUser string
 	HTTPPass string
+	// Compress enables deflate framing on this proxy's tunnel channel.
+	Compress bool
 }
 
 // VisitorConfig is a local listener that reaches an sealed-tcp/sealed-udp proxy without
@@ -70,12 +72,17 @@ type ClientConfig struct {
 	// Protocol selects the transport to the server: "tcp" (default) or "kcp".
 	Protocol string
 	// KCPPort is the server's UDP tunnel port, used when Protocol is "kcp".
-	KCPPort   int
-	AuthToken string
-	TLSEnable bool
-	Web       WebServer
-	Proxies   []ProxyConfig
-	Visitors  []VisitorConfig
+	KCPPort int
+	// ProtocolVersion selects the tunnel protocol generation: 1 = legacy
+	// wire behavior, 2 (default) = extended (compressed data channels).
+	ProtocolVersion int
+	// StunServer is used for PUNCH hole punching (host:port).
+	StunServer string
+	AuthToken  string
+	TLSEnable  bool
+	Web        WebServer
+	Proxies    []ProxyConfig
+	Visitors   []VisitorConfig
 }
 
 // ValidProxyTypes lists the proxy kinds this build supports.
@@ -87,6 +94,7 @@ var ValidProxyTypes = map[string]bool{
 	"mux": true,
 	"sealed-tcp":   true,
 	"sealed-udp":   true,
+	"punch":   true,
 }
 
 // LoadServer reads and validates a lumos config file.
@@ -149,6 +157,8 @@ func LoadClient(path string) (*ClientConfig, error) {
 	c.ServerPort = getInt(root, "serverPort", 7000)
 	c.Protocol = getStr(root, "protocol", "tcp")
 	c.KCPPort = getInt(root, "kcpPort", 0)
+	c.ProtocolVersion = getInt(root, "protocolVersion", 2)
+	c.StunServer = getStr(root, "stunServer", "stun.easyvoip.com:3478")
 	if a := getTable(root, "auth"); a != nil {
 		c.AuthToken = getStr(a, "token", "")
 	}
@@ -167,6 +177,7 @@ func LoadClient(path string) (*ClientConfig, error) {
 			Bandwidth:     getStr(item, "bandwidth", ""),
 			HTTPUser:      getStr(item, "httpUser", ""),
 			HTTPPass:      getStr(item, "httpPass", ""),
+			Compress:      getBool(item, "compress"),
 		}
 		c.Proxies = append(c.Proxies, p)
 	}
@@ -239,7 +250,7 @@ func (c *ClientConfig) Validate() error {
 			if len(p.CustomDomains) == 0 {
 				return fmt.Errorf("proxy %q: customDomains is required for mux", p.Name)
 			}
-		case "sealed-tcp", "sealed-udp":
+		case "sealed-tcp", "sealed-udp", "punch":
 			if p.SK == "" {
 				return fmt.Errorf("proxy %q: sk is required for %s", p.Name, p.Type)
 			}
@@ -290,6 +301,13 @@ func getStr(m map[string]any, key, def string) string {
 		return v
 	}
 	return def
+}
+
+func getBool(m map[string]any, key string) bool {
+	if v, ok := m[key].(bool); ok {
+		return v
+	}
+	return false
 }
 
 func getStrs(m map[string]any, key string) []string {
