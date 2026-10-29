@@ -21,6 +21,15 @@ function toggleTheme() {
   setThemePref(theme.value === 'dark' ? 'light' : 'dark')
 }
 
+const logLevel = ref('all')
+function levelRank(level: string): number {
+  const lv = (level || '').toUpperCase()
+  if (lv.startsWith('ERR')) return 3
+  if (lv.startsWith('WARN')) return 2
+  if (lv.startsWith('INFO') || lv.startsWith('DEBUG')) return 1
+  return 0
+}
+
 const nType = ref('tcp')
 const tomlText = ref('')
 const tomlId = ref('')
@@ -496,7 +505,7 @@ setInterval(() => refresh(true), 2500)
           <path d="M10 42H62" stroke="#35E0C8" stroke-width="4.6" stroke-linecap="round"/>
           <circle cx="10" cy="42" r="3.8" fill="#35E0C8"/><circle cx="62" cy="42" r="3.8" fill="#35E0C8"/>
         </svg>
-        <span class="wm">LUMO</span>
+        <span class="wm">LUMO</span><span class="cn">客户端</span>
       </div>
 
       <div class="nav-label">工作区</div>
@@ -532,13 +541,6 @@ setInterval(() => refresh(true), 2500)
       <div class="engine">
         <div class="row"><span class="dot on"></span><span class="t">控制台已连接</span><span class="v">v{{ info?.version || '—' }}</span></div>
         <div class="addr">{{ consoleHost }}</div>
-      </div>
-    <div class="user">
-        <div class="av">A</div>
-        <div>
-          <div class="nm">admin</div>
-          <div class="pl">隧道引擎运行中</div>
-        </div>
       </div>
     </aside>
 
@@ -753,7 +755,7 @@ setInterval(() => refresh(true), 2500)
                 <div class="kv"><span>版本</span><b>v{{ info?.version || '—' }}</b></div>
               </div>
             </div>
-            <div class="dfoot">
+            <div class="dfoot" v-show="detailSection === 'files'">
               <span class="link" @click="showToml(draft)">完整编辑</span>
               <span class="spacer"></span>
               <button class="btn" @click="save">保存并应用</button>
@@ -773,6 +775,15 @@ setInterval(() => refresh(true), 2500)
 
       <!-- 运行日志视图 -->
       <div class="logview" v-show="view === 'logs'" ref="logView" @scroll="0">
+        <div class="logtools">
+          <span class="lg-lb">日志级别</span>
+          <select v-model="logLevel" class="lvsel">
+            <option value="all">全部</option>
+            <option value="info">info</option>
+            <option value="warn">warn</option>
+            <option value="error">error</option>
+          </select>
+        </div>
         <template v-if="runningConfigs.length">
           <div v-for="rc in runningConfigs" :key="rc.status.id" class="loggroup">
             <div class="loghead">
@@ -782,7 +793,7 @@ setInterval(() => refresh(true), 2500)
               <button class="btn ghost sm" @click="copyLogs(rc.status.log)">复制日志</button>
             </div>
             <div v-if="rc.status.error" class="logrow err"><span class="lt"></span><span class="lv">ERR</span><span class="lm">{{ rc.status.error }}</span></div>
-            <div v-for="(l, i) in parseLogs(rc.status.log)" :key="i" class="logrow" :class="l.cls">
+            <div v-for="(l, i) in parseLogs(rc.status.log).filter((x) => levelRank(x.level) >= levelRank(logLevel))" :key="i" class="logrow" :class="l.cls">
               <span class="lt">{{ l.time }}</span>
               <span class="lv">{{ l.level }}</span>
               <span class="lm">{{ l.msg }}</span>

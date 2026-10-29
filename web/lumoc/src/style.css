@@ -29,6 +29,7 @@ input,select,textarea{font:inherit;color:inherit}
   display:flex;flex-direction:column;padding:20px 14px;gap:6px}
 .sbrand{display:flex;align-items:center;gap:10px;padding:0 6px 16px}
 .sbrand .wm{font-weight:700;font-size:14px;letter-spacing:1px}
+.sbrand .cn{font-size:10px;letter-spacing:1.6px;color:var(--tx-4);margin-left:6px;padding-left:8px;border-left:1px solid var(--line-3)}
 .nav-label{font-size:10px;letter-spacing:1.6px;color:var(--tx-5);padding:10px 8px 6px;font-weight:500}
 .nav{display:flex;align-items:center;gap:10px;height:40px;padding:0 12px;border-radius:10px;
   color:var(--tx-3);font-size:13px;width:100%;text-align:left}
@@ -353,6 +354,9 @@ html[data-theme="light"] .sechint{color:#6E7A8C}
 html[data-theme="light"] .secadd:hover{background:#E4EAFC}
 
 /* ---------------- 日志视图 / TOML 编辑器 ---------------- */
+.logtools{display:flex;align-items:center;gap:10px;padding:0 0 10px}
+.lg-lb{font-size:11px;color:var(--tx-3)}
+.lvsel{height:30px;padding:0 9px;background:var(--panel);border:1px solid var(--line);border-radius:8px;font-size:11.5px;color:var(--tx);outline:none}
 .loggroup{display:flex;flex-direction:column;gap:2px;margin-bottom:16px}
 .loghead{display:flex;align-items:center;gap:8px;padding:2px 0 6px;position:sticky;top:0;background:var(--bg);z-index:1}
 .lg-name{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600}
