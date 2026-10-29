@@ -215,6 +215,9 @@ func (c *ClientConfig) Validate() error {
 	if c.Protocol == "kcp" && (c.KCPPort < 1 || c.KCPPort > 65535) {
 		return fmt.Errorf("kcpPort %d out of range", c.KCPPort)
 	}
+	if c.ProtocolVersion != 0 && (c.ProtocolVersion < 1 || c.ProtocolVersion > 2) {
+		return fmt.Errorf("protocolVersion %d not supported (1 or 2)", c.ProtocolVersion)
+	}
 	if c.AuthToken == "" {
 		return fmt.Errorf("auth.token is required")
 	}

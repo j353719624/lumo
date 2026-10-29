@@ -1,5 +1,15 @@
 // Typed API client for the lumoc console.
 
+export interface Visitor {
+  id: string
+  name?: string
+  serverName: string
+  sk: string
+  type: string // sealed-tcp | sealed-udp | punch
+  bindAddr?: string
+  bindPort: number
+}
+
 export interface Mapping {
   id: string
   name?: string
@@ -31,6 +41,7 @@ export interface ConnConfig {
   enabled: boolean
   autoReconnect?: boolean
   autoStart?: boolean
+  visitors?: Visitor[]
   mappings: Mapping[]
 }
 

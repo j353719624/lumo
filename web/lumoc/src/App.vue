@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { api, type ConnConfig, type ConnStatus, type EngineInfo, type Mapping } from './api'
+import { api, type ConnConfig, type ConnStatus, type EngineInfo, type Mapping, type Visitor } from './api'
 import { applyThemePref, getThemePref, type Theme, type ThemePref } from './theme'
 
 /* ---------------- 状态 ---------------- */
@@ -206,6 +206,39 @@ function updatePaths(m: Mapping, raw: string) {
   m.subPaths = splitList(raw)
 }
 
+function addVisitor() {
+  const c = draft.value
+  if (!c) return
+  if (!c.visitors) c.visitors = []
+  const first = (c.mappings || [])[0]
+  c.visitors.push({
+    id: uid(), name: '', type: 'sealed-tcp',
+    serverName: first ? c.id + '-' + first.id : '', sk: '',
+    bindAddr: '127.0.0.1', bindPort: 0,
+  })
+}
+
+function removeVisitor(idx: number) {
+  const c = draft.value
+  if (!c || !c.visitors) return
+  c.visitors.splice(idx, 1)
+}
+
+function visitorList(c: ConnConfig): Visitor[] {
+  return c.visitors || []
+}
+
+function updateVisitorBind(v: Visitor, raw: string) {
+  const s = raw.trim()
+  const i = s.lastIndexOf(':')
+  if (i > -1) {
+    v.bindAddr = s.slice(0, i) || '127.0.0.1'
+    v.bindPort = Number(s.slice(i + 1)) || 0
+  } else {
+    v.bindPort = Number(s) || 0
+  }
+}
+
 function updateAuth(m: Mapping, raw: string) {
   const i = raw.indexOf(':')
   if (i < 0) {
@@ -226,7 +259,7 @@ async function save() {
     const r = await api.update(c.id, {
       name: c.name, serverAddr: c.serverAddr, serverPort: c.serverPort,
       protocol: c.protocol || 'tcp', kcpPort: c.protocol === 'kcp' ? Number(c.kcpPort) || 0 : 0,
-      token: c.token, tls: c.tls, mappings: c.mappings,
+      token: c.token, tls: c.tls, mappings: c.mappings, visitors: c.visitors || [],
     })
     await refresh()
     toast(r?.restarted || wasRunning ? '已保存，正在重启该连接' : '已保存')
@@ -640,6 +673,24 @@ setInterval(() => refresh(true), 2500)
                   <input class="bw" v-model="m.bandwidth" placeholder="限速 如 1MB" aria-label="带宽限制">
                   <input class="auth" :value="(m.httpUser ? m.httpUser + ':' + (m.httpPass || '') : '')" placeholder="Basic 认证 用户:密码" aria-label="HTTP Basic 认证" @input="updateAuth(m, ($event.target as HTMLInputElement).value)">
                 </div>
+              </div>
+            </div>
+
+            <div class="sec"><span>访问端 {{ visitorList(draft).length }} 条</span><span class="flex1"></span>
+              <button class="secadd" @click="addVisitor">＋ 添加</button>
+            </div>
+            <div class="cards" style="gap:8px">
+              <div v-for="(v, idx) in visitorList(draft)" :key="v.id" class="map">
+                <input class="mname" v-model="v.name" placeholder="名称" aria-label="访问端名称">
+                <select v-model="v.type" aria-label="访问端类型">
+                  <option value="sealed-tcp">sealed-tcp</option><option value="sealed-udp">sealed-udp</option><option value="punch">PUNCH（P2P）</option>
+                </select>
+                <input class="local" v-model="v.serverName" placeholder="目标代理名（服务端注册名）" aria-label="目标代理">
+                <input class="msk" v-model="v.sk" placeholder="密钥 sk" aria-label="密钥">
+                <input class="remote" :value="(v.bindAddr || '127.0.0.1') + ':' + (v.bindPort || '')" placeholder="127.0.0.1:6000" aria-label="本地监听" @input="updateVisitorBind(v, ($event.target as HTMLInputElement).value)">
+                <button class="del" aria-label="删除这个访问端" @click="removeVisitor(idx)">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3.5 4.5H12.5M6.5 4.5V3.2H9.5V4.5M5 4.5L5.6 12.6H10.4L11 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
               </div>
             </div>
 

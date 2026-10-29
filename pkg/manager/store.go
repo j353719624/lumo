@@ -48,6 +48,19 @@ type ConnConfig struct {
 	AutoReconnect bool      `json:"autoReconnect,omitempty"`
 	AutoStart     bool      `json:"autoStart,omitempty"`
 	Mappings      []Mapping `json:"mappings"`
+	Visitors      []Visitor `json:"visitors,omitempty"`
+}
+
+// Visitor is a local listener that reaches a secret-key proxy (sealed-tcp/sealed-udp
+// by relaying through the server, punch by punching a direct connection).
+type Visitor struct {
+	ID         string `json:"id"`
+	Name       string `json:"name,omitempty"`
+	ServerName string `json:"serverName"`
+	SK         string `json:"sk"`
+	Type       string `json:"type"` // sealed-tcp | sealed-udp | punch
+	BindAddr   string `json:"bindAddr,omitempty"`
+	BindPort   int    `json:"bindPort"`
 }
 
 // toClientConfig converts the stored form into engine configuration.
@@ -98,6 +111,23 @@ func (c *ConnConfig) toClientConfig() (*config.ClientConfig, error) {
 		p.HTTPPass = m.HTTPPass
 		p.Compress = m.Compress
 		out.Proxies = append(out.Proxies, p)
+	}
+	for _, v := range c.Visitors {
+		vt := "tcp"
+		switch v.Type {
+		case "sealed-udp":
+			vt = "udp"
+		case "punch":
+			vt = "punch"
+		}
+		out.Visitors = append(out.Visitors, config.VisitorConfig{
+			Name:       safe(v.ID),
+			ServerName: v.ServerName,
+			SK:         v.SK,
+			Type:       vt,
+			BindAddr:   cmpOr(v.BindAddr, "127.0.0.1"),
+			BindPort:   v.BindPort,
+		})
 	}
 	if err := out.Validate(); err != nil {
 		return nil, err

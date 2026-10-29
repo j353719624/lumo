@@ -422,6 +422,25 @@ func renderToml(cfg ConnConfig) string {
 		}
 		L = append(L, "")
 	}
+	for _, v := range cfg.Visitors {
+		vt := v.Type
+		switch vt {
+		case "sealed-tcp":
+			vt = "tcp"
+		case "sealed-udp":
+			vt = "udp"
+		case "punch":
+			vt = "punch"
+		}
+		L = append(L, "[[visitors]]",
+			`name = "`+esc(v.ID)+`"`,
+			`type = "`+esc(vt)+`"`,
+			`serverName = "`+esc(v.ServerName)+`"`,
+			`sk = "`+esc(v.SK)+`"`,
+			`bindAddr = "`+esc(cmpOr(v.BindAddr, "127.0.0.1"))+`"`,
+			"bindPort = "+strconv.Itoa(v.BindPort),
+			"")
+	}
 	return strings.Join(L, "\n")
 }
 
@@ -481,8 +500,8 @@ func (m *Manager) apiTomlSave(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if len(parsed.Proxies) == 0 {
-		fail(w, http.StatusBadRequest, "至少保留一条端口映射")
+	if len(parsed.Proxies) == 0 && len(parsed.Visitors) == 0 {
+		fail(w, http.StatusBadRequest, "至少保留一条端口映射或一个访问端")
 		return
 	}
 	next := cur
@@ -493,6 +512,7 @@ func (m *Manager) apiTomlSave(w http.ResponseWriter, r *http.Request) {
 	next.ProtocolVer = parsed.ProtocolVersion
 	next.Token = parsed.AuthToken
 	next.Mappings = nil
+	next.Visitors = nil
 	for _, p := range parsed.Proxies {
 		mid := strings.TrimPrefix(p.Name, cur.ID+"-")
 		if mid == p.Name || mid == "" {
@@ -510,6 +530,20 @@ func (m *Manager) apiTomlSave(w http.ResponseWriter, r *http.Request) {
 			mp.Domain = p.CustomDomains[0]
 		}
 		next.Mappings = append(next.Mappings, mp)
+	}
+	for _, v := range parsed.Visitors {
+		vt := v.Type
+		switch vt {
+		case "tcp":
+			vt = "sealed-tcp"
+		case "udp":
+			vt = "sealed-udp"
+		}
+		next.Visitors = append(next.Visitors, Visitor{
+			ID: proto.RandomHex(4), Name: v.Name, Type: vt,
+			ServerName: v.ServerName, SK: v.SK,
+			BindAddr: v.BindAddr, BindPort: v.BindPort,
+		})
 	}
 	normalize(&next)
 	if _, err := next.toClientConfig(); err != nil {
