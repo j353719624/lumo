@@ -11,7 +11,6 @@ function toggleTheme() {
 
 const account = ref('')
 const password = ref('')
-const remember = ref(true)
 const showPwd = ref(false)
 const state = ref<'idle' | 'loading' | 'done'>('idle')
 const alertMsg = ref('')
@@ -109,26 +108,14 @@ async function submit() {
 }
 
 function finish(acc: string) {
-  try {
-    if (remember.value) localStorage.setItem('lumo.remember', acc)
-    else localStorage.removeItem('lumo.remember')
-  } catch { /* localStorage 不可用时忽略 */ }
   state.value = 'done'
   successShow.value = true
   setTimeout(() => { location.href = '/' }, 350)
 }
 
-try {
-  const saved = localStorage.getItem('lumo.remember')
-  if (saved) account.value = saved
-} catch { /* ignore */ }
 </script>
 
 <template>
-  <button class="themefab" type="button" :title="theme === 'dark' ? '日间模式' : '黑夜模式'" @click="toggleTheme">
-    <svg v-if="theme === 'dark'" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3.2" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.2V3M8 13V14.8M1.2 8H3M13 8H14.8M3.2 3.2L4.5 4.5M11.5 11.5L12.8 12.8M12.8 3.2L11.5 4.5M4.5 11.5L3.2 12.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-    <svg v-else width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M13.4 9.6A5.8 5.8 0 0 1 6.4 2.6A5.8 5.8 0 1 0 13.4 9.6Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
-  </button>
   <div class="app">
     <header class="loginbar">
       <div class="brandmark">
@@ -141,6 +128,11 @@ try {
         <span class="divider"></span>
         <span class="cn">隧光</span>
       </div>
+      <div class="bartools">
+  <button class="themefab" type="button" :title="theme === 'dark' ? '日间模式' : '黑夜模式'" @click="toggleTheme">
+    <svg v-if="theme === 'dark'" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3.2" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.2V3M8 13V14.8M1.2 8H3M13 8H14.8M3.2 3.2L4.5 4.5M11.5 11.5L12.8 12.8M12.8 3.2L11.5 4.5M4.5 11.5L3.2 12.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    <svg v-else width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M13.4 9.6A5.8 5.8 0 0 1 6.4 2.6A5.8 5.8 0 1 0 13.4 9.6Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+  </button>
       <div class="langsel" :class="{ open: langOpen }">
         <button class="langbtn" type="button" @click.stop="langOpen = !langOpen">
           <span class="flag">{{ locale === 'zh' ? '🇨🇳' : '🇺🇸' }}</span>
@@ -153,6 +145,7 @@ try {
           <button type="button" :class="{ cur: locale === 'zh' }" @click="pickLang('zh')"><span>🇨🇳</span> 简体中文</button>
           <button type="button" :class="{ cur: locale === 'en' }" @click="pickLang('en')"><span>🇺🇸</span> English</button>
         </div>
+      </div>
       </div>
     </header>
 
@@ -261,14 +254,6 @@ try {
                 </svg>
               </button>
             </div>
-          </div>
-
-          <div class="row" v-if="!twoFAStep">
-            <label class="remember">
-              <input type="checkbox" v-model="remember">
-              <span class="sw"></span>
-              <span>{{ t('login.remember') }}</span>
-            </label>
           </div>
 
           <div class="field" v-if="twoFAStep">
