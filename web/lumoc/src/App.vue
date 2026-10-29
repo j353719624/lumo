@@ -436,6 +436,11 @@ function setView(v: 'list' | 'logs') {
   view.value = v
 }
 
+function openSection(s: 'overview' | 'server' | 'mappings' | 'visitors' | 'files') {
+  view.value = 'list'
+  detailSection.value = s
+}
+
 
 async function testConnection(addr: string, port: number) {
   if (!addr) { toast('请先填写服务器地址', true); return }
@@ -496,24 +501,33 @@ setInterval(() => refresh(true), 2500)
 
       <div class="nav-label">工作区</div>
 
-      <button class="nav" :aria-current="view === 'list' ? 'page' : undefined" @click="setView('list')">
+      <button class="nav" :aria-current="view === 'list' && detailSection === 'overview' ? 'page' : undefined" @click="openSection('overview')">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 5.5L8 2L14 5.5V10.5L8 14L2 10.5V5.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 8.2V14M2 5.5L8 8.2M14 5.5L8 8.2" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
-        <span>连接配置</span>
+        <span>概览</span>
         <span class="nbadge">{{ configs.length }}</span>
       </button>
-      <template v-if="view === 'list'">
-        <button class="nav sub" :class="{ cur: detailSection === 'overview' }" @click="detailSection = 'overview'"><span>概览</span></button>
-        <button class="nav sub" :class="{ cur: detailSection === 'server' }" @click="detailSection = 'server'"><span>服务器</span></button>
-        <button class="nav sub" :class="{ cur: detailSection === 'mappings' }" @click="detailSection = 'mappings'"><span>端口映射</span></button>
-        <button class="nav sub" :class="{ cur: detailSection === 'visitors' }" @click="detailSection = 'visitors'"><span>访问端</span></button>
-        <button class="nav sub" :class="{ cur: detailSection === 'files' }" @click="detailSection = 'files'"><span>配置文件</span></button>
-      </template>
+      <button class="nav" :aria-current="view === 'list' && detailSection === 'server' ? 'page' : undefined" @click="openSection('server')">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="5" rx="1.2" stroke="currentColor" stroke-width="1.4"/><rect x="2" y="9" width="12" height="5" rx="1.2" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 4.5H5.5M4.5 11.5H5.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        <span>服务器</span>
+      </button>
+      <button class="nav" :aria-current="view === 'list' && detailSection === 'mappings' ? 'page' : undefined" @click="openSection('mappings')">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 4H9M11 4H13M3 8H5M7 8H13M3 12H9M11 12H13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="10" cy="4" r="1.4" stroke="currentColor" stroke-width="1.2"/><circle cx="6" cy="8" r="1.4" stroke="currentColor" stroke-width="1.2"/><circle cx="10" cy="12" r="1.4" stroke="currentColor" stroke-width="1.2"/></svg>
+        <span>端口映射</span>
+      </button>
+      <button class="nav" :aria-current="view === 'list' && detailSection === 'visitors' ? 'page' : undefined" @click="openSection('visitors')">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 2C5 2 2.8 4.2 2.8 7.2C2.8 10.8 8 14 8 14C8 14 13.2 10.8 13.2 7.2C13.2 4.2 11 2 8 2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="8" cy="7" r="1.8" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span>访问端</span>
+      </button>
+      <button class="nav" :aria-current="view === 'list' && detailSection === 'files' ? 'page' : undefined" @click="openSection('files')">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 1.5H9.5L13 5V14.5H4V1.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M9 1.5V5.5H13" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        <span>配置文件</span>
+      </button>
       <button class="nav" :aria-current="view === 'logs' ? 'page' : undefined" @click="setView('logs')">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 3H13M3 6.5H13M3 10H9M3 13.5H11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
         <span>运行日志</span>
       </button>
 
-      <div class="spacer"></div>
+      <div class="spacer"></div>      <div class="spacer"></div>
 
       <div class="engine">
         <div class="row"><span class="dot on"></span><span class="t">控制台已连接</span><span class="v">v{{ info?.version || '—' }}</span></div>
