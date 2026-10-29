@@ -87,7 +87,7 @@ const tomlSaving = ref(false)
 const logView = ref<HTMLElement | null>(null)
 
 const q = ref('')
-const view = ref<'list' | 'logs' | 'security'>('list')
+const view = ref<'list' | 'logs'>('list')
 const detailSection = ref<'overview' | 'server' | 'mappings' | 'visitors' | 'files'>('overview')
 watch(detailSection, async (sec) => {
   if (sec === 'files' && draft.value && !tomlText.value) {
@@ -491,7 +491,7 @@ function scrollLogsToEnd() {
   })
 }
 
-function setView(v: 'list' | 'logs' | 'security') {
+function setView(v: 'list' | 'logs') {
   view.value = v
 }
 
@@ -590,10 +590,6 @@ setInterval(() => refresh(true), 2500)
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 3H13M3 6.5H13M3 10H9M3 13.5H11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
         <span>{{ t('c.nav.logs') }}</span>
       </button>
-      <button class="nav" :aria-current="view === 'security' ? 'page' : undefined" @click="setView('security')">
-        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 1.5L13.5 3.5V7.2C13.5 10.9 11.2 13.6 8 14.8C4.8 13.6 2.5 10.9 2.5 7.2V3.5L8 1.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M5.6 7.9L7.3 9.6L10.6 6.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span>{{ t('c.nav.security') }}</span>
-      </button>
 
       <div class="spacer"></div>      <div class="spacer"></div>
 
@@ -607,8 +603,8 @@ setInterval(() => refresh(true), 2500)
     <main class="main">
       <div class="topbar">
         <div class="titleblock">
-          <h1>{{ { list: t('c.title.list'), logs: t('c.nav.logs'), security: t('c.nav.security') }[view] }}<template v-if="view === 'list'">{{ ' · ' + { overview: t('c.sec.overview'), server: t('c.sec.server'), mappings: t('c.sec.mappings'), visitors: t('c.sec.visitors'), files: t('c.sec.files') }[detailSection] }}</template></h1>
-          <p>{{ view === 'list' ? (configs.length ? t('c.sub.configs', configs.length, enabledCount) : t('c.sub.none')) : view === 'security' ? t('c.sub.security') : t('c.sub.logs') }}</p>
+          <h1>{{ { list: t('c.title.list'), logs: t('c.nav.logs') }[view] }}<template v-if="view === 'list'">{{ ' · ' + { overview: t('c.sec.overview'), server: t('c.sec.server'), mappings: t('c.sec.mappings'), visitors: t('c.sec.visitors'), files: t('c.sec.files') }[detailSection] }}</template></h1>
+          <p>{{ view === 'list' ? (configs.length ? t('c.sub.configs', configs.length, enabledCount) : t('c.sub.none')) : t('c.sub.logs') }}</p>
         </div>
         <span class="spacer"></span>
         <span class="welcome">{{ t('welcome') }} <b>LUMO</b></span>
@@ -886,16 +882,6 @@ setInterval(() => refresh(true), 2500)
           </div>
         </template>
         <div v-else class="hint" style="margin:16px">{{ t('c.log.empty') }}</div>
-      </div>
-
-      <!-- 安全视图（控制台级，不依赖任何连接配置） -->
-      <div class="content" v-show="view === 'security'">
-        <div class="setcard" style="max-width:640px">
-          <div class="kv"><span>{{ t('c.sec.tfa') }}</span>
-            <button class="btn ghost sm" @click="open2fa">{{ twofaEnabled ? t('c.sec.manage') : t('c.sec.turnOn') }}</button>
-          </div>
-          <p class="setnote" style="margin:0">{{ t('c.sec.note') }}</p>
-        </div>
       </div>
 
     </main>
