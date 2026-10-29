@@ -596,7 +596,7 @@ function closeMenu(e: MouseEvent) {
         <div id="rows">
           <div v-if="!pageSlice.length" class="lempty">{{ t('empty') }}</div>
           <div v-for="p in pageSlice" :key="p.name" class="prow" :class="{ offline: !p.online }">
-            <span class="c-name" :title="p.name">{{ p.label || p.name }}</span>
+            <span class="c-name">{{ p.label || p.name }}</span>
             <span class="c-type" :class="typeClass(p.type)">{{ p.type.toUpperCase() }}</span>
             <span class="c-client" :title="p.client">{{ p.client }}</span>
             <span class="c-entry" :title="p.entry">{{ p.entry }}</span>

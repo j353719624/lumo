@@ -187,17 +187,18 @@ a{color:inherit;text-decoration:none}
 
 .table{flex:1 1 auto;min-height:0;overflow:auto}
 .phead-row,.prow{display:grid;gap:16px;align-items:center;padding:0 18px;
-  grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 34px}
+  grid-template-columns:minmax(0,1.4fr) 64px minmax(0,1fr) minmax(0,1.5fr) minmax(0,0.8fr) 84px 34px}
 .phead-row{height:30px;background:#10161F;position:sticky;top:0;z-index:2;
-  font-size:10px;letter-spacing:.9px;color:var(--tx-5);font-weight:500}
+  font-size:10px;letter-spacing:.9px;color:var(--tx-5);font-weight:500;text-align:center}
+.phead-row>span{text-align:center}
 .prow{height:44px;border-bottom:1px solid var(--line-2);font-size:12px}
 .prow:hover{background:#151B26}
-.c-name{font:500 12px/1 var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.c-type{font:700 9.5px/1 var(--mono);letter-spacing:.4px}
+.c-name{font:500 12px/1 var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+.c-type{font:700 9.5px/1 var(--mono);letter-spacing:.4px;text-align:center}
 .c-client,.c-entry,.c-traffic{font:10.5px/1 var(--mono);color:var(--tx-3);
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
 .c-entry{color:#C7D2E4}
-.c-traffic{text-align:left;color:var(--tx-2)}
+.c-traffic{color:var(--tx-2)}
 .t-tcp{color:var(--accent-soft)} .t-http{color:var(--teal)}
 .t-udp{color:var(--warn)} .t-sealed-tcp{color:var(--sealed-tcp)}
 .t-https{color:#7BE3C3} .t-mux{color:#E8A45E} .t-sealed-udp{color:#F07FA6}
@@ -207,7 +208,7 @@ a{color:inherit;text-decoration:none}
 .state-pill.wait{background:#2A2113;color:var(--warn)}
 .prow.offline .c-name{color:#7D8AA0}
 .prow.offline .c-type,.prow.offline .c-entry,.prow.offline .c-client{color:var(--tx-4)}
-.more{width:26px;height:22px;border-radius:6px;display:grid;place-items:center;color:var(--tx-3)}
+.more{width:26px;height:22px;border-radius:6px;display:grid;place-items:center;color:var(--tx-3);justify-self:center}
 .more:hover{background:#1F2735;color:var(--tx)}
 
 .lfoot{height:44px;display:flex;align-items:center;gap:6px;padding:0 16px;
@@ -271,7 +272,7 @@ a{color:inherit;text-decoration:none}
 }
 @media (max-width:1180px){
   .layout{grid-template-columns:minmax(0,1fr) 340px}
-  .phead-row,.prow{grid-template-columns:minmax(0,1.5fr) 60px minmax(0,1.2fr) minmax(0,1fr) 76px 30px}
+  .phead-row,.prow{grid-template-columns:minmax(0,1.3fr) 56px minmax(0,1.4fr) minmax(0,0.9fr) 72px 30px}
   .c-client{display:none}
   .layout{grid-template-columns:1fr;
     grid-template-areas:"band" "rate" "proxies" "config" "logs";

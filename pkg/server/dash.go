@@ -413,11 +413,7 @@ func (s *Server) apiProxies(w http.ResponseWriter, _ *http.Request) {
 		}
 		label := ent.name
 		if ent.owner.name != "" {
-			if i := strings.Index(ent.name, "-"); i >= 0 && i+1 < len(ent.name) {
-				label = ent.owner.name + " · " + ent.name[i+1:]
-			} else {
-				label = ent.owner.name + " · " + ent.name
-			}
+			label = ent.owner.name
 		}
 		switch ent.kind {
 		case "tcp", "udp":
