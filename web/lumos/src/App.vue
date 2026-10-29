@@ -195,7 +195,7 @@ function normTime(t: string): string {
 const menu = ref<{ x: number; y: number; proxy: ProxyItem | null }>({ x: 0, y: 0, proxy: null })
 
 /* ---------------- 服务配置（可编辑） ---------------- */
-const srvCfg = ref({ bindPort: null as number | null, kcpPort: 0, vhostHttpPort: 0, vhostHttpsPort: 0, authToken: '', subdomainHost: '', allowPortsStr: '', webPort: 0, webPassword: '' })
+const srvCfg = ref({ bindPort: null as number | null, kcpPort: 0, vhostHttpPort: 0, vhostHttpsPort: 0, authToken: '', subdomainHost: '', allowPortsStr: '', webPort: 0, webPassword: '', revision: 0 })
 const showToken = ref(false)
 const tokenGenerated = ref(false)
 const tokenCopying = ref(false)
@@ -250,6 +250,7 @@ watch(info, (v) => {
   cfgLoaded.value = true
   srvCfg.value.bindPort = v.bindPort
   srvCfg.value.kcpPort = v.kcpPort || 0
+  srvCfg.value.revision = (v as any).revision || 0
   srvCfg.value.vhostHttpPort = v.vhostHttpPort
   srvCfg.value.vhostHttpsPort = v.vhostHttpsPort
   srvCfg.value.subdomainHost = v.subdomainHost
@@ -267,6 +268,7 @@ async function saveServerConfig() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...srvCfg.value, webPort: undefined, webPassword: undefined }),
+      // 409 = 页面过期（他人已保存），提示刷新
     })
     const d = await res.json()
     if (res.ok) {
@@ -279,6 +281,7 @@ async function saveServerConfig() {
       if (d.restart) setTimeout(() => location.reload(), 1500)
     } else {
       showToast(d.error || '保存失败', true)
+      if (res.status === 409) setTimeout(() => location.reload(), 1800)
     }
   } catch (e: any) {
     showToast('保存失败：' + (e?.message || e), true)

@@ -30,7 +30,15 @@ type ServerConfig struct {
 	// AuthPubKey is the Ed25519 public key of the tunnel secret (pubkey
 	// auth mode); when set, the secret itself is never stored server-side.
 	AuthPubKey string
-	Web        WebServer
+	// SubdomainHost turns dot-less proxy domains into <name>.<SubdomainHost>.
+	SubdomainHost string
+	// AllowPorts restricts the remote ports clients may bind, e.g.
+	// "1000-2000,3000". Empty means unrestricted.
+	AllowPorts string
+	// Revision increments on every config save; the console must send the
+	// revision it based its edit on, or the save is rejected as stale.
+	Revision int
+	Web      WebServer
 }
 
 // ProxyConfig describes one tunnel registered by a client.
@@ -120,6 +128,9 @@ func LoadServer(path string) (*ServerConfig, error) {
 		c.AuthToken = getStr(a, "token", "")
 		c.AuthPubKey = getStr(a, "pubKey", "")
 	}
+	c.SubdomainHost = getStr(root, "subdomainHost", "")
+	c.AllowPorts = getStr(root, "allowPorts", "")
+	c.Revision = getInt(root, "revision", 1)
 	c.Web = loadWeb(root, WebServer{Addr: "127.0.0.1"})
 	if err := c.validate(); err != nil {
 		return nil, err

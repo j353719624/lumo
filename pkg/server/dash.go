@@ -419,8 +419,8 @@ func (s *Server) apiServerInfo(w http.ResponseWriter, _ *http.Request) {
 		"quicPort":         0,
 		"vhostHttpPort":    s.cfg.VhostHTTPPort,
 		"vhostHttpsPort":   s.cfg.VhostHTTPSPort,
-		"subdomainHost":    "",
-		"allowPortsStr":    "",
+		"subdomainHost":    s.cfg.SubdomainHost,
+		"allowPortsStr":    s.cfg.AllowPorts,
 		"maxPoolCount":     0,
 		"heartbeatTimeout": 90,
 		"tlsForce":         false,
@@ -432,6 +432,7 @@ func (s *Server) apiServerInfo(w http.ResponseWriter, _ *http.Request) {
 		"pid":              os.Getpid(),
 		"authMode":         authModeLabel(s.cfg),
 		"authFp":           authFingerprint(s.cfg),
+		"revision":         s.cfg.Revision,
 		"startedAt":        s.start.Format("01-02 15:04:05"),
 		"uptimeStr":        formatDuration(time.Since(s.start)),
 	})
@@ -565,7 +566,10 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 		KCPPort        int    `json:"kcpPort"`
 		VhostHTTPPort  int    `json:"vhostHttpPort"`
 		VhostHTTPSPort int    `json:"vhostHttpsPort"`
+		SubdomainHost  string `json:"subdomainHost"`
+		AllowPorts     string `json:"allowPortsStr"`
 		AuthToken      string `json:"authToken"`
+		Revision       int    `json:"revision"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -589,6 +593,13 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 			failJSON(w, http.StatusBadRequest, name+" 必须在 1-65535 之间（0 表示不修改）")
 			return
 		}
+	}
+	// 乐观并发：页面必须基于最新修订保存，防止过期标签页互相覆盖
+	if req.Revision != s.cfg.Revision {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]string{"error": "配置已被修改（页面过期），请刷新页面后重试"})
+		return
 	}
 	oldVhostHTTP := s.cfg.VhostHTTPPort
 	oldVhostHTTPS := s.cfg.VhostHTTPSPort
@@ -625,6 +636,8 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	s.cfg.BindPort = req.BindPort
 	s.cfg.KCPPort = req.KCPPort
+	s.cfg.SubdomainHost = strings.TrimSpace(req.SubdomainHost)
+	s.cfg.AllowPorts = strings.TrimSpace(req.AllowPorts)
 	s.cfg.VhostHTTPPort = req.VhostHTTPPort
 	s.cfg.VhostHTTPSPort = req.VhostHTTPSPort
 	// 令牌由服务端生成：提交非空值即轮换——服务端只保存派生公钥，
@@ -634,6 +647,7 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 		s.cfg.AuthToken = ""
 	}
 
+	s.cfg.Revision++
 	// 写回 toml（校验失败则跳过，绝不写出无法登录的配置）
 	if s.cfgPath != "" && (s.cfg.AuthPubKey != "" || s.cfg.AuthToken != "") {
 		_ = config.SaveServer(s.cfgPath, s.cfg)

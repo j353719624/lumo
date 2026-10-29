@@ -9,6 +9,8 @@ import (
 
 	"github.com/j353719624/lumo/pkg/log"
 	"github.com/j353719624/lumo/pkg/proto"
+	"strconv"
+
 	"github.com/j353719624/lumo/pkg/relay"
 )
 
@@ -98,6 +100,9 @@ func (s *Server) setupProxyLocked(ent *proxyEnt) error {
 		if ent.remotePort < 1 || ent.remotePort > 65535 {
 			return fmt.Errorf("remote_port %d out of range", ent.remotePort)
 		}
+		if err := s.checkAllowedPort(ent.remotePort); err != nil {
+			return err
+		}
 		if s.usedPort[ent.remotePort] {
 			return fmt.Errorf("port %d already in use", ent.remotePort)
 		}
@@ -110,6 +115,9 @@ func (s *Server) setupProxyLocked(ent *proxyEnt) error {
 	case "udp":
 		if ent.remotePort < 1 || ent.remotePort > 65535 {
 			return fmt.Errorf("remote_port %d out of range", ent.remotePort)
+		}
+		if err := s.checkAllowedPort(ent.remotePort); err != nil {
+			return err
 		}
 		if s.usedPort[ent.remotePort] {
 			return fmt.Errorf("port %d already in use", ent.remotePort)
@@ -146,6 +154,14 @@ func (s *Server) setupProxyLocked(ent *proxyEnt) error {
 		}
 		if len(ent.domains) == 0 {
 			return fmt.Errorf("at least one domain is required")
+		}
+		// 无点域名视为子域名，挂到服务端 subdomainHost 上
+		if s.cfg.SubdomainHost != "" {
+			for i, d := range ent.domains {
+				if !strings.Contains(d, ".") {
+					ent.domains[i] = d + "." + s.cfg.SubdomainHost
+				}
+			}
 		}
 		// 同一域名下允许多个代理，按最长路径前缀匹配
 		table := s.httpDom
@@ -285,4 +301,34 @@ func lowerAll(in []string) []string {
 		}
 	}
 	return out
+}
+
+// checkAllowedPort enforces the server's allowPorts ranges (e.g.
+// "1000-2000,3000"). An empty allowlist means every port is permitted.
+func (s *Server) checkAllowedPort(port int) error {
+	spec := strings.TrimSpace(s.cfg.AllowPorts)
+	if spec == "" {
+		return nil
+	}
+	for _, part := range strings.Split(spec, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if lo, hi, found := strings.Cut(part, "-"); found {
+			loN, err1 := strconv.Atoi(strings.TrimSpace(lo))
+			hiN, err2 := strconv.Atoi(strings.TrimSpace(hi))
+			if err1 != nil || err2 != nil {
+				continue
+			}
+			if port >= loN && port <= hiN {
+				return nil
+			}
+			continue
+		}
+		if n, err := strconv.Atoi(part); err == nil && n == port {
+			return nil
+		}
+	}
+	return fmt.Errorf("port %d is outside the server's allowed ports (%s)", port, spec)
 }
