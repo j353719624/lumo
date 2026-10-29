@@ -721,7 +721,7 @@ setInterval(() => refresh(true), 2500)
               <p class="setnote">{{ t('c.ov.note') }}</p>
             </div>
             <div v-show="detailSection === 'server'">
-            <div class="sec"><span>{{ t('c.sv.connInfo') }}</span><span class="flex1"></span><span class="sechint">{{ t('c.sv.tomlHint') }}</span></div>
+            <div class="sec"><span>{{ t('c.sv.connInfo') }}</span><span class="flex1"></span><span class="sechint">{{ t('c.sv.tomlHint') }}</span><button class="secadd" @click="save">{{ t('config.save') }}</button></div>
 
             <div class="field"><label>{{ t('c.sv.name') }}</label><input v-model="draft.name" :placeholder="t('c.sv.namePh')"></div>
             <div class="field">
@@ -768,6 +768,7 @@ setInterval(() => refresh(true), 2500)
             </div>
             <div v-show="detailSection === 'mappings'">
             <div class="sec"><span>{{ t('c.mp.title', draft.mappings.length) }}</span><span class="flex1"></span>
+              <button class="secadd" @click="save">{{ t('config.save') }}</button>
               <button class="secadd" @click="addMapping">{{ t('c.add') }}</button>
             </div>
             <div class="cards" style="gap:8px">
@@ -804,6 +805,7 @@ setInterval(() => refresh(true), 2500)
             </div>
             <div v-show="detailSection === 'visitors'">
             <div class="sec"><span>{{ t('c.vi.title', visitorList(draft).length) }}</span><span class="flex1"></span>
+              <button class="secadd" @click="save">{{ t('config.save') }}</button>
               <button class="secadd" @click="addVisitor">{{ t('c.add') }}</button>
             </div>
             <div class="cards" style="gap:8px">

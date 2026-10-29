@@ -192,9 +192,10 @@ async function submit2fa() {
 
       <!-- 右：表单 -->
       <div class="formside">
-        <h1>{{ t('login.title') }}</h1>
+        <h1>{{ otpStep ? t('login.2fa') : t('login.title') }}</h1>
 
         <form @submit.prevent="submit" novalidate>
+          <template v-if="!otpStep">
           <div class="field">
             <label for="acc">{{ t('login.account') }}</label>
             <div class="ctrl">
@@ -233,6 +234,8 @@ async function submit2fa() {
               </button>
             </div>
           </div>
+
+          </template>
 
           <div class="field" v-if="otpStep">
             <label for="otp">{{ t('login.2fa') }}（2FA）</label>

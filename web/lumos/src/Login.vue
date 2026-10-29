@@ -213,10 +213,11 @@ function finish(acc: string) {
     <!-- 右：登录表单 -->
     <section class="formside">
       <div class="panel">
-        <h2>{{ t('login.title') }}</h2>
-        <p class="sub">{{ t('login.sub') }}</p>
+        <h2>{{ twoFAStep ? t('login.2fa') : t('login.title') }}</h2>
+        <p class="sub">{{ twoFAStep ? t('login.need2fa') : t('login.sub') }}</p>
 
         <form @submit.prevent="submit" novalidate>
+          <template v-if="!twoFAStep">
           <div class="field">
             <label for="acc">{{ t('login.account') }}</label>
             <div class="ctrl">
@@ -255,6 +256,8 @@ function finish(acc: string) {
               </button>
             </div>
           </div>
+
+          </template>
 
           <div class="field" v-if="twoFAStep">
             <label for="otp">{{ t('login.2fa') }}</label>
