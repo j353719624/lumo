@@ -146,7 +146,7 @@ async function poll() {
     connected.value = false
     healthOk.value = null
     booted.value = true
-    pushEvent('ERROR', `拉取失败：${err?.message || err}（${apiCfg.base || location.origin}）`)
+    pushEvent('ERROR', locale.value === 'zh' ? '拉取失败：服务暂不可达（可能是重启中）' : 'Fetch failed: service unreachable (restarting?)')
     return
   }
 
@@ -738,6 +738,7 @@ function closeMenu(e: MouseEvent) {
         <span class="spacer"></span>
         <button class="btn ghost sm" @click="copy(tomlSnippet(), 'lumos.toml ' + t('copied'))">{{ t('config.copy') }}</button>
       </div>
+      <div class="cbody" v-if="!cfgLoaded"><div class="note">读取配置…</div></div>
       <div class="cbody" v-if="cfgLoaded && cfgLocked">
         <div class="note" style="color:var(--tx-3)">🔒 {{ t('config.locked') }}</div>
         <div class="lrow"><span class="llb">{{ t('config.bindPort') }}</span><b class="mono">{{ srvCfg.bindPort }}</b></div>
@@ -785,7 +786,6 @@ function closeMenu(e: MouseEvent) {
         </div>
         <div class="note">{{ locale === 'zh' ? '注意：隧道端口与 KCP 端口保存后立即生效，HTTP/HTTPS 虚拟主机端口需重启 lumos' : 'Note: port changes take effect after a lumos restart' }}</div>
       </div>
-      <div class="cbody" v-else><div class="note">读取配置…</div></div>
       <div class="cfoot" v-if="cfgLoaded && !cfgLocked">
         <span class="spacer"></span>
         <button class="btn sm" :disabled="savingCfg" @click="saveServerConfig">{{ savingCfg ? t('config.saving') : t('config.save') }}</button>
