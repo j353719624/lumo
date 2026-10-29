@@ -631,7 +631,7 @@ setInterval(() => refresh(true), 2500)
             <div class="field" v-if="draft.protocol === 'kcp'"><label>KCP 端口（服务端 UDP）</label><input v-model.number="draft.kcpPort" class="mono" type="number" min="1" max="65535" placeholder="如 47011"></div>
             <div class="field"><label>认证令牌 · auth.token</label>
               <div class="token-wrap">
-                <input v-model="draft.token" class="mono" :type="showToken ? 'text' : 'password'" placeholder="与服务端一致" autocomplete="off">
+                <input v-model="draft.token" class="mono" :type="showToken ? 'text' : 'password'" placeholder="粘贴服务端生成的令牌（保存后服务端不再显示）" autocomplete="off">
                 <button type="button" class="eye-btn" :aria-pressed="showToken ? 'true' : 'false'" @click="showToken = !showToken" title="显示/隐藏">
                   <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
                     <path d="M1.6 8C3.4 4.9 5.6 3.4 8 3.4C10.4 3.4 12.6 4.9 14.4 8C12.6 11.1 10.4 12.6 8 12.6C5.6 12.6 3.4 11.1 1.6 8Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>

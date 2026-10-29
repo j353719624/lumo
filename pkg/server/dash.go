@@ -22,6 +22,7 @@ import (
 	"github.com/j353719624/lumo/pkg/config"
 	"github.com/j353719624/lumo/pkg/log"
 	"github.com/j353719624/lumo/pkg/qrcode"
+	"github.com/j353719624/lumo/pkg/token"
 	"github.com/j353719624/lumo/pkg/totp"
 	"github.com/j353719624/lumo/pkg/version"
 	lumosweb "github.com/j353719624/lumo/web/lumos"
@@ -77,6 +78,7 @@ func (s *Server) runDash() {
 	mux.HandleFunc("GET /login", s.loginPage)
 	mux.HandleFunc("POST /api/login", s.apiLogin)
 	mux.HandleFunc("POST /api/login/2fa", s.apiLogin2FA)
+	mux.Handle("GET /api/token/new", s.guard(http.HandlerFunc(s.apiTokenNew)))
 	mux.HandleFunc("GET /logout", s.apiLogout)
 	mux.HandleFunc("/api/profile/2fa", s.api2FAStatus)
 	mux.HandleFunc("POST /api/profile/2fa/setup", s.api2FASetup)
@@ -348,6 +350,36 @@ func jsonDecodeBody(r *http.Request, v any) error {
 	return json.NewDecoder(r.Body).Decode(v)
 }
 
+func authModeLabel(cfg *config.ServerConfig) string {
+	if cfg.AuthPubKey != "" {
+		return "key"
+	}
+	return "token"
+}
+
+func authFingerprint(cfg *config.ServerConfig) string {
+	if cfg.AuthPubKey != "" {
+		return token.Fingerprint(cfg.AuthPubKey)
+	}
+	return ""
+}
+
+// apiTokenNew mints a fresh tunnel secret. It is NOT stored here; the caller
+// must copy it before saving, after which only the derived public key is kept.
+func (s *Server) apiTokenNew(w http.ResponseWriter, _ *http.Request) {
+	secret, pub, err := token.Generate()
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, map[string]string{
+		"token": secret,
+		"fp":    token.Fingerprint(pub),
+	})
+}
+
 // apiTestConn tests TCP connectivity from the server to a target.
 func (s *Server) apiTestConn(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -398,6 +430,8 @@ func (s *Server) apiServerInfo(w http.ResponseWriter, _ *http.Request) {
 		"clientCounts":     clients,
 		"proxyTypeCount":   typeCount,
 		"pid":              os.Getpid(),
+		"authMode":         authModeLabel(s.cfg),
+		"authFp":           authFingerprint(s.cfg),
 		"startedAt":        s.start.Format("01-02 15:04:05"),
 		"uptimeStr":        formatDuration(time.Since(s.start)),
 	})
@@ -548,9 +582,11 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 	s.cfg.KCPPort = req.KCPPort
 	s.cfg.VhostHTTPPort = req.VhostHTTPPort
 	s.cfg.VhostHTTPSPort = req.VhostHTTPSPort
-	// 令牌由客户端生成：面板不回显、提交空值表示维持原令牌不变
+	// 令牌由服务端生成：提交非空值即轮换——服务端只保存派生公钥，
+	// 令牌本身保存后不再存在，也就无法再次显示或复制
 	if req.AuthToken != "" {
-		s.cfg.AuthToken = req.AuthToken
+		s.cfg.AuthPubKey = token.DerivePublicKey(req.AuthToken)
+		s.cfg.AuthToken = ""
 	}
 
 	// 写回 toml

@@ -233,6 +233,7 @@ func (c *Client) serve(ctx context.Context) error {
 		"client": c.id,
 		"nonce":  hex.EncodeToString(nonce),
 		"auth":   proto.Sign(c.cfg.AuthToken, nonce),
+		"authp":  proto.SignProof(c.cfg.AuthToken, nonce),
 	}
 	if c.cfg.Name != "" {
 		hello["name"] = c.cfg.Name

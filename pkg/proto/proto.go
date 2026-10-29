@@ -4,6 +4,8 @@
 package proto
 
 import (
+	"github.com/j353719624/lumo/pkg/token"
+
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -158,6 +160,12 @@ func (m Msg) StrList(key string) []string {
 }
 
 // Sign computes the hex HMAC-SHA256 of nonce under token.
+// SignProof returns the Ed25519 proof for the challenge, keyed by the
+// tunnel secret (any string; internally seeded via SHA-256).
+func SignProof(secret string, challenge []byte) string {
+	return token.SignProof(secret, challenge)
+}
+
 func Sign(token string, nonce []byte) string {
 	mac := hmac.New(sha256.New, []byte(token))
 	mac.Write(nonce)

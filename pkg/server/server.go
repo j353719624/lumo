@@ -25,6 +25,7 @@ import (
 	"github.com/j353719624/lumo/pkg/proto"
 	"github.com/j353719624/lumo/pkg/relay"
 	"github.com/j353719624/lumo/pkg/tlsgen"
+	"github.com/j353719624/lumo/pkg/token"
 	"github.com/j353719624/lumo/pkg/udpstream"
 	"github.com/j353719624/lumo/pkg/version"
 )
@@ -380,16 +381,30 @@ func (s *Server) newSession(c net.Conn, hello proto.Msg) {
 		_ = c.Close()
 		return
 	}
-	expect := proto.Sign(s.cfg.AuthToken, nonce)
-	if !hmac.Equal([]byte(expect), []byte(hello.Str("auth"))) {
-		who := hello.Str("client")
-		if n := hello.Str("name"); n != "" {
-			who = n + " (" + who + ")"
+	if s.cfg.AuthPubKey != "" {
+		// 公钥模式：验证 Ed25519 签名（服务端不保存令牌本身）
+		if !token.VerifyProof(s.cfg.AuthPubKey, nonce, hello.Str("authp")) {
+			who := hello.Str("client")
+			if n := hello.Str("name"); n != "" {
+				who = n + " (" + who + ")"
+			}
+			log.Warnf("client %q failed authentication (pubkey mode)", who)
+			_ = proto.Send(c, proto.Msg{"type": "error", "message": "authentication failed"})
+			_ = c.Close()
+			return
 		}
-		log.Warnf("client %q failed authentication", who)
-		_ = proto.Send(c, proto.Msg{"type": "error", "message": "authentication failed"})
-		_ = c.Close()
-		return
+	} else {
+		expect := proto.Sign(s.cfg.AuthToken, nonce)
+		if !hmac.Equal([]byte(expect), []byte(hello.Str("auth"))) {
+			who := hello.Str("client")
+			if n := hello.Str("name"); n != "" {
+				who = n + " (" + who + ")"
+			}
+			log.Warnf("client %q failed authentication", who)
+			_ = proto.Send(c, proto.Msg{"type": "error", "message": "authentication failed"})
+			_ = c.Close()
+			return
+		}
 	}
 	_ = c.SetDeadline(time.Time{})
 	sid := hello.Str("client")
@@ -570,7 +585,12 @@ func (s *Server) serveMuxConn(c net.Conn) {
 	if name := req.Header.Get("Lumo-Name"); name != "" {
 		// client attach: verify token + proxy, then hand off to the pairing
 		cid := req.Header.Get("Lumo-Cid")
-		if !hmac.Equal([]byte(proto.Sign(s.cfg.AuthToken, []byte(cid))),
+		if s.cfg.AuthPubKey != "" {
+			if !token.VerifyProof(s.cfg.AuthPubKey, []byte(cid), req.Header.Get("Lumo-TokenP")) {
+				_ = c.Close()
+				return
+			}
+		} else if !hmac.Equal([]byte(proto.Sign(s.cfg.AuthToken, []byte(cid))),
 			[]byte(req.Header.Get("Lumo-Token"))) {
 			_ = c.Close()
 			return

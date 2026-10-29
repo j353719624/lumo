@@ -27,7 +27,10 @@ type ServerConfig struct {
 	MuxPort     int
 	KCPPort        int
 	AuthToken      string
-	Web            WebServer
+	// AuthPubKey is the Ed25519 public key of the tunnel secret (pubkey
+	// auth mode); when set, the secret itself is never stored server-side.
+	AuthPubKey string
+	Web        WebServer
 }
 
 // ProxyConfig describes one tunnel registered by a client.
@@ -115,6 +118,7 @@ func LoadServer(path string) (*ServerConfig, error) {
 	c.KCPPort = getInt(root, "kcpPort", 0)
 	if a := getTable(root, "auth"); a != nil {
 		c.AuthToken = getStr(a, "token", "")
+		c.AuthPubKey = getStr(a, "pubKey", "")
 	}
 	c.Web = loadWeb(root, WebServer{Addr: "127.0.0.1"})
 	if err := c.validate(); err != nil {
@@ -127,8 +131,8 @@ func (c *ServerConfig) validate() error {
 	if c.BindPort < 1 || c.BindPort > 65535 {
 		return fmt.Errorf("bindPort %d out of range", c.BindPort)
 	}
-	if c.AuthToken == "" {
-		return fmt.Errorf("auth.token is required")
+	if c.AuthToken == "" && c.AuthPubKey == "" {
+		return fmt.Errorf("auth.token or auth.pubKey is required")
 	}
 	for name, port := range map[string]int{"vhostHTTPPort": c.VhostHTTPPort, "vhostHTTPSPort": c.VhostHTTPSPort, "muxPort": c.MuxPort} {
 		if port != 0 && (port < 1 || port > 65535) {

@@ -197,6 +197,50 @@ const menu = ref<{ x: number; y: number; proxy: ProxyItem | null }>({ x: 0, y: 0
 /* ---------------- 服务配置（可编辑） ---------------- */
 const srvCfg = ref({ bindPort: null as number | null, kcpPort: 0, vhostHttpPort: 0, vhostHttpsPort: 0, authToken: '', subdomainHost: '', allowPortsStr: '', webPort: 0, webPassword: '' })
 const showToken = ref(false)
+const tokenGenerated = ref(false)
+const tokenCopying = ref(false)
+const authMode = computed(() => (info.value as any)?.authMode || 'token')
+const authFp = computed(() => (info.value as any)?.authFp || '')
+
+async function generateToken() {
+  try {
+    const r = await fetch('/api/token/new')
+    const d = await r.json()
+    if (d.token) {
+      srvCfg.value.authToken = d.token
+      tokenGenerated.value = true
+      showToken.value = true
+      showToast('令牌已生成：保存前请先复制，保存后将不再显示')
+    } else {
+      showToast(d.error || '生成失败', true)
+    }
+  } catch (e: any) {
+    showToast('生成失败：' + (e?.message || e), true)
+  }
+}
+
+async function copyToken() {
+  const v = srvCfg.value.authToken
+  if (!v) return
+  tokenCopying.value = true
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(v)
+    } else {
+      const ta = document.createElement('textarea')
+      ta.value = v
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      ta.remove()
+    }
+    showToast('令牌已复制（保存后将无法再复制）')
+  } finally {
+    setTimeout(() => { tokenCopying.value = false }, 600)
+  }
+}
 const savedCfg = ref(null)
 const cfgLoaded = ref(false)
 const savingCfg = ref(false)
@@ -226,8 +270,10 @@ async function saveServerConfig() {
     })
     const d = await res.json()
     if (res.ok) {
-      // 令牌仅用于“写入新值”：保存后立即从表单移除，避免任何回显
+      // 令牌仅用于“写入新值”：保存后立即从表单移除，且服务端已不保存令牌本身
       srvCfg.value.authToken = ''
+      tokenGenerated.value = false
+      showToken.value = false
       if (savedCfg.value) (savedCfg.value as any).authToken = ''
       showToast(d.restart ? '已保存服务' : '已保存（token/面板密码热生效）')
       if (d.restart) setTimeout(() => location.reload(), 1500)
@@ -649,11 +695,17 @@ function closeMenu(e: MouseEvent) {
         </div>
         <div class="field"><label>{{ t('config.subdomain') }}</label><input v-model="srvCfg.subdomainHost" :placeholder="t('config.subdomainPh')"></div>
         <div class="field"><label>{{ t('config.allowPorts') }}</label><input v-model="srvCfg.allowPortsStr" :placeholder="t('config.allowPortsPh')"></div>
-        <div class="field"><label>{{ t('config.authToken') }}</label>
+        <div class="field"><label>{{ t('config.authToken') }}<span v-if="authMode === 'key' && authFp" style="margin-left:8px;color:var(--tx-4);font-family:var(--mono)">公钥 {{ authFp }}</span></label>
           <div style="position:relative">
-            <input v-model="srvCfg.authToken" :type="showToken ? 'text' : 'password'" autocomplete="off"
-                   :placeholder="t('config.authTokenPh')">
-            <button style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;cursor:pointer;color:var(--tx-3)" type="button" @click="showToken = !showToken">👁</button>
+            <input v-model="srvCfg.authToken" :type="tokenGenerated ? 'text' : 'password'" autocomplete="off" readonly
+                   :placeholder="authMode === 'key' ? '已保存（不再显示）。要更换请点「生成新令牌」' : '空 = 保持不变；点「生成新令牌」轮换'">
+            <button v-if="srvCfg.authToken && tokenGenerated" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;cursor:pointer;color:var(--tx-3)" type="button" @click="copyToken">{{ tokenCopying ? '已复制' : '复制' }}</button>
+          </div>
+          <div v-if="srvCfg.authToken && tokenGenerated" style="font-size:10px;color:var(--warn);line-height:1.6;margin-top:4px">
+            ⚠ 保存前先复制！保存后服务端只存公钥，令牌永久不可再查看；所有现有连接会断开，需把新令牌填到客户端。
+          </div>
+          <div style="margin-top:6px">
+            <button class="btn ghost sm" type="button" @click="generateToken">生成新令牌</button>
           </div>
         </div>
         <div class="sw-list">
