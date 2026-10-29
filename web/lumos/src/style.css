@@ -187,7 +187,8 @@ a{color:inherit;text-decoration:none}
 
 .table{flex:1 1 auto;min-height:0;overflow:auto}
 .phead-row,.prow{display:grid;gap:16px;align-items:center;padding:0 18px;
-  grid-template-columns:minmax(0,1.4fr) 64px minmax(0,1fr) minmax(0,1.5fr) minmax(0,0.8fr) 84px 34px}
+  grid-template-columns:minmax(150px,1.4fr) 64px minmax(92px,1fr) minmax(132px,1.5fr) minmax(70px,0.8fr) 84px 34px;
+  min-width:740px}
 .phead-row{height:30px;background:#10161F;position:sticky;top:0;z-index:2;
   font-size:10px;letter-spacing:.9px;color:var(--tx-5);font-weight:500;text-align:center}
 .phead-row>span{text-align:center}
@@ -272,7 +273,7 @@ a{color:inherit;text-decoration:none}
 }
 @media (max-width:1180px){
   .layout{grid-template-columns:minmax(0,1fr) 340px}
-  .phead-row,.prow{grid-template-columns:minmax(0,1.3fr) 56px minmax(0,1.4fr) minmax(0,0.9fr) 72px 30px}
+  .phead-row,.prow{grid-template-columns:minmax(130px,1.3fr) 56px minmax(130px,1.4fr) minmax(64px,0.9fr) 72px 30px;min-width:560px}
   .c-client{display:none}
   .layout{grid-template-columns:1fr;
     grid-template-areas:"band" "rate" "proxies" "config" "logs";
