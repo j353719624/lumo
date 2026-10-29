@@ -41,6 +41,13 @@ type ProxyConfig struct {
 	RemotePort    int
 	SK            string // secret key for sealed-tcp/sealed-udp
 	CustomDomains []string
+	// SubPaths narrows an http(s) proxy to specific request paths (e.g. /,/api).
+	SubPaths []string
+	// Bandwidth caps this proxy's throughput on the client, e.g. "1MB", "500KB".
+	Bandwidth string
+	// HTTPUser/HTTPPass enable HTTP Basic Auth on the public http entry.
+	HTTPUser string
+	HTTPPass string
 }
 
 // VisitorConfig is a local listener that reaches an sealed-tcp/sealed-udp proxy without
@@ -156,6 +163,10 @@ func LoadClient(path string) (*ClientConfig, error) {
 			RemotePort:    getInt(item, "remotePort", 0),
 			SK:            getStr(item, "sk", ""),
 			CustomDomains: getStrs(item, "customDomains"),
+			SubPaths:      getStrs(item, "subPaths"),
+			Bandwidth:     getStr(item, "bandwidth", ""),
+			HTTPUser:      getStr(item, "httpUser", ""),
+			HTTPPass:      getStr(item, "httpPass", ""),
 		}
 		c.Proxies = append(c.Proxies, p)
 	}

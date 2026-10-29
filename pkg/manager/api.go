@@ -386,8 +386,29 @@ func renderToml(cfg ConnConfig) string {
 		if mp.Name != "" {
 			L = append(L, `label = "`+esc(mp.Name)+`"`)
 		}
+		if mp.Bandwidth != "" {
+			L = append(L, `bandwidth = "`+esc(mp.Bandwidth)+`"`)
+		}
+		if mp.HTTPUser != "" {
+			L = append(L, `httpUser = "`+esc(mp.HTTPUser)+`"`, `httpPass = "`+esc(mp.HTTPPass)+`"`)
+		}
 		if mp.Type == "http" || mp.Type == "https" || mp.Type == "mux" {
-			L = append(L, `customDomains = ["`+esc(mp.Domain)+`"]`)
+			ds := mp.Domains
+			if len(ds) == 0 && mp.Domain != "" {
+				ds = []string{mp.Domain}
+			}
+			quoted := make([]string, 0, len(ds))
+			for _, d := range ds {
+				quoted = append(quoted, `"`+esc(d)+`"`)
+			}
+			L = append(L, "customDomains = ["+strings.Join(quoted, ", ")+"]")
+			if len(mp.SubPaths) > 0 {
+				qp := make([]string, 0, len(mp.SubPaths))
+				for _, p := range mp.SubPaths {
+					qp = append(qp, `"`+esc(p)+`"`)
+				}
+				L = append(L, "subPaths = ["+strings.Join(qp, ", ")+"]")
+			}
 		} else if mp.Type == "sealed-tcp" || mp.Type == "sealed-udp" {
 			L = append(L, `sk = "`+esc(mp.SK)+`"`)
 		} else {
@@ -474,8 +495,11 @@ func (m *Manager) apiTomlSave(w http.ResponseWriter, r *http.Request) {
 			ID: mid, Name: p.Label, Type: p.Type,
 			LocalIP: p.LocalIP, LocalPort: p.LocalPort,
 			RemotePort: p.RemotePort, SK: p.SK,
+			SubPaths: p.SubPaths, Bandwidth: p.Bandwidth,
+			HTTPUser: p.HTTPUser, HTTPPass: p.HTTPPass,
 		}
 		if len(p.CustomDomains) > 0 {
+			mp.Domains = p.CustomDomains
 			mp.Domain = p.CustomDomains[0]
 		}
 		next.Mappings = append(next.Mappings, mp)

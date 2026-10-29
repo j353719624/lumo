@@ -43,8 +43,8 @@ type Server struct {
 	sessions map[string]*session
 	proxies  map[string]*proxyEnt // by globally unique name
 	usedPort map[int]bool
-	httpDom  map[string]*proxyEnt
-	httpsDom map[string]*proxyEnt
+	httpDom  map[string][]*proxyEnt
+	httpsDom map[string][]*proxyEnt
 	muxDom   map[string]*proxyEnt
 
 	pendMu   sync.Mutex
@@ -90,6 +90,9 @@ type proxyEnt struct {
 	sk         string
 	remotePort int
 	domains    []string
+	subPaths   []string
+	httpUser   string
+	httpPass   string
 	owner      *session
 	since      time.Time
 
@@ -113,8 +116,8 @@ func New(cfg *config.ServerConfig) *Server {
 		sessions:    map[string]*session{},
 		proxies:     map[string]*proxyEnt{},
 		usedPort:    map[int]bool{},
-		httpDom:     map[string]*proxyEnt{},
-		httpsDom:    map[string]*proxyEnt{},
+		httpDom:     map[string][]*proxyEnt{},
+		httpsDom:    map[string][]*proxyEnt{},
 		muxDom:      map[string]*proxyEnt{},
 		pending:     map[string]pendEntry{},
 		webSessions: auth.NewSessions(7 * 24 * time.Hour),
@@ -657,11 +660,17 @@ func (s *Server) removeProxyLocked(name string, ent *proxyEnt) {
 	switch ent.kind {
 	case "http":
 		for _, d := range ent.domains {
-			delete(s.httpDom, d)
+			s.httpDom[d] = withoutEnt(s.httpDom[d], ent)
+			if len(s.httpDom[d]) == 0 {
+				delete(s.httpDom, d)
+			}
 		}
 	case "https":
 		for _, d := range ent.domains {
-			delete(s.httpsDom, d)
+			s.httpsDom[d] = withoutEnt(s.httpsDom[d], ent)
+			if len(s.httpsDom[d]) == 0 {
+				delete(s.httpsDom, d)
+			}
 		}
 	case "mux":
 		for _, d := range ent.domains {
@@ -672,4 +681,15 @@ func (s *Server) removeProxyLocked(name string, ent *proxyEnt) {
 	}
 	delete(s.proxies, name)
 	log.Infof("proxy %q (%s) removed", name, ent.kind)
+}
+
+// withoutEnt returns list without ent (nil when absent).
+func withoutEnt(list []*proxyEnt, ent *proxyEnt) []*proxyEnt {
+	out := list[:0]
+	for _, e := range list {
+		if e != ent {
+			out = append(out, e)
+		}
+	}
+	return out
 }

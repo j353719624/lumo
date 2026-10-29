@@ -9,6 +9,11 @@ export interface Mapping {
   localPort: number
   remotePort?: number
   domain?: string
+  domains?: string[]
+  subPaths?: string[]
+  bandwidth?: string
+  httpUser?: string
+  httpPass?: string
   sk?: string
 }
 

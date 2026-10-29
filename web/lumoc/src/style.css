@@ -366,6 +366,13 @@ html[data-theme="light"] .secadd:hover{background:#E4EAFC}
   border:1px solid var(--line);border-radius:10px;padding:12px;font:11px/1.6 var(--mono);color:var(--tx);outline:none}
 .tomledit:focus{border-color:rgba(90,123,255,.6)}
 .map input.msk{flex:0 0 110px}
+.maptoadv{display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%}
+.maptoadv input{height:28px;padding:0 9px;background:var(--panel-2);border:1px solid var(--line-3);
+  border-radius:7px;font:10.5px/1 var(--mono);outline:none;min-width:0}
+.maptoadv .paths{flex:1 1 130px}
+.maptoadv .bw{flex:0 0 110px}
+.maptoadv .auth{flex:0 0 170px}
+html[data-theme="light"] .maptoadv input{background:#FFFFFF}
 html[data-theme="light"] .logrow .lm{color:#4C586B}
 html[data-theme="light"] .logrow.warn .lm{color:#8A5B00}
 html[data-theme="light"] .logrow.err .lm{color:#C0394B}

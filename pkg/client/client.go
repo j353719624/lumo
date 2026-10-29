@@ -399,6 +399,9 @@ func (c *Client) registerAll() error {
 			"remote_port": p.RemotePort,
 			"sk":          p.SK,
 			"domains":     p.CustomDomains,
+			"sub_paths":   p.SubPaths,
+			"http_user":   p.HTTPUser,
+			"http_pass":   p.HTTPPass,
 		}, 10*time.Second)
 		c.mu.Lock()
 		if reply.Str("type") == "reg_ok" {
@@ -443,6 +446,9 @@ func (c *Client) retryFailedRegistrations(ctx context.Context, conn net.Conn) {
 				"remote_port": p.RemotePort,
 				"sk":          p.SK,
 				"domains":     p.CustomDomains,
+				"sub_paths":   p.SubPaths,
+				"http_user":   p.HTTPUser,
+				"http_pass":   p.HTTPPass,
 			}, 10*time.Second)
 			if reply.Str("type") == "reg_ok" {
 				c.mu.Lock()

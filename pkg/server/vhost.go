@@ -2,6 +2,8 @@ package server
 
 import (
 	"bytes"
+	"crypto/subtle"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net"
@@ -83,13 +85,39 @@ func (s *Server) routeVhost(kind string, c net.Conn) {
 		table = s.httpsDom
 	}
 	s.mu.Lock()
-	ent := table[host]
+	list := append([]*proxyEnt(nil), table[host]...)
 	s.mu.Unlock()
-	if ent == nil || ent.dead.Load() {
+
+	path := "/"
+	if kind == "http" {
+		path = pathFromHTTPHead(head)
+	}
+	var ent *proxyEnt
+	best := -1
+	for _, e := range list {
+		if e == nil || e.dead.Load() {
+			continue
+		}
+		if score := e.matchSubPath(path); score > best {
+			best = score
+			ent = e
+		}
+	}
+	if ent == nil {
 		if kind == "http" {
 			writeHTTPError(c, 404, "no proxy for host "+host)
 		}
 		return
+	}
+	// HTTP 入口的 Basic 认证（TLS 直通无法检查明文请求头，仅 http 代理生效）
+	if kind == "http" && ent.httpUser != "" {
+		user, pass, ok := basicAuthFromHead(head)
+		okUser := subtle.ConstantTimeCompare([]byte(user), []byte(ent.httpUser)) == 1
+		okPass := subtle.ConstantTimeCompare([]byte(pass), []byte(ent.httpPass)) == 1
+		if !ok || !okUser || !okPass {
+			writeHTTPAuthRequired(c)
+			return
+		}
 	}
 	wc, err := s.getWork(ent, 10*time.Second)
 	if err != nil {
@@ -165,6 +193,98 @@ func hostFromHTTPHead(head []byte) string {
 		}
 	}
 	return ""
+}
+
+// matchSubPath reports how specifically this proxy matches the request path.
+// A negative score means "no match"; "/" (the default) matches everything.
+func (e *proxyEnt) matchSubPath(path string) int {
+	if len(e.subPaths) == 0 {
+		return 0
+	}
+	best := -1
+	for _, sp := range e.subPaths {
+		sp = strings.TrimSpace(sp)
+		if sp == "" {
+			sp = "/"
+		}
+		if !strings.HasPrefix(sp, "/") {
+			sp = "/" + sp
+		}
+		if sp == "/" {
+			if best < 0 {
+				best = 0
+			}
+			continue
+		}
+		if path == sp || strings.HasPrefix(path, sp+"/") || strings.HasPrefix(path, sp+"?") {
+			if len(sp) > best {
+				best = len(sp)
+			}
+		}
+	}
+	return best
+}
+
+// pathFromHTTPHead extracts the request path from the first request line.
+func pathFromHTTPHead(head []byte) string {
+	line := string(head)
+	if i := strings.Index(line, "\r\n"); i > 0 {
+		line = line[:i]
+	}
+	parts := strings.Fields(line)
+	if len(parts) < 2 {
+		return "/"
+	}
+	target := parts[1]
+	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
+		if i := strings.Index(target, "://"); i > 0 {
+			rest := target[i+3:]
+			if j := strings.IndexByte(rest, '/'); j >= 0 {
+				target = rest[j:]
+			} else {
+				target = "/"
+			}
+		}
+	}
+	if i := strings.IndexByte(target, '?'); i >= 0 {
+		target = target[:i]
+	}
+	if target == "" {
+		return "/"
+	}
+	return target
+}
+
+// basicAuthFromHead parses an Authorization: Basic header.
+func basicAuthFromHead(head []byte) (user, pass string, ok bool) {
+	for _, line := range strings.Split(string(head), "\r\n")[1:] {
+		if line == "" {
+			break
+		}
+		idx := strings.IndexByte(line, ':')
+		if idx <= 0 || !strings.EqualFold(strings.TrimSpace(line[:idx]), "authorization") {
+			continue
+		}
+		val := strings.TrimSpace(line[idx+1:])
+		if !strings.HasPrefix(strings.ToLower(val), "basic ") {
+			return "", "", false
+		}
+		raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(val[6:]))
+		if err != nil {
+			return "", "", false
+		}
+		u, p, found := strings.Cut(string(raw), ":")
+		return u, p, found
+	}
+	return "", "", false
+}
+
+// writeHTTPAuthRequired replies 401 with a Basic challenge.
+func writeHTTPAuthRequired(c net.Conn) {
+	body := "<html><head><title>LUMO</title></head><body><h1>401 Unauthorized</h1><hr>LUMO</body></html>"
+	resp := fmt.Sprintf("HTTP/1.1 401 Unauthorized\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %d\r\nWWW-Authenticate: Basic realm=\"LUMO\"\r\nConnection: close\r\n\r\n%s",
+		len(body), body)
+	_, _ = io.WriteString(c, resp)
 }
 
 func writeHTTPError(c net.Conn, code int, msg string) {

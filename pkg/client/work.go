@@ -33,8 +33,12 @@ func (c *Client) handleWork(m proto.Msg) {
 
 	// mux pairs through the dedicated entry port with an HTTP CONNECT
 	// attach instead of a control-port data connection.
+	bw, bwErr := config.ParseBandwidth(p.Bandwidth)
+	if bwErr != nil {
+		c.logw("proxy %q: %v (ignoring bandwidth limit)", name, bwErr)
+	}
 	if p.Type == "mux" {
-		c.muxRelay(name, m.Str("cid"), local, cnt)
+		c.muxRelay(name, m.Str("cid"), local, cnt, bw)
 		return
 	}
 
@@ -50,17 +54,17 @@ func (c *Client) handleWork(m proto.Msg) {
 	}
 	switch p.Type {
 	case "tcp", "https", "sealed-tcp":
-		c.rawRelay(name, dc, local, cnt)
+		c.rawRelay(name, dc, local, cnt, bw)
 	case "http":
-		c.httpRelay(name, dc, local, cnt)
+		c.httpRelay(name, dc, local, cnt, bw)
 	case "udp", "sealed-udp":
-		c.udpRelay(name, dc, local, cnt)
+		c.udpRelay(name, dc, local, cnt, bw)
 	}
 }
 
 // muxRelay attaches to the server's mux port with the cid issued by
 // the work request, then relays to the local service.
-func (c *Client) muxRelay(name, cid, local string, cnt *relay.Counters) {
+func (c *Client) muxRelay(name, cid, local string, cnt *relay.Counters, bw int64) {
 	c.mu.Lock()
 	port := c.muxPort
 	c.mu.Unlock()
@@ -81,7 +85,7 @@ func (c *Client) muxRelay(name, cid, local string, cnt *relay.Counters) {
 		_ = dc.Close()
 		return
 	}
-	c.rawRelay(name, dc, local, cnt)
+	c.rawRelay(name, dc, local, cnt, bw)
 }
 
 func (c *Client) counters(name string) *relay.Counters {
@@ -90,7 +94,7 @@ func (c *Client) counters(name string) *relay.Counters {
 	return c.stats[name]
 }
 
-func (c *Client) rawRelay(name string, dc net.Conn, local string, cnt *relay.Counters) {
+func (c *Client) rawRelay(name string, dc net.Conn, local string, cnt *relay.Counters, bw int64) {
 	lc, err := net.DialTimeout("tcp", local, 5*time.Second)
 	if err != nil {
 		c.loge("proxy %q: dial local %s: %v", name, local, err)
@@ -102,7 +106,7 @@ func (c *Client) rawRelay(name string, dc net.Conn, local string, cnt *relay.Cou
 
 // httpRelay serves HTTP over the work connection and reverse-proxies each
 // request to the local service, preserving the visitor's Host header.
-func (c *Client) httpRelay(name string, dc net.Conn, local string, cnt *relay.Counters) {
+func (c *Client) httpRelay(name string, dc net.Conn, local string, cnt *relay.Counters, bw int64) {
 	target := &url.URL{Scheme: "http", Host: local}
 	rp := &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
@@ -111,7 +115,7 @@ func (c *Client) httpRelay(name string, dc net.Conn, local string, cnt *relay.Co
 		},
 	}
 	sl := &singleListener{ch: make(chan net.Conn, 1), addr: dc.RemoteAddr()}
-	sl.ch <- &relay.Conn{Conn: dc, C: cnt, In: true}
+	sl.ch <- &relay.Conn{Conn: relay.LimitConn(dc, bw), C: cnt, In: true}
 	if err := http.Serve(sl, rp); err != nil {
 		c.logd("proxy %q: http relay ended: %v", name, err)
 	}
@@ -120,13 +124,13 @@ func (c *Client) httpRelay(name string, dc net.Conn, local string, cnt *relay.Co
 
 // udpRelay shuffles framed datagrams between the server and per-visitor
 // UDP sockets pointed at the local service.
-func (c *Client) udpRelay(name string, dc net.Conn, local string, cnt *relay.Counters) {
+func (c *Client) udpRelay(name string, dc net.Conn, local string, cnt *relay.Counters, bw int64) {
 	var (
 		wmu sync.Mutex
 		mmu sync.Mutex
 		m   = map[string]*net.UDPConn{}
 	)
-	counted := &relay.Conn{Conn: dc, C: cnt, In: true}
+	counted := &relay.Conn{Conn: relay.LimitConn(dc, bw), C: cnt, In: true}
 
 	ensureLocal := func(raddr string) (*net.UDPConn, error) {
 		mmu.Lock()

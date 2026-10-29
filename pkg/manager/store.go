@@ -14,15 +14,20 @@ import (
 
 // Mapping is one port forwarding rule inside a connection config.
 type Mapping struct {
-	ID         string `json:"id"`
-	Name       string `json:"name,omitempty"`
-	Enabled    *bool  `json:"enabled,omitempty"`
-	Type       string `json:"type"`
-	LocalIP    string `json:"localIP,omitempty"`
-	LocalPort  int    `json:"localPort"`
-	RemotePort int    `json:"remotePort,omitempty"`
-	Domain     string `json:"domain,omitempty"`
-	SK         string `json:"sk,omitempty"`
+	ID         string   `json:"id"`
+	Name       string   `json:"name,omitempty"`
+	Enabled    *bool    `json:"enabled,omitempty"`
+	Type       string   `json:"type"`
+	LocalIP    string   `json:"localIP,omitempty"`
+	LocalPort  int      `json:"localPort"`
+	RemotePort int      `json:"remotePort,omitempty"`
+	Domain     string   `json:"domain,omitempty"`
+	Domains    []string `json:"domains,omitempty"`
+	SubPaths   []string `json:"subPaths,omitempty"`
+	Bandwidth  string   `json:"bandwidth,omitempty"`
+	HTTPUser   string   `json:"httpUser,omitempty"`
+	HTTPPass   string   `json:"httpPass,omitempty"`
+	SK         string   `json:"sk,omitempty"`
 }
 
 func (m Mapping) active() bool { return m.Enabled == nil || *m.Enabled }
@@ -77,9 +82,17 @@ func (c *ConnConfig) toClientConfig() (*config.ClientConfig, error) {
 			RemotePort: m.RemotePort,
 		}
 		if m.Type == "http" || m.Type == "https" || m.Type == "mux" {
-			p.CustomDomains = []string{m.Domain}
+			ds := m.Domains
+			if len(ds) == 0 && m.Domain != "" {
+				ds = []string{m.Domain}
+			}
+			p.CustomDomains = ds
 		}
 		p.SK = m.SK
+		p.SubPaths = m.SubPaths
+		p.Bandwidth = m.Bandwidth
+		p.HTTPUser = m.HTTPUser
+		p.HTTPPass = m.HTTPPass
 		out.Proxies = append(out.Proxies, p)
 	}
 	if err := out.Validate(); err != nil {

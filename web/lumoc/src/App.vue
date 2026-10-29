@@ -190,9 +190,31 @@ function updateLocal(m: Mapping, raw: string) {
   }
 }
 
+function splitList(raw: string): string[] {
+  return raw.split(',').map((s) => s.trim()).filter(Boolean)
+}
+
 function updateRemote(m: Mapping, raw: string) {
-  if (m.type === 'http' || m.type === 'https' || m.type === 'mux') m.domain = raw.trim()
-  else if (m.type !== 'sealed-tcp' && m.type !== 'sealed-udp') m.remotePort = Number(raw.trim()) || 0
+  if (m.type === 'http' || m.type === 'https' || m.type === 'mux') {
+    const ds = splitList(raw)
+    m.domains = ds
+    m.domain = ds[0] || ''
+  } else if (m.type !== 'sealed-tcp' && m.type !== 'sealed-udp') m.remotePort = Number(raw.trim()) || 0
+}
+
+function updatePaths(m: Mapping, raw: string) {
+  m.subPaths = splitList(raw)
+}
+
+function updateAuth(m: Mapping, raw: string) {
+  const i = raw.indexOf(':')
+  if (i < 0) {
+    m.httpUser = raw.trim()
+    m.httpPass = ''
+  } else {
+    m.httpUser = raw.slice(0, i).trim()
+    m.httpPass = raw.slice(i + 1)
+  }
 }
 
 async function save() {
@@ -250,9 +272,25 @@ async function createAndConnect() {
   }
   const mapName = (document.querySelector('#nMap .mname') as HTMLInputElement)?.value.trim() || ''
   if (mapName) mapping.name = mapName
-  if (type === 'http' || type === 'https' || type === 'mux') mapping.domain = remoteRaw
-  else if (type === 'sealed-tcp' || type === 'sealed-udp') mapping.sk = ((document.querySelector('#nMap .msk') as HTMLInputElement)?.value || '').trim()
-  else mapping.remotePort = Number(remoteRaw) || 0
+  if (type === 'http' || type === 'https' || type === 'mux') {
+    const ds = splitList(remoteRaw)
+    mapping.domains = ds
+    mapping.domain = ds[0] || ''
+  } else if (type === 'sealed-tcp' || type === 'sealed-udp') {
+    mapping.sk = ((document.querySelector('#nMap .msk') as HTMLInputElement)?.value || '').trim()
+  } else {
+    mapping.remotePort = Number(remoteRaw) || 0
+  }
+  if (type === 'http' || type === 'https') {
+    mapping.subPaths = splitList((document.querySelector('#nMap .paths') as HTMLInputElement)?.value || '')
+    mapping.bandwidth = ((document.querySelector('#nMap .bw') as HTMLInputElement)?.value || '').trim()
+    const authRaw = ((document.querySelector('#nMap .auth') as HTMLInputElement)?.value || '').trim()
+    if (authRaw) {
+      const i2 = authRaw.indexOf(':')
+      mapping.httpUser = i2 < 0 ? authRaw : authRaw.slice(0, i2).trim()
+      mapping.httpPass = i2 < 0 ? '' : authRaw.slice(i2 + 1)
+    }
+  }
 
   const startNowVal = startNow.value
 
@@ -576,14 +614,19 @@ setInterval(() => refresh(true), 2500)
                 <input class="local" :value="(m.localIP || '127.0.0.1') + ':' + (m.localPort || '')" aria-label="本地地址" @input="updateLocal(m, ($event.target as HTMLInputElement).value)">
                 <div class="mapto">
                   <span style="color:#5A7BFF">→</span>
-                  <input class="remote" :value="(m.type === 'http' || m.type === 'https' || m.type === 'mux') ? (m.domain || '') : (m.remotePort || '')"
-                         :placeholder="(m.type === 'http' || m.type === 'https' || m.type === 'mux') ? '域名' : (m.type === 'sealed-tcp' || m.type === 'sealed-udp') ? '无需公网端口' : '公网端口'"
+                  <input class="remote" :value="(m.type === 'http' || m.type === 'https' || m.type === 'mux') ? ((m.domains && m.domains.length ? m.domains : (m.domain ? [m.domain] : [])).join(', ')) : (m.remotePort || '')"
+                         :placeholder="(m.type === 'http' || m.type === 'https' || m.type === 'mux') ? '域名，多个用逗号分隔' : (m.type === 'sealed-tcp' || m.type === 'sealed-udp') ? '无需公网端口' : '公网端口'"
                          :disabled="m.type === 'sealed-tcp' || m.type === 'sealed-udp'" aria-label="公网入口"
                          @input="updateRemote(m, ($event.target as HTMLInputElement).value)">
                   <input v-if="m.type === 'sealed-tcp' || m.type === 'sealed-udp'" class="msk" v-model="m.sk" placeholder="密钥 sk" aria-label="密钥">
                   <button class="del" aria-label="删除这条映射" @click="removeMapping(idx)">
                     <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3.5 4.5H12.5M6.5 4.5V3.2H9.5V4.5M5 4.5L5.6 12.6H10.4L11 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   </button>
+                </div>
+                <div v-if="m.type === 'http' || m.type === 'https'" class="maptoadv">
+                  <input class="paths" :value="(m.subPaths || []).join(', ')" placeholder="访问路径 /,/api" aria-label="访问路径" @input="updatePaths(m, ($event.target as HTMLInputElement).value)">
+                  <input class="bw" v-model="m.bandwidth" placeholder="限速 如 1MB" aria-label="带宽限制">
+                  <input class="auth" :value="(m.httpUser ? m.httpUser + ':' + (m.httpPass || '') : '')" placeholder="Basic 认证 用户:密码" aria-label="HTTP Basic 认证" @input="updateAuth(m, ($event.target as HTMLInputElement).value)">
                 </div>
               </div>
             </div>
@@ -707,9 +750,14 @@ setInterval(() => refresh(true), 2500)
         </select>
         <input class="local" placeholder="127.0.0.1:5000">
         <div class="mapto"><span style="color:#5A7BFF">→</span>
-          <input class="remote" :placeholder="(nType === 'http' || nType === 'https' || nType === 'mux') ? '域名' : (nType === 'sealed-tcp' || nType === 'sealed-udp') ? '无需公网端口' : '15000'" :disabled="nType === 'sealed-tcp' || nType === 'sealed-udp'">
+          <input class="remote" :placeholder="(nType === 'http' || nType === 'https' || nType === 'mux') ? '域名，多个用逗号分隔' : (nType === 'sealed-tcp' || nType === 'sealed-udp') ? '无需公网端口' : '15000'" :disabled="nType === 'sealed-tcp' || nType === 'sealed-udp'">
         </div>
         <input v-if="nType === 'sealed-tcp' || nType === 'sealed-udp'" class="msk" placeholder="密钥 sk">
+        <div v-if="nType === 'http' || nType === 'https'" class="maptoadv">
+          <input class="paths" placeholder="访问路径 /,/api">
+          <input class="bw" placeholder="限速 如 1MB">
+          <input class="auth" placeholder="Basic 认证 用户:密码">
+        </div>
       </div>
 
       <div class="grp"><span class="gnum">3</span><b>启动方式</b><em>可随时在列表里开关</em></div>

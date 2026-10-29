@@ -53,6 +53,9 @@ func (s *Server) handleReg(ses *session, m proto.Msg) {
 		sk:         m.Str("sk"),
 		remotePort: m.Int("remote_port"),
 		domains:    lowerAll(m.StrList("domains")),
+		subPaths:   m.StrList("sub_paths"),
+		httpUser:   m.Str("http_user"),
+		httpPass:   m.Str("http_pass"),
 		owner:      ses,
 		since:      time.Now(),
 		workCh:     make(chan net.Conn, 64),
@@ -144,17 +147,13 @@ func (s *Server) setupProxyLocked(ent *proxyEnt) error {
 		if len(ent.domains) == 0 {
 			return fmt.Errorf("at least one domain is required")
 		}
+		// 同一域名下允许多个代理，按最长路径前缀匹配
 		table := s.httpDom
 		if ent.kind == "https" {
 			table = s.httpsDom
 		}
 		for _, d := range ent.domains {
-			if _, taken := table[d]; taken {
-				return fmt.Errorf("domain %q already in use", d)
-			}
-		}
-		for _, d := range ent.domains {
-			table[d] = ent
+			table[d] = append(table[d], ent)
 		}
 	}
 	return nil
