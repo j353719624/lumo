@@ -56,7 +56,10 @@ func runDiscover(args []string) {
 	if err != nil {
 		fail(err)
 	}
-	if first.Str("type") != "welcome" && first.Str("type") != "services" {
+	if first.Str("type") == "error" {
+		fail(fmt.Errorf("server: %s", first.Str("message")))
+	}
+	if first.Str("type") != "services" && first.Str("type") != "welcome" {
 		fail(fmt.Errorf("unexpected reply type %q", first.Str("type")))
 	}
 

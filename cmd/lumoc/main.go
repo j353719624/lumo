@@ -25,6 +25,10 @@ func main() {
 		runEngine(os.Args[2:])
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "discover" {
+		runDiscover(os.Args[2:])
+		return
+	}
 	if len(os.Args) > 1 && os.Args[1] == "token" {
 		// 认证令牌由客户端生成；两端填入同一令牌即可互通
 		tok, err := newToken()
