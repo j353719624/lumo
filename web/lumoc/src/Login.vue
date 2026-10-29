@@ -10,8 +10,6 @@ function toggleTheme() {
 
 const account = ref('')
 const password = ref('')
-const remember = ref(true)
-const autostart = ref(false)
 const showPwd = ref(false)
 const state = ref<'idle' | 'loading' | 'done'>('idle')
 const alertMsg = ref('')
@@ -61,11 +59,6 @@ async function submit() {
       return
     }
     if (res.ok) {
-      try {
-        if (remember.value) localStorage.setItem('lumo.client.account', acc)
-        else localStorage.removeItem('lumo.client.account')
-        localStorage.setItem('lumo.client.autostart', autostart.value ? '1' : '0')
-      } catch { /* ignore */ }
       state.value = 'done'
       successShow.value = true
       setTimeout(() => { location.href = '/' }, 350)
@@ -105,11 +98,6 @@ async function submit2fa() {
   }
 }
 
-try {
-  const saved = localStorage.getItem('lumo.client.account')
-  if (saved) account.value = saved
-  if (localStorage.getItem('lumo.client.autostart') === '1') autostart.value = true
-} catch { /* ignore */ }
 </script>
 
 <template>
@@ -224,19 +212,6 @@ try {
               <input id="otp" v-model="otpCode" type="text" inputmode="numeric" maxlength="6"
                      placeholder="6 位动态验证码" autocomplete="one-time-code">
             </div>
-          </div>
-
-          <div class="opts" v-if="!otpStep">
-            <label class="opt">
-              <input type="checkbox" v-model="remember">
-              <span class="sw"></span>
-              <span>记住账号</span>
-            </label>
-            <label class="opt">
-              <input type="checkbox" v-model="autostart">
-              <span class="sw"></span>
-              <span>开机自启</span>
-            </label>
           </div>
 
           <div class="alert" :class="{ show: alertShow }" role="alert" aria-live="polite">
