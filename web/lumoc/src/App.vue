@@ -106,11 +106,11 @@ function parseLogs(lines: string[]) {
 function mappingSummary(c: ConnConfig): string {
   const m = (c.mappings || [])[0]
   if (!m) return '未配置映射'
-  const local = `${m.localIP || '127.0.0.1'}:${m.localPort || '—'}`
   const remote = (m.type === 'http' || m.type === 'https') ? (m.domain || '未填域名') : String(m.remotePort || '—')
   const more = c.mappings.length > 1 ? `  +${c.mappings.length - 1}` : ''
-  const tag = m.name ? `[${m.name}] ` : ''
-  return `${c.serverAddr}:${c.serverPort}  →  ${tag}${local}  ⇒  ${remote}${more}`
+  const tag = m.name ? `[${m.name}] `
+    : (m.type === 'http' || m.type === 'https' || m.type === 'mux') ? '' : ''
+  return `${c.serverPort} → ${tag}${m.localPort || '—'}  ⇒  ${remote}${more}`
 }
 
 watch(() => runningConfigs.value.map((rc) => rc.status.log.length).join(','), () => scrollLogsToEnd())
@@ -533,14 +533,6 @@ setInterval(() => refresh(true), 2500)
         <div class="row"><span class="dot on"></span><span class="t">控制台已连接</span><span class="v">v{{ info?.version || '—' }}</span></div>
         <div class="addr">{{ consoleHost }}</div>
       </div>
-      <div class="themepref">
-      <span class="tp-lb">外观</span>
-      <div class="seg tp-seg">
-        <button :aria-pressed="themePref === 'auto'" @click="setThemePref('auto')">系统</button>
-        <button :aria-pressed="themePref === 'light'" @click="setThemePref('light')">日间</button>
-        <button :aria-pressed="themePref === 'dark'" @click="setThemePref('dark')">黑夜</button>
-      </div>
-    </div>
     <div class="user">
         <div class="av">A</div>
         <div>
@@ -562,14 +554,10 @@ setInterval(() => refresh(true), 2500)
           <svg v-if="theme === 'dark'" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3.2" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.2V3M8 13V14.8M1.2 8H3M13 8H14.8M3.2 3.2L4.5 4.5M11.5 11.5L12.8 12.8M12.8 3.2L11.5 4.5M4.5 11.5L3.2 12.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
           <svg v-else width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M13.4 9.6A5.8 5.8 0 0 1 6.4 2.6A5.8 5.8 0 1 0 13.4 9.6Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
         </button>
-        <label class="search">
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.6" stroke="#5D6A80" stroke-width="1.6"/><path d="M10.4 10.4L13.4 13.4" stroke="#5D6A80" stroke-width="1.6" stroke-linecap="round"/></svg>
-          <input v-model="q" type="search" placeholder="搜索配置" autocomplete="off">
-        </label>
-        <button class="btn" @click="openModal('modalNew')">
-          <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 2V12M2 7H12" stroke="#0B1117" stroke-width="2" stroke-linecap="round"/></svg>
-          新建配置
-        </button>
+        <div class="topuser">
+          <span class="topav">A</span>
+          <span class="topnm">admin</span>
+        </div>
       </div>
 
       <!-- 连接配置视图 -->
@@ -751,7 +739,12 @@ setInterval(() => refresh(true), 2500)
             </div>
 
             <div v-show="detailSection === 'files'">
-              <div class="sec"><span>lumoc.toml</span><span class="flex1"></span><span class="sechint">只读预览</span></div>
+              <div class="sec"><span>lumoc.toml</span><span class="flex1"></span>
+                <button class="btn sm" @click="openModal('modalNew')">
+                  <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 2V12M2 7H12" stroke="#0B1117" stroke-width="2" stroke-linecap="round"/></svg>
+                  新建配置
+                </button>
+              </div>
               <pre class="warnbox" style="white-space:pre-wrap;max-height:40vh;overflow:auto">{{ tomlText || '加载中…' }}</pre>
               <div class="setcard" style="margin-top:12px">
                 <div class="kv"><span>运行模式</span><b>单进程托管全部连接</b></div>
