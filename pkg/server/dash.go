@@ -479,6 +479,41 @@ func (s *Server) apiProxies(w http.ResponseWriter, _ *http.Request) {
 		})
 	}
 	s.mu.Unlock()
+
+	// 离线档案：最近见过、当前已断开的代理（灰显），最多保留 7 天
+	s.mu.Lock()
+	now := time.Now()
+	for name, mem := range s.proxyMem {
+		if _, live := s.proxies[name]; live {
+			continue
+		}
+		if now.Sub(mem.removed) > proxyMemTTL {
+			delete(s.proxyMem, name)
+			continue
+		}
+		conf := map[string]any{
+			"type": mem.kind,
+			"user": mem.clientName,
+		}
+		switch mem.kind {
+		case "tcp", "udp":
+			conf["localIP"] = "—"
+			conf["localPort"] = 0
+			conf["remotePort"] = 0
+		}
+		list = append(list, map[string]any{
+			"name":              name,
+			"label":             mem.label,
+			"clientName":        mem.clientName,
+			"status":            "offline",
+			"today_traffic_in":  mem.trafficIn,
+			"today_traffic_out": mem.trafficOut,
+			"cur_conns":         0,
+			"last_start_time":   mem.since.Format("2006-01-02 15:04:05"),
+			"conf":              conf,
+		})
+	}
+	s.mu.Unlock()
 	writeJSON(w, map[string]any{"proxies": list})
 }
 
@@ -567,6 +602,10 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 		}
 		persistFirewallPort(req.BindPort)
 	}
+	// 0 = 保持现状：过期页面可能带着旧值，不能当「关闭」处理
+	if req.KCPPort == 0 {
+		req.KCPPort = oldKCP
+	}
 	if req.KCPPort != oldKCP {
 		if err := s.StartKCP(req.KCPPort); err != nil {
 			// 恢复旧监听，避免服务处于半开状态
@@ -577,6 +616,12 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 		if req.KCPPort > 0 {
 			persistFirewallPort(req.KCPPort)
 		}
+	}
+	if req.VhostHTTPPort == 0 && oldVhostHTTP > 0 {
+		req.VhostHTTPPort = oldVhostHTTP
+	}
+	if req.VhostHTTPSPort == 0 && oldVhostHTTPS > 0 {
+		req.VhostHTTPSPort = oldVhostHTTPS
 	}
 	s.cfg.BindPort = req.BindPort
 	s.cfg.KCPPort = req.KCPPort
@@ -589,8 +634,8 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 		s.cfg.AuthToken = ""
 	}
 
-	// 写回 toml
-	if s.cfgPath != "" {
+	// 写回 toml（校验失败则跳过，绝不写出无法登录的配置）
+	if s.cfgPath != "" && (s.cfg.AuthPubKey != "" || s.cfg.AuthToken != "") {
 		_ = config.SaveServer(s.cfgPath, s.cfg)
 	}
 

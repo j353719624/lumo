@@ -50,8 +50,12 @@ type Server struct {
 	httpsDom map[string][]*proxyEnt
 	muxDom   map[string]*proxyEnt
 
-	pendMu   sync.Mutex
-	pending  map[string]pendEntry
+	pendMu  sync.Mutex
+	pending map[string]pendEntry
+
+	// proxyMem remembers recently-seen proxies after their client went
+	// away, so the console can show them greyed out as offline.
+	proxyMem map[string]*proxyMemEntry
 	connsNow atomic.Int64
 
 	webSessions *auth.Sessions
@@ -59,6 +63,20 @@ type Server struct {
 	tlsCert     *tls.Certificate
 	cfgPath     string
 }
+
+type proxyMemEntry struct {
+	name       string
+	label      string
+	clientName string
+	kind       string
+	entry      string
+	trafficIn  uint64
+	trafficOut uint64
+	since      time.Time
+	removed    time.Time
+}
+
+const proxyMemTTL = 7 * 24 * time.Hour
 
 type pendEntry struct {
 	ch   chan net.Conn
@@ -121,6 +139,7 @@ func New(cfg *config.ServerConfig) *Server {
 		proxies:     map[string]*proxyEnt{},
 		usedPort:    map[int]bool{},
 		httpDom:     map[string][]*proxyEnt{},
+		proxyMem:    map[string]*proxyMemEntry{},
 		httpsDom:    map[string][]*proxyEnt{},
 		muxDom:      map[string]*proxyEnt{},
 		pending:     map[string]pendEntry{},
@@ -710,7 +729,48 @@ func (s *Server) removeProxyLocked(name string, ent *proxyEnt) {
 		delete(s.usedPort, ent.remotePort)
 	}
 	delete(s.proxies, name)
+	if s.proxyMem != nil {
+		label := ent.name
+		if ent.owner != nil && ent.owner.name != "" {
+			label = ent.owner.name
+		}
+		if ent.label != "" {
+			if ent.owner != nil && ent.owner.name != "" {
+				label = ent.owner.name + " · " + ent.label
+			} else {
+				label = ent.label
+			}
+		}
+		entry := ""
+		switch ent.kind {
+		case "tcp", "udp":
+			entry = fmt.Sprintf(":%d", ent.remotePort)
+		case "http", "https", "mux":
+			if len(ent.domains) > 0 {
+				entry = ent.domains[0]
+			}
+		}
+		s.proxyMem[name] = &proxyMemEntry{
+			name:       name,
+			label:      label,
+			clientName: ent.ownerNameSafe(),
+			kind:       ent.kind,
+			entry:      entry,
+			trafficIn:  ent.cnt.In.Load(),
+			trafficOut: ent.cnt.Out.Load(),
+			since:      ent.since,
+			removed:    time.Now(),
+		}
+	}
 	log.Infof("proxy %q (%s) removed", name, ent.kind)
+}
+
+// ownerNameSafe returns the client display name, tolerating a nil owner.
+func (e *proxyEnt) ownerNameSafe() string {
+	if e.owner != nil {
+		return e.owner.name
+	}
+	return ""
 }
 
 // withoutEnt returns list without ent (nil when absent).
