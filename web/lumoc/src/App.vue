@@ -694,7 +694,7 @@ setInterval(() => refresh(true), 2500)
             <div class="dhead">
               <div class="txt">
                 <h2>{{ draft.name }}</h2>
-                <div class="sub">{{ draft.serverAddr }}:{{ draft.serverPort }} · {{ (draft.protocol || 'tcp').toUpperCase() }} · {{ statusOf(draft).label }}</div>
+                <div class="sub">{{ (draft.protocol || 'tcp').toUpperCase() }} · {{ statusOf(draft).label }}</div>
               </div>
               <span class="switch" role="switch" :aria-checked="draft.enabled ? 'true' : 'false'" tabindex="0" @click="toggleConfig(draft)"></span>
             </div>
