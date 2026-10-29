@@ -234,6 +234,10 @@ a{color:inherit;text-decoration:none}
 .pg:hover{background:#1A2130;color:var(--tx)}
 
 /* ---------------- ② 配置面板 ---------------- */
+.lrow{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:8px 2px;border-bottom:1px solid var(--line-2)}
+.lrow .llb{font-size:11px;color:var(--tx-4)}
+.lrow b{font-size:12.5px;color:var(--tx);font-weight:600;word-break:break-all;text-align:right}
 .cbody{flex:1 1 auto;min-height:0;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:5px}
 .field{display:flex;flex-direction:column;gap:4px}
 .field>label{font-size:10px;color:var(--tx-4)}

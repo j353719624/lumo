@@ -307,11 +307,6 @@ async function saveServerConfig() {
   }
 }
 
-function resetCfg() {
-  if (savedCfg.value) { srvCfg.value = clone(savedCfg.value); showToast('已还原') }
-  else { showToast('没有可还原的配置', true) }
-}
-
 function logout() {
   fetch('/logout').then(() => { location.href = '/login' })
 }
@@ -743,11 +738,20 @@ function closeMenu(e: MouseEvent) {
         <span class="spacer"></span>
         <button class="btn ghost sm" @click="copy(tomlSnippet(), 'lumos.toml ' + t('copied'))">{{ t('config.copy') }}</button>
       </div>
-      <div class="cbody" v-if="cfgLoaded">
-        <div class="note" v-if="!cfgLocked" style="color:var(--warn)">⚠ {{ t('config.lockHint') }}</div>
-        <div class="note" v-else style="color:var(--tx-3)">🔒 {{ t('config.locked') }}</div>
+      <div class="cbody" v-if="cfgLoaded && cfgLocked">
+        <div class="note" style="color:var(--tx-3)">🔒 {{ t('config.locked') }}</div>
+        <div class="lrow"><span class="llb">{{ t('config.bindPort') }}</span><b class="mono">{{ srvCfg.bindPort }}</b></div>
+        <div class="lrow"><span class="llb">{{ t('config.kcpPort') }}</span><b class="mono">{{ srvCfg.kcpPort > 0 ? srvCfg.kcpPort : '—' }}</b></div>
+        <div class="lrow"><span class="llb">{{ t('config.vhostHttp') }}</span><b class="mono">{{ srvCfg.vhostHttpPort > 0 ? srvCfg.vhostHttpPort : '—' }}</b></div>
+        <div class="lrow"><span class="llb">{{ t('config.vhostHttps') }}</span><b class="mono">{{ srvCfg.vhostHttpsPort > 0 ? srvCfg.vhostHttpsPort : '—' }}</b></div>
+        <div class="lrow"><span class="llb">{{ t('config.subdomain') }}</span><b class="mono">{{ srvCfg.subdomainHost || '—' }}</b></div>
+        <div class="lrow"><span class="llb">{{ t('config.allowPorts') }}</span><b class="mono">{{ srvCfg.allowPortsStr || '—' }}</b></div>
+        <div class="lrow"><span class="llb">{{ t('config.authToken') }}</span><b class="mono">{{ authMode === 'key' && authFp ? '公钥 ' + authFp : '••••••' }}</b></div>
+      </div>
+      <div class="cbody" v-if="cfgLoaded && !cfgLocked">
+        <div class="note" style="color:var(--warn)">⚠ {{ t('config.lockHint') }}</div>
         <div class="field-row">
-          <div class="field"><label>{{ t('config.bindPort') }}</label><input v-model.number="srvCfg.bindPort" type="number" :disabled="cfgLocked"></div>
+          <div class="field"><label>{{ t('config.bindPort') }}</label><input v-model.number="srvCfg.bindPort" type="number"></div>
           <div class="field"><label>{{ t('config.kcpPort') }}</label><input v-model.number="srvCfg.kcpPort" type="number" min="0" max="65535" :placeholder="t('config.kcpOff')" :disabled="cfgLocked"></div>
         </div>
         <div class="field-row">
@@ -783,7 +787,6 @@ function closeMenu(e: MouseEvent) {
       </div>
       <div class="cbody" v-else><div class="note">读取配置…</div></div>
       <div class="cfoot" v-if="cfgLoaded && !cfgLocked">
-        <button class="btn ghost sm" @click="resetCfg">{{ t('config.reset') }}</button>
         <span class="spacer"></span>
         <button class="btn sm" :disabled="savingCfg" @click="saveServerConfig">{{ savingCfg ? t('config.saving') : t('config.save') }}</button>
       </div>
