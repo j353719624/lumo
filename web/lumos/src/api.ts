@@ -46,6 +46,7 @@ export interface RawProxy {
 
 export interface ProxyItem {
   name: string
+  label: string
   type: string
   client: string
   local: string
@@ -137,8 +138,9 @@ export function normalizeProxy(p: RawProxy, type: string, host: string): ProxyIt
   const status = String(pick(p, ['status'], 'offline')).toLowerCase()
   return {
     name: pick(p, ['name'], '—'),
+    label: pick(p, ['label'], '') as string,
     type: String(pick(c, ['type'], type) || type).toLowerCase(),
-    client: pick(c, ['clientName', 'client_name', 'user'], '—'),
+    client: (pick(p, ['clientName'], '') as string) || pick(c, ['user'], '—'),
     local: ip && port ? `${ip}:${port}` : port ? `:${port}` : '',
     entry,
     trafficIn: num(pick(p, ['today_traffic_in', 'todayTrafficIn'], 0)),
@@ -157,7 +159,7 @@ export async function serverInfo(): Promise<ServerInfo> {
   return {
     version: pick(s, ['version'], '—'),
     bindPort: pick(s, ['bindPort', 'bind_port'], 0),
-    kcpPort: pick(s, ['kcpBindPort', 'kcp_bind_port'], 0),
+    kcpPort: pick(s, ['kcpPort', 'kcpBindPort', 'kcp_bind_port'], 0),
     quicPort: pick(s, ['quicBindPort', 'quic_bind_port'], 0),
     vhostHttpPort: pick(s, ['vhostHTTPPort', 'vhost_http_port'], 0),
     vhostHttpsPort: pick(s, ['vhostHTTPSPort', 'vhost_https_port'], 0),

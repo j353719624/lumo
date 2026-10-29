@@ -54,6 +54,8 @@ type VisitorConfig struct {
 
 // ClientConfig is the lumoc (client) configuration.
 type ClientConfig struct {
+	// Name is an optional display name shown in the server console.
+	Name       string
 	ServerAddr string
 	ServerPort int
 	// Protocol selects the transport to the server: "tcp" (default) or "kcp".
@@ -133,6 +135,7 @@ func LoadClient(path string) (*ClientConfig, error) {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	c := &ClientConfig{}
+	c.Name = getStr(root, "name", "")
 	c.ServerAddr = getStr(root, "serverAddr", "127.0.0.1")
 	c.ServerPort = getInt(root, "serverPort", 7000)
 	c.Protocol = getStr(root, "protocol", "tcp")

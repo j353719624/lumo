@@ -50,7 +50,7 @@ const filteredProxies = computed(() => {
   return proxyList.value.filter((p) => {
     if (type !== 'all' && p.type !== type) return false
     if (onlineOnly && !p.online) return false
-    if (kw && !`${p.name} ${p.client} ${p.entry}`.toLowerCase().includes(kw)) return false
+    if (kw && !`${p.name} ${p.label} ${p.client} ${p.entry}`.toLowerCase().includes(kw)) return false
     return true
   })
 })
@@ -218,7 +218,7 @@ async function saveServerConfig() {
       // 令牌仅用于“写入新值”：保存后立即从表单移除，避免任何回显
       srvCfg.value.authToken = ''
       if (savedCfg.value) (savedCfg.value as any).authToken = ''
-      showToast(d.restart ? '已保存并重启服务' : '已保存（token/面板密码热生效）')
+      showToast(d.restart ? '已保存服务' : '已保存（token/面板密码热生效）')
       if (d.restart) setTimeout(() => location.reload(), 1500)
     } else {
       showToast(d.error || '保存失败', true)
@@ -596,7 +596,7 @@ function closeMenu(e: MouseEvent) {
         <div id="rows">
           <div v-if="!pageSlice.length" class="lempty">{{ t('empty') }}</div>
           <div v-for="p in pageSlice" :key="p.name" class="prow" :class="{ offline: !p.online }">
-            <span class="c-name" :title="p.name">{{ p.name }}</span>
+            <span class="c-name" :title="p.name">{{ p.label || p.name }}</span>
             <span class="c-type" :class="typeClass(p.type)">{{ p.type.toUpperCase() }}</span>
             <span class="c-client" :title="p.client">{{ p.client }}</span>
             <span class="c-entry" :title="p.entry">{{ p.entry }}</span>
@@ -642,16 +642,16 @@ function closeMenu(e: MouseEvent) {
           </div>
         </div>
         <div class="sw-list">
-          <label class="switch-row">
-            <span class="switch on" role="switch" aria-checked="true" tabindex="-1"></span>
-            TLS {{ locale === 'zh' ? '强制' : 'enforced' }}
-          </label>
+          <span class="switch-row" style="cursor:default">
+            <span class="switch" :class="{ on: (srvCfg.kcpPort || 0) > 0 }" role="switch" :aria-checked="(srvCfg.kcpPort || 0) > 0 ? 'true' : 'false'" tabindex="-1"></span>
+            KCP {{ (srvCfg.kcpPort || 0) > 0 ? (locale === 'zh' ? `传输 · UDP ${srvCfg.kcpPort}` : `transport · UDP ${srvCfg.kcpPort}`) : (locale === 'zh' ? '未启用' : 'disabled') }}
+          </span>
           <span class="switch-row" style="cursor:default">
             <span class="switch on" role="switch" aria-checked="true" tabindex="-1"></span>
-            TCP {{ locale === 'zh' ? '多路复用' : 'multiplexing' }}
+            TCP {{ locale === 'zh' ? '传输 · 隧道端口 ' + (srvCfg.bindPort || '') : 'transport · tunnel port ' + (srvCfg.bindPort || '') }}
           </span>
         </div>
-        <div class="note">{{ locale === 'zh' ? '注意：端口类参数保存后需重启 lumos 才会生效' : 'Note: port changes take effect after a lumos restart' }}</div>
+        <div class="note">{{ locale === 'zh' ? '注意：隧道端口与 KCP 端口保存后立即生效，HTTP/HTTPS 虚拟主机端口需重启 lumos' : 'Note: port changes take effect after a lumos restart' }}</div>
       </div>
       <div class="cbody" v-else><div class="note">读取配置…</div></div>
       <div class="cfoot" v-if="cfgLoaded">

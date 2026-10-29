@@ -93,7 +93,7 @@ const zh: Dict = {
   // config panel
   'config.title': '服务配置',
   'config.copy': '复制',
-  'config.save': '保存并重启',
+  'config.save': '保存',
   'config.saving': '保存中…',
   'config.reset': '还原',
   'config.bindPort': '监听端口 bindPort',
@@ -203,7 +203,7 @@ const en: Dict = {
   'pager.info': '{0} items · page {1} / {2}',
   'config.title': 'Server config',
   'config.copy': 'Copy',
-  'config.save': 'Save & restart',
+  'config.save': 'Save',
   'config.saving': 'Saving…',
   'config.reset': 'Reset',
   'config.bindPort': 'Bind port',

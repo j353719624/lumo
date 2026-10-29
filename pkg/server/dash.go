@@ -411,6 +411,14 @@ func (s *Server) apiProxies(w http.ResponseWriter, _ *http.Request) {
 			"type": ent.kind,
 			"user": ent.owner.id,
 		}
+		label := ent.name
+		if ent.owner.name != "" {
+			if i := strings.Index(ent.name, "-"); i >= 0 && i+1 < len(ent.name) {
+				label = ent.owner.name + " · " + ent.name[i+1:]
+			} else {
+				label = ent.owner.name + " · " + ent.name
+			}
+		}
 		switch ent.kind {
 		case "tcp", "udp":
 			conf["localIP"] = "—"
@@ -423,6 +431,8 @@ func (s *Server) apiProxies(w http.ResponseWriter, _ *http.Request) {
 		}
 		list = append(list, map[string]any{
 			"name":              ent.name,
+			"label":             label,
+			"clientName":        ent.owner.name,
 			"status":            "online",
 			"today_traffic_in":  ent.cnt.In.Load(),
 			"today_traffic_out": ent.cnt.Out.Load(),

@@ -226,6 +226,9 @@ func (c *Client) serve(ctx context.Context) error {
 		"nonce":  hex.EncodeToString(nonce),
 		"auth":   proto.Sign(c.cfg.AuthToken, nonce),
 	}
+	if c.cfg.Name != "" {
+		hello["name"] = c.cfg.Name
+	}
 	if err := proto.Send(conn, hello); err != nil {
 		return fmt.Errorf("send hello: %w", err)
 	}

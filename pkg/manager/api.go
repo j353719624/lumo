@@ -360,6 +360,9 @@ func renderToml(cfg ConnConfig) string {
 		`serverAddr = "` + esc(cfg.ServerAddr) + `"`,
 		"serverPort = " + strconv.Itoa(cfg.ServerPort),
 	}
+	if cfg.Name != "" {
+		L = append([]string{`name = "` + esc(cfg.Name) + `"`}, L...)
+	}
 	if cfg.Protocol == "kcp" {
 		L = append(L, `protocol = "kcp"`, "kcpPort = "+strconv.Itoa(cfg.KCPPort))
 	}
@@ -389,10 +392,20 @@ func renderToml(cfg ConnConfig) string {
 }
 
 // serveConsole serves embedded files; unknown paths go back to the root.
+//
+// HTML is always revalidated (hashed asset names make it safe to cache
+// assets for a year); without this, browsers keep serving a stale index
+// that references old asset hashes after an upgrade.
 func serveConsole(fsys http.FileSystem) http.Handler {
 	fsrv := http.FileServer(fsys)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if p := strings.TrimPrefix(r.URL.Path, "/"); p != "" {
+		p := strings.TrimPrefix(r.URL.Path, "/")
+		if p == "" || strings.HasSuffix(p, ".html") {
+			w.Header().Set("Cache-Control", "no-cache")
+		} else if strings.HasPrefix(p, "assets/") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		}
+		if p != "" {
 			f, err := fsys.Open(strings.TrimPrefix(path.Clean("/"+p), "/"))
 			if err != nil {
 				http.Redirect(w, r, "/", http.StatusFound)

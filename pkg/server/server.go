@@ -65,6 +65,7 @@ type pendEntry struct {
 type session struct {
 	srv     *Server
 	id      string
+	name    string
 	since   time.Time
 	conn    net.Conn
 	wmu     sync.Mutex
@@ -363,6 +364,7 @@ func (s *Server) newSession(c net.Conn, hello proto.Msg) {
 	ses := &session{
 		srv:     s,
 		id:      sid,
+		name:    hello.Str("name"),
 		since:   time.Now(),
 		conn:    c,
 		names:   map[string]*proxyEnt{},

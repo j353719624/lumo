@@ -44,6 +44,7 @@ type ConnConfig struct {
 // toClientConfig converts the stored form into engine configuration.
 func (c *ConnConfig) toClientConfig() (*config.ClientConfig, error) {
 	out := &config.ClientConfig{
+		Name:       c.Name,
 		ServerAddr: c.ServerAddr,
 		ServerPort: c.ServerPort,
 		Protocol:   c.Protocol,
