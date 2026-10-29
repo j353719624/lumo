@@ -366,7 +366,9 @@ async function bind2FA() {
     const d = await res.json()
     if (res.ok) {
       tfaEnabled.value = true
-      tfaMsg.value = { ok: true, text: t('tfa.bound') }
+      tfaCode.value = ''
+      tfaOpen.value = false
+      showToast(t('tfa.bound'))
     } else {
       tfaMsg.value = { ok: false, text: d.error || 'failed' }
     }
@@ -394,8 +396,8 @@ async function unbind2FA() {
     if (res.ok) {
       tfaEnabled.value = false
       tfaCode.value = ''
-      tfaMsg.value = { ok: true, text: t('tfa.unbound') }
-      await loadSetup()
+      tfaOpen.value = false
+      showToast(t('tfa.unbound'))
     } else {
       tfaMsg.value = { ok: false, text: d.error || 'failed' }
     }
