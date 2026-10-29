@@ -313,9 +313,6 @@ try {
     </section>
     </main>
 
-    <footer class="pagefoot">
-      <span>v0.1.0</span><span class="sep"></span><span>localhost:7500</span><span class="sep"></span><span>© 2026 LUMO</span>
-    </footer>
   </div>
 </template>
 

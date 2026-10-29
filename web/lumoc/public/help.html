@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LUMO 帮助与反馈</title>
+<style>
+  :root{
+    --bg:#0A0E15;--panel:#10151F;--panel2:#141B29;--line:#1C2433;--line3:#2A3547;
+    --tx:#E8ECF4;--tx2:#A8B3C7;--tx3:#6C788E;--tx4:#4A5568;
+    --accent:#5A7BFF;--teal:#35E0C8;--ok:#3DDC97;--bad:#FF5F73;--warn:#F5B95F;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#F4F6FB;--panel:#FFFFFF;--panel2:#F2F5FA;--line:#E3E8F1;--line3:#D2DAE8;
+      --tx:#1A2434;--tx2:#3E4C63;--tx3:#7A8598;--tx4:#98A3B4;
+    }
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--tx);font:14px/1.75 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    padding:0 20px 60px}
+  .wrap{max-width:860px;margin:0 auto}
+  header.page{padding:44px 0 8px;display:flex;align-items:center;gap:14px}
+  header.page .mark{width:34px;height:34px}
+  header.page h1{font-size:22px;font-weight:700}
+  header.page .sub{margin-left:auto;color:var(--tx3);font-size:12px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin-top:16px}
+  h2{font-size:15.5px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  h2::before{content:"";width:4px;height:15px;border-radius:2px;background:linear-gradient(180deg,var(--accent),var(--teal))}
+  p{color:var(--tx2);margin:6px 0}
+  p b,li b{color:var(--tx)}
+  ol,ul{padding-left:22px;color:var(--tx2)}
+  li{margin:6px 0}
+  code{font:12.5px/1.6 Consolas,Menlo,monospace;background:var(--panel2);border:1px solid var(--line);
+    border-radius:6px;padding:1px 7px;color:var(--tx);white-space:nowrap}
+  .fig{margin:14px 0 4px;overflow-x:auto}
+  .fig svg{display:block;margin:0 auto;max-width:100%;height:auto}
+  .figcap{text-align:center;color:var(--tx4);font-size:11.5px;margin-top:6px}
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}
+  th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;color:var(--tx2)}
+  th{background:var(--panel2);color:var(--tx);font-weight:600}
+  .qa{margin-top:12px}
+  .qa .q{color:var(--tx);font-weight:600}
+  .qa .a{color:var(--tx2);margin-top:3px}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .back{display:inline-block;margin-top:26px;color:var(--tx3);font-size:12.5px}
+  .back:hover{color:var(--tx)}
+  .tip{border-left:3px solid var(--warn);background:var(--panel2);border-radius:0 8px 8px 0;
+    padding:8px 14px;margin-top:10px;color:var(--tx2);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <svg class="mark" viewBox="0 0 72 72" fill="none" aria-hidden="true">
+      <path d="M22 57V38C22 26.9 28.3 18.4 36 18.4C43.7 18.4 50 26.9 50 38V57" stroke="#5A7BFF" stroke-width="6.8" stroke-linecap="round"/>
+      <path d="M10 42H62" stroke="#35E0C8" stroke-width="4.6" stroke-linecap="round"/>
+      <circle cx="10" cy="42" r="3.8" fill="#35E0C8"/><circle cx="62" cy="42" r="3.8" fill="#35E0C8"/>
+    </svg>
+    <h1>帮助与反馈</h1>
+    <span class="sub">LUMO · 隧光</span>
+  </header>
+
+  <section class="card">
+    <h2>LUMO 是什么</h2>
+    <p>LUMO 由两部分组成：<b>服务端 lumos</b> 装在有公网 IP 的服务器上，<b>客户端 lumoc</b> 装在内网设备（NAS、路由器、办公电脑）上。客户端主动连向服务端建立隧道，把内网里的服务「搬运」到公网——内网不用开任何入站端口。</p>
+    <div class="fig">
+      <svg width="780" height="200" viewBox="0 0 780 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0L10 5L0 10z" fill="#5A7BFF"/>
+          </marker>
+          <marker id="arrT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0L10 5L0 10z" fill="#35E0C8"/>
+          </marker>
+        </defs>
+        <!-- 外网用户 -->
+        <rect x="14" y="66" width="150" height="66" rx="12" fill="#141B29" stroke="#2A3547"/>
+        <text x="89" y="94" fill="#E8ECF4" font-size="14" font-weight="600" text-anchor="middle">外网用户</text>
+        <text x="89" y="115" fill="#6C788E" font-size="11" text-anchor="middle">手机 / 电脑</text>
+        <!-- 服务端 -->
+        <rect x="262" y="52" width="230" height="94" rx="12" fill="#141B29" stroke="#5A7BFF"/>
+        <text x="377" y="80" fill="#E8ECF4" font-size="14" font-weight="600" text-anchor="middle">服务端 lumos</text>
+        <text x="377" y="101" fill="#6C788E" font-size="11" text-anchor="middle">公网服务器（有公网 IP）</text>
+        <text x="377" y="122" fill="#AFC0FF" font-size="11" text-anchor="middle">公网入口 IP:15000</text>
+        <!-- 客户端 -->
+        <rect x="588" y="52" width="178" height="94" rx="12" fill="#141B29" stroke="#35E0C8"/>
+        <text x="677" y="80" fill="#E8ECF4" font-size="14" font-weight="600" text-anchor="middle">客户端 lumoc</text>
+        <text x="677" y="101" fill="#6C788E" font-size="11" text-anchor="middle">内网 NAS / 电脑</text>
+        <text x="677" y="122" fill="#35E0C8" font-size="11" text-anchor="middle">隧道主动外连</text>
+        <!-- 连线 -->
+        <line x1="164" y1="99" x2="256" y2="99" stroke="#5A7BFF" stroke-width="1.6" marker-end="url(#arr)"/>
+        <text x="210" y="90" fill="#6C788E" font-size="11" text-anchor="middle">访问入口</text>
+        <line x1="492" y1="99" x2="582" y2="99" stroke="#35E0C8" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrT)"/>
+        <text x="537" y="90" fill="#6C788E" font-size="11" text-anchor="middle">加密隧道</text>
+        <!-- 内网服务 -->
+        <line x1="677" y1="146" x2="677" y2="176" stroke="#35E0C8" stroke-width="1.6" marker-end="url(#arrT)"/>
+        <text x="677" y="192" fill="#6C788E" font-size="11" text-anchor="middle">127.0.0.1:5000（内网服务）</text>
+      </svg>
+      <div class="figcap">示例图 1 · 流量走向：外网用户访问公网入口，经加密隧道到达内网服务</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>三步上手</h2>
+    <ol>
+      <li><b>拿令牌</b>：登录服务端控制台 →「认证令牌」→ 生成并复制（令牌只在生成时显示一次）。</li>
+      <li><b>建配置</b>：客户端控制台 →「新建连接配置」→ 填服务器地址与服务端口，粘贴令牌。</li>
+      <li><b>加映射</b>：在配置里添加端口映射，如 <code>127.0.0.1:5000 → 15000</code>，保存并打开开关。</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>端口映射怎么填</h2>
+    <p><b>本地地址</b>是内网里真实服务的地址；<b>公网入口</b>是外网访问时用的端口（HTTP/HTTPS 类型填域名）。保存后，访问 <code>http://服务器IP:公网端口</code> 就等于访问内网那条本地地址。</p>
+    <div class="fig">
+      <svg width="780" height="150" viewBox="0 0 780 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="14" y="14" width="240" height="122" rx="12" fill="#141B29" stroke="#2A3547"/>
+        <text x="134" y="42" fill="#E8ECF4" font-size="13" font-weight="600" text-anchor="middle">内网（家里 / 公司）</text>
+        <rect x="34" y="58" width="200" height="30" rx="8" fill="#10151F" stroke="#2A3547"/>
+        <text x="134" y="78" fill="#35E0C8" font-size="12" text-anchor="middle">127.0.0.1:5000  NAS 管理页</text>
+        <rect x="34" y="96" width="200" height="30" rx="8" fill="#10151F" stroke="#2A3547"/>
+        <text x="134" y="116" fill="#35E0C8" font-size="12" text-anchor="middle">10.0.0.8:3389  远程桌面</text>
+        <line x1="254" y1="73" x2="452" y2="73" stroke="#5A7BFF" stroke-width="1.6" marker-end="url(#arr)"/>
+        <line x1="254" y1="111" x2="452" y2="111" stroke="#5A7BFF" stroke-width="1.6" marker-end="url(#arr)"/>
+        <rect x="458" y="14" width="308" height="122" rx="12" fill="#141B29" stroke="#5A7BFF"/>
+        <text x="612" y="42" fill="#E8ECF4" font-size="13" font-weight="600" text-anchor="middle">公网（服务端入口）</text>
+        <rect x="478" y="58" width="268" height="30" rx="8" fill="#10151F" stroke="#2A3547"/>
+        <text x="612" y="78" fill="#AFC0FF" font-size="12" text-anchor="middle">IP:15000  →  前往 NAS 管理页</text>
+        <rect x="478" y="96" width="268" height="30" rx="8" fill="#10151F" stroke="#2A3547"/>
+        <text x="612" y="116" fill="#AFC0FF" font-size="12" text-anchor="middle">IP:15001  →  远程桌面</text>
+      </svg>
+      <div class="figcap">示例图 2 · 映射关系：每条映射把一个内网地址挂到一个公网端口</div>
+    </div>
+    <table>
+      <tr><th>想访问的东西</th><th>本地地址</th><th>公网入口</th><th>外网访问</th></tr>
+      <tr><td>NAS 管理页</td><td><code>127.0.0.1:5000</code></td><td><code>15000</code></td><td><code>http://服务器IP:15000</code></td></tr>
+      <tr><td>Windows 远程桌面</td><td><code>10.0.0.8:3389</code></td><td><code>15001</code></td><td>远程桌面客户端连 <code>服务器IP:15001</code></td></tr>
+      <tr><td>家庭网站</td><td><code>127.0.0.1:8080</code></td><td>域名 <code>home.example.com</code></td><td><code>http://home.example.com</code>（需 HTTP 代理）</td></tr>
+      <tr><td>不想暴露公网的服务</td><td><code>127.0.0.1:5000</code></td><td>sealed-tcp + 密钥</td><td>用「访问端」在本机生成入口，不占公网端口</td></tr>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>安全建议</h2>
+    <ul>
+      <li><b>TLS 传输加密</b>保持开启（连接配置里默认开启）。</li>
+      <li>敏感服务不要用普通 TCP 暴露公网，改用 <b>sealed-tcp / sealed-udp</b>：凭密钥连接，公网上没有入口。</li>
+      <li>给两个控制台都<b>开启 2FA</b>；认证令牌只在生成时显示一次，换设备需重新生成。</li>
+      <li>服务端可设置「允许端口段」，限制客户端能占用的公网端口范围。</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>常见问题</h2>
+    <div class="qa"><div class="q">外网访问不通？</div>
+      <div class="a">① 看服务端控制台「代理与客户端」，对应代理显示<b>在线</b>；② 确认云服务商的<b>安全组</b>放行了该公网端口（LUMO 只能改系统防火墙，改不了云安全组）；③ 映射的本地地址在内网设备上先确认能打开。</div>
+    </div>
+    <div class="qa"><div class="q">动态码（2FA）丢了，登不进控制台？</div>
+      <div class="a">在设备上删除密钥文件后重启进程即可重置：客户端是容器内 <code>/data/console-totp.json</code>；服务端是 <code>/opt/lumo/lumos.toml</code> 里的 <code>totpSecret</code> 行。重置后可重新绑定。</div>
+    </div>
+    <div class="qa"><div class="q">提示端口被占用？</div>
+      <div class="a">同一公网端口同一时间只能属于一条映射。换一个端口，或在服务端控制台停掉占用它的旧代理。</div>
+    </div>
+    <div class="qa"><div class="q">连接频繁掉线？</div>
+      <div class="a">客户端会自动重连（约 5 秒）。若持续掉线，检查内网设备到服务端的网络质量；不稳定链路建议切到 KCP（UDP）传输。</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>反馈渠道</h2>
+    <p>提交反馈请到 <a href="https://github.com/j353719624/lumo/issues" target="_blank" rel="noopener">GitHub Issues</a>。为方便定位，请附上：</p>
+    <ul>
+      <li>版本号（登录页底部，如 v0.1.0）</li>
+      <li>现象描述：做了什么、预期是什么、实际是什么</li>
+      <li>日志：客户端控制台「运行日志」页可一键复制</li>
+    </ul>
+    <div class="tip">日志里不含令牌与密码，可以放心粘贴；涉及内网地址时自行打码即可。</div>
+  </section>
+
+  <a class="back" href="/login">← 返回登录</a>
+</div>
+</body>
+</html>

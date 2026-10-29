@@ -274,9 +274,8 @@ try {
       <span class="sep"></span>
       <a href="#" @click.prevent="showError('当前已是最新版本 v0.1.0')">检查更新</a>
       <span class="sep"></span>
-      <a href="#" @click.prevent="showError('帮助文档与反馈入口，正式版会打开浏览器')">帮助与反馈</a>
+      <a href="/help.html" target="_blank" rel="noopener">帮助与反馈</a>
     </div>
-    <div class="hint">账号与密码由 <b>lumoc ui -user</b> 启动参数指定</div>
   </main>
 </template>
 

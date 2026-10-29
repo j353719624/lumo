@@ -62,7 +62,7 @@ func (m *Manager) guardUI(next http.Handler) http.Handler {
 
 // isPublicAsset reports whether the path must be reachable without login.
 func isPublicAsset(p string) bool {
-	return p == "/login" || p == "/login.html" || strings.HasPrefix(p, "/assets/")
+	return p == "/login" || p == "/login.html" || p == "/help.html" || strings.HasPrefix(p, "/assets/")
 }
 
 // authed checks the session cookie, then basic auth credentials.
