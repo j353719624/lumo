@@ -60,3 +60,23 @@ func Fingerprint(pub string) string {
 }
 
 var ErrBadSecret = errors.New("token: empty secret")
+
+// MinSecretLen is the minimum accepted secret length when rotating a token.
+// The server-generated format is 43 base64url characters (256 bits).
+const MinSecretLen = 32
+
+// CheckStrength rejects weak secrets before the server accepts a rotation:
+// short values (passwords, ids) could be brute-forced from the public key.
+func CheckStrength(secret string) error {
+	if len(secret) < MinSecretLen {
+		return errors.New("令牌太弱：长度不足，请使用服务端「生成新令牌」生成的令牌")
+	}
+	distinct := map[rune]bool{}
+	for _, r := range secret {
+		distinct[r] = true
+	}
+	if len(distinct) < 8 {
+		return errors.New("令牌太弱：随机性不足，请使用服务端生成的令牌")
+	}
+	return nil
+}

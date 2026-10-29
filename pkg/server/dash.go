@@ -643,6 +643,10 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 	// 令牌由服务端生成：提交非空值即轮换——服务端只保存派生公钥，
 	// 令牌本身保存后不再存在，也就无法再次显示或复制
 	if req.AuthToken != "" {
+		if err := token.CheckStrength(req.AuthToken); err != nil {
+			failJSON(w, http.StatusBadRequest, err.Error())
+			return
+		}
 		s.cfg.AuthPubKey = token.DerivePublicKey(req.AuthToken)
 		s.cfg.AuthToken = ""
 	}

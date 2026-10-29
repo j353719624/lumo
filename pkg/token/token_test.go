@@ -45,3 +45,41 @@ func TestSecretNeverDerivableFromPub(t *testing.T) {
 	}
 	_ = secret
 }
+
+// TestPublicKeyIsNotUsableAsSecret proves the exact property the console
+// depends on: someone who only has the stored public key (e.g. from a full
+// server compromise) cannot authenticate with it.
+func TestPublicKeyIsNotUsableAsSecret(t *testing.T) {
+	secret, pub, _ := Generate()
+	nonce := []byte("challenge-bytes")
+	realSig := SignProof(secret, nonce)
+	if !VerifyProof(pub, nonce, realSig) {
+		t.Fatal("precondition: real secret must verify")
+	}
+	// 攻击者把公钥本身当令牌：派生出的公钥完全不同，签名必然不被接受
+	imposterSig := SignProof(pub, nonce)
+	if VerifyProof(pub, nonce, imposterSig) {
+		t.Fatal("public key must NOT work as a client secret")
+	}
+	// 弱令牌对其自身公钥同样有效（安全性靠拒绝弱令牌入库来保证）
+	weak := "12345"
+	weakPub := DerivePublicKey(weak)
+	if !VerifyProof(weakPub, nonce, SignProof(weak, nonce)) {
+		t.Fatal("weak token must verify against its own pubkey (sanity)")
+	}
+}
+
+func TestCheckStrength(t *testing.T) {
+	_, pub, _ := Generate()
+	strong := "VPT3M6cAugSWfd-0dZgJ_Lqpyz8Fp4sbsgY0p748DBg"
+	for _, ok := range []string{strong, pub} {
+		if err := CheckStrength(ok); err != nil {
+			t.Fatalf("CheckStrength(%q): %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"", "12345", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"} {
+		if err := CheckStrength(bad); err == nil {
+			t.Fatalf("CheckStrength(%q) should reject", bad)
+		}
+	}
+}
