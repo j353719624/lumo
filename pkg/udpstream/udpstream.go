@@ -33,7 +33,7 @@ const (
 	window        = 96               // packets in flight per stream
 	ackSackCap    = 24               // selective-ACK entries per datagram
 	pingInterval  = 6 * time.Second  // NAT keepalive
-	deadTimeout   = 40 * time.Second // session silence before teardown
+	deadTimeout   = 25 * time.Second // session silence before teardown (pings every 6s)
 	minRTO        = 60 * time.Millisecond
 	maxRTO        = time.Second
 	initialRTO    = 250 * time.Millisecond

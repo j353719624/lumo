@@ -254,11 +254,15 @@ func (c *Client) serve(ctx context.Context) error {
 	// The read loop must run before registration: reg replies are only
 	// delivered through it, and registerAll blocks on those replies.
 	readErr := make(chan error, 1)
-	go func() { readErr <- c.readLoop(ctx, conn) }()
+	serveCtx, serveCancel := context.WithCancel(ctx)
+	defer serveCancel()
+	go func() { readErr <- c.readLoop(serveCtx, conn) }()
 
 	if err := c.registerAll(); err != nil {
 		return err
 	}
+	// 注册被拒的代理（典型：KCP 旧会话尚未超时，名字还被占着）持续重试
+	go c.retryFailedRegistrations(serveCtx, conn)
 
 	pingTicker := time.NewTicker(20 * time.Second)
 	defer pingTicker.Stop()
@@ -406,6 +410,46 @@ func (c *Client) registerAll() error {
 		c.mu.Unlock()
 	}
 	return nil
+}
+
+// retryFailedRegistrations re-registers proxies that were rejected, so a
+// restart that races the previous session's timeout heals by itself.
+func (c *Client) retryFailedRegistrations(ctx context.Context, conn net.Conn) {
+	t := time.NewTicker(5 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+		c.mu.Lock()
+		var pending []*config.ProxyConfig
+		for name, st := range c.state {
+			if st.Status == "error" {
+				if p, ok := c.proxies[name]; ok {
+					pending = append(pending, p)
+				}
+			}
+		}
+		c.mu.Unlock()
+		for _, p := range pending {
+			reply := c.request(proto.Msg{
+				"type":        "reg",
+				"name":        p.Name,
+				"kind":        p.Type,
+				"remote_port": p.RemotePort,
+				"sk":          p.SK,
+				"domains":     p.CustomDomains,
+			}, 10*time.Second)
+			if reply.Str("type") == "reg_ok" {
+				c.mu.Lock()
+				c.state[p.Name] = &ProxyState{Status: "running", Since: time.Now()}
+				c.mu.Unlock()
+				c.logi("proxy %q (%s) registered after retry", p.Name, p.Type)
+			}
+		}
+	}
 }
 
 // unregisterAll removes every proxy from the server.
