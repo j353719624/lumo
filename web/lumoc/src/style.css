@@ -34,7 +34,9 @@ input,select,textarea{font:inherit;color:inherit}
   color:var(--tx-3);font-size:13px;width:100%;text-align:left}
 .nav:hover{background:#141A24;color:var(--tx-2)}
 .nav[aria-current]{background:#182031;color:var(--tx)}
-.nav svg{flex:0 0 auto}
+.nav.sub{height:34px;padding:0 12px 0 30px;font-size:12px;border-radius:8px}
+.nav.sub.cur{background:#182031;color:var(--tx)}
+html[data-theme="light"] .nav.sub.cur{background:#E4EAFC}
 .nav .nbadge{margin-left:auto;font:500 9.5px/1 var(--mono);background:#1B2540;color:var(--accent-soft);
   padding:3px 6px;border-radius:9px}
 .spacer{flex:1 1 auto}

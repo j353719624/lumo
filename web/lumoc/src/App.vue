@@ -28,7 +28,14 @@ const tomlSaving = ref(false)
 const logView = ref<HTMLElement | null>(null)
 
 const q = ref('')
-const view = ref<'list' | 'logs' | 'settings'>('list')
+const view = ref<'list' | 'logs'>('list')
+const detailSection = ref<'overview' | 'server' | 'mappings' | 'visitors' | 'files'>('overview')
+watch(detailSection, async (sec) => {
+  if (sec === 'files' && draft.value && !tomlText.value) {
+    try { tomlText.value = await api.toml(draft.value.id) } catch { tomlText.value = '加载失败' }
+  }
+});
+watch(draft, () => { tomlText.value = '' });
 const pendingDelete = ref<ConnConfig | null>(null)
 const tomlView = ref('')
 const toastMsg = ref<{ msg: string; bad: boolean } | null>(null)
@@ -425,7 +432,7 @@ function scrollLogsToEnd() {
   })
 }
 
-function setView(v: 'list' | 'logs' | 'settings') {
+function setView(v: 'list' | 'logs') {
   view.value = v
 }
 
@@ -488,18 +495,6 @@ setInterval(() => refresh(true), 2500)
       </div>
 
       <div class="nav-label">工作区</div>
-      <button class="nav" :aria-current="view === 'list' ? 'page' : undefined" @click="setView('list')">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="3.6" cy="8" r="2" stroke="#AFC0FF" stroke-width="1.5"/><circle cx="12.4" cy="8" r="2" stroke="#AFC0FF" stroke-width="1.5"/><path d="M5.6 8H10.4" stroke="#AFC0FF" stroke-width="1.5" stroke-linecap="round"/></svg>
-        <span>连接配置</span><span class="nbadge">{{ configs.length }}</span>
-      </button>
-      <button class="nav" :aria-current="view === 'logs' ? 'page' : undefined" @click="setView('logs')">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 4.5H13M3 8H10M3 11.5H7.5" stroke="#7D8AA0" stroke-width="1.5" stroke-linecap="round"/></svg>
-        <span>运行日志</span>
-      </button>
-      <button class="nav" :aria-current="view === 'settings' ? 'page' : undefined" @click="setView('settings')">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 5H13M3 11H13" stroke="#7D8AA0" stroke-width="1.5" stroke-linecap="round"/><circle cx="6" cy="5" r="1.8" fill="#0C1017" stroke="#7D8AA0" stroke-width="1.4"/><circle cx="10.5" cy="11" r="1.8" fill="#0C1017" stroke="#7D8AA0" stroke-width="1.4"/></svg>
-        <span>偏好设置</span>
-      </button>
 
       <div class="spacer"></div>
 
@@ -507,7 +502,15 @@ setInterval(() => refresh(true), 2500)
         <div class="row"><span class="dot on"></span><span class="t">控制台已连接</span><span class="v">v{{ info?.version || '—' }}</span></div>
         <div class="addr">{{ consoleHost }}</div>
       </div>
-      <div class="user">
+      <div class="themepref">
+      <span class="tp-lb">外观</span>
+      <div class="seg tp-seg">
+        <button :aria-pressed="themePref === 'auto'" @click="setThemePref('auto')">系统</button>
+        <button :aria-pressed="themePref === 'light'" @click="setThemePref('light')">日间</button>
+        <button :aria-pressed="themePref === 'dark'" @click="setThemePref('dark')">黑夜</button>
+      </div>
+    </div>
+    <div class="user">
         <div class="av">A</div>
         <div>
           <div class="nm">admin</div>
@@ -520,8 +523,8 @@ setInterval(() => refresh(true), 2500)
     <main class="main">
       <div class="topbar">
         <div class="titleblock">
-          <h1>{{ { list: '连接配置', logs: '运行日志', settings: '偏好设置' }[view] }}</h1>
-          <p>{{ view === 'list' ? (configs.length ? `共 ${configs.length} 个配置 · ${enabledCount} 个正在运行` : '还没有配置') : view === 'logs' ? '本地引擎的实时运行事件' : '引擎与运行环境' }}</p>
+          <h1>{{ { list: '连接配置', logs: '运行日志' }[view] }}<template v-if="view === 'list'">{{ { overview: ' · 概览', server: ' · 服务器', mappings: ' · 端口映射', visitors: ' · 访问端', files: ' · 配置文件' }[detailSection] }}</template></h1>
+          <p>{{ view === 'list' ? (configs.length ? `共 ${configs.length} 个配置 · ${enabledCount} 个正在运行` : '还没有配置') : '本地引擎的实时运行事件' }}</p>
         </div>
         <span class="spacer"></span>
         <button class="themebtn" :title="theme === 'dark' ? '日间模式' : '黑夜模式'" @click="toggleTheme">
@@ -596,6 +599,24 @@ setInterval(() => refresh(true), 2500)
               <span class="switch" role="switch" :aria-checked="draft.enabled ? 'true' : 'false'" tabindex="0" @click="toggleConfig(draft)"></span>
             </div>
 
+            <div v-show="detailSection === 'overview'">
+              <div class="sec"><span>运行状态</span></div>
+              <div class="setcard">
+                <div class="kv"><span>连接状态</span><b>{{ statusOf(draft).label }}</b></div>
+                <div class="kv"><span>连接协议</span><b>{{ (draft.protocol || 'tcp').toUpperCase() }}</b></div>
+                <div class="kv"><span>端口映射</span><b>{{ draft.mappings.length }} 条</b></div>
+                <div class="kv"><span>访问端</span><b>{{ visitorList(draft).length }} 条</b></div>
+              </div>
+              <div class="sec" style="padding-top:10px"><span>引擎与运行环境（只读）</span></div>
+              <div class="setcard">
+                <div class="kv"><span>运行模式</span><b>单进程托管全部连接</b></div>
+                <div class="kv"><span>隧道引擎</span><b>{{ info?.engineBin || '—' }}</b></div>
+                <div class="kv"><span>数据位置</span><b>{{ info?.dataDir || '—' }}</b></div>
+                <div class="kv"><span>版本</span><b>v{{ info?.version || '—' }}</b></div>
+              </div>
+              <p class="setnote">外观主题在左侧栏底部切换（跟随系统 / 日间 / 黑夜）。</p>
+            </div>
+            <div v-show="detailSection === 'server'">
             <div class="sec"><span>连接信息</span><span class="flex1"></span><span class="sechint">对应 lumoc.toml 基础段</span></div>
 
             <div class="field"><label>配置名称</label><input v-model="draft.name" placeholder="例如 家庭 NAS"></div>
@@ -623,6 +644,10 @@ setInterval(() => refresh(true), 2500)
               </div>
             </div>
             <div class="field" v-if="draft.protocol === 'kcp'"><label>KCP 端口（服务端 UDP）</label><input v-model.number="draft.kcpPort" class="mono" type="number" min="1" max="65535" placeholder="如 47011"></div>
+            <div class="sec"><span>传输与高级</span></div>
+            <div class="optrow"><span class="lbl">TLS 加密传输</span><span class="switch sm" role="switch" :aria-checked="draft.tls ? 'true' : 'false'" tabindex="0" @click="draft.tls = !draft.tls"></span></div>
+            <div class="optrow"><span class="lbl">断线自动重连</span><span class="switch sm on" role="switch" aria-checked="true" tabindex="0"></span></div>
+
             <div class="field"><label>认证令牌 · auth.token</label>
               <div class="token-wrap">
                 <input v-model="draft.token" class="mono" :type="showToken ? 'text' : 'password'" placeholder="粘贴服务端生成的令牌（保存后服务端不再显示）" autocomplete="off">
@@ -636,6 +661,8 @@ setInterval(() => refresh(true), 2500)
               </div>
             </div>
 
+            </div>
+            <div v-show="detailSection === 'mappings'">
             <div class="sec"><span>端口映射 {{ draft.mappings.length }} 条</span><span class="flex1"></span>
               <button class="secadd" @click="addMapping">＋ 添加</button>
             </div>
@@ -670,6 +697,8 @@ setInterval(() => refresh(true), 2500)
               </div>
             </div>
 
+            </div>
+            <div v-show="detailSection === 'visitors'">
             <div class="sec"><span>访问端 {{ visitorList(draft).length }} 条</span><span class="flex1"></span>
               <button class="secadd" @click="addVisitor">＋ 添加</button>
             </div>
@@ -688,12 +717,20 @@ setInterval(() => refresh(true), 2500)
               </div>
             </div>
 
-            <div class="sec"><span>传输与高级</span></div>
-            <div class="optrow"><span class="lbl">TLS 加密传输</span><span class="switch sm" role="switch" :aria-checked="draft.tls ? 'true' : 'false'" tabindex="0" @click="draft.tls = !draft.tls"></span></div>
-            <div class="optrow"><span class="lbl">断线自动重连</span><span class="switch sm on" role="switch" aria-checked="true" tabindex="0"></span></div>
+            </div>
 
+            <div v-show="detailSection === 'files'">
+              <div class="sec"><span>lumoc.toml</span><span class="flex1"></span><span class="sechint">只读预览</span></div>
+              <pre class="warnbox" style="white-space:pre-wrap;max-height:40vh;overflow:auto">{{ tomlText || '加载中…' }}</pre>
+              <div class="setcard" style="margin-top:12px">
+                <div class="kv"><span>运行模式</span><b>单进程托管全部连接</b></div>
+                <div class="kv"><span>隧道引擎</span><b>{{ info?.engineBin || '—' }}</b></div>
+                <div class="kv"><span>数据位置</span><b>{{ info?.dataDir || '—' }}</b></div>
+                <div class="kv"><span>版本</span><b>v{{ info?.version || '—' }}</b></div>
+              </div>
+            </div>
             <div class="dfoot">
-              <span class="link" @click="showToml(draft)">查看 lumoc.toml</span>
+              <span class="link" @click="showToml(draft)">完整编辑</span>
               <span class="spacer"></span>
               <button class="btn" @click="save">保存并应用</button>
               <button id="deleteBtn" style="display:none"></button>
@@ -731,25 +768,6 @@ setInterval(() => refresh(true), 2500)
         <div v-else class="hint" style="margin:16px">没有正在运行的连接。启用一个配置后，这里会显示 lumoc 的实时事件。</div>
       </div>
 
-      <!-- 设置视图 -->
-      <div class="setpage" v-show="view === 'settings'">
-        <div class="setcard">
-          <div class="kv"><span>外观主题</span>
-            <div class="seg">
-              <button :aria-pressed="themePref === 'auto'" @click="setThemePref('auto')">跟随系统</button>
-              <button :aria-pressed="themePref === 'light'" @click="setThemePref('light')">日间</button>
-              <button :aria-pressed="themePref === 'dark'" @click="setThemePref('dark')">黑夜</button>
-            </div>
-          </div>
-          <p class="setnote">「跟随系统」会随操作系统的浅色/深色设置自动切换；右上角的按钮可快速临时切换。</p>
-        </div>
-        <div class="setcard">
-          <div class="kv"><span>运行模式</span><b>单进程托管全部连接</b></div>
-          <div class="kv"><span>隧道引擎</span><b>{{ info?.engineBin || '—' }}</b></div>
-          <div class="kv"><span>数据位置</span><b>{{ info?.dataDir || '—' }}</b></div>
-          <div class="kv"><span>版本</span><b>v{{ info?.version || '—' }}</b></div>
-        </div>
-      </div>
     </main>
   </div>
 
