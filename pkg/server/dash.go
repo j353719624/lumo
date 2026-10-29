@@ -445,6 +445,7 @@ func (s *Server) apiServerInfo(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Unlock()
 
 	writeJSON(w, map[string]any{
+		"configLocked":     s.cfg.ConfigLocked,
 		"version":          version.Version,
 		"bindPort":         s.cfg.BindPort,
 		"kcpPort":          s.cfg.KCPPort,

@@ -125,7 +125,7 @@ function diffEvents(next: ProxyItem[]) {
     if (!seen.has(name)) pushEvent('WARN', `代理移除 ${name} · ${old.type}`)
   }
   const prevClients = new Set(clientNames.value)
-  for (const c of clientNamesOf(next)) if (!prevClients.has(c)) pushEvent('INFO', `客户端接入 ${c} · ${host()}`)
+  for (const c of clientNamesOf(next)) if (!prevClients.has(c)) pushEvent('INFO', `客户端接入 ${c} · ${maskedHost.value || host()}`)
   for (const c of clientNames.value) if (!clientNamesOf(next).includes(c)) pushEvent('WARN', `客户端断开 ${c}`)
 }
 
@@ -138,7 +138,7 @@ async function poll() {
   let nextProxies: ProxyItem[]
   try {
     nextInfo = await serverInfo()
-    nextProxies = await fetchProxies(host())
+    nextProxies = await fetchProxies(maskedHost.value || host())
     connected.value = true
     healthOk.value = await health()
   } catch (err: any) {
@@ -243,6 +243,23 @@ async function copyToken() {
 }
 const savedCfg = ref(null)
 const cfgLoaded = ref(false)
+const cfgLocked = computed(() => !!(info.value as any)?.configLocked)
+
+// IP 掩码：面板上不出现明文 IP，用确定性摘要代替（同 IP → 同显示）
+const maskedHost = ref('')
+function isIPv4(h: string) { return /^\d{1,3}(\.\d{1,3}){3}$/.test(h) }
+async function maskHost() {
+  const h = host()
+  if (!h) return
+  if (!isIPv4(h)) { maskedHost.value = h; return }
+  try {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('lumo:' + h))
+    const hex = [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
+    maskedHost.value = 'ip-' + hex.slice(0, 8)
+  } catch {
+    maskedHost.value = 'ip-hidden'
+  }
+}
 const savingCfg = ref(false)
 
 watch(info, (v) => {
@@ -541,7 +558,8 @@ function typeClass(t: string) {
   return ['tcp', 'udp', 'http', 'https', 'mux', 'sealed-tcp', 'sealed-udp'].includes(t) ? 't-' + t : 't-tcp'
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await maskHost()
   poll()
   pollTimer = window.setInterval(poll, apiCfg.interval)
   window.addEventListener('click', closeMenu as EventListener)
@@ -726,16 +744,18 @@ function closeMenu(e: MouseEvent) {
         <button class="btn ghost sm" @click="copy(tomlSnippet(), 'lumos.toml ' + t('copied'))">{{ t('config.copy') }}</button>
       </div>
       <div class="cbody" v-if="cfgLoaded">
+        <div class="note" v-if="!cfgLocked" style="color:var(--warn)">⚠ {{ t('config.lockHint') }}</div>
+        <div class="note" v-else style="color:var(--tx-3)">🔒 {{ t('config.locked') }}</div>
         <div class="field-row">
-          <div class="field"><label>{{ t('config.bindPort') }}</label><input v-model.number="srvCfg.bindPort" type="number"></div>
-          <div class="field"><label>{{ t('config.kcpPort') }}</label><input v-model.number="srvCfg.kcpPort" type="number" min="0" max="65535" :placeholder="t('config.kcpOff')"></div>
+          <div class="field"><label>{{ t('config.bindPort') }}</label><input v-model.number="srvCfg.bindPort" type="number" :disabled="cfgLocked"></div>
+          <div class="field"><label>{{ t('config.kcpPort') }}</label><input v-model.number="srvCfg.kcpPort" type="number" min="0" max="65535" :placeholder="t('config.kcpOff')" :disabled="cfgLocked"></div>
         </div>
         <div class="field-row">
-          <div class="field"><label>{{ t('config.vhostHttp') }}</label><input v-model.number="srvCfg.vhostHttpPort" type="number" placeholder="0"></div>
-          <div class="field"><label>{{ t('config.vhostHttps') }}</label><input v-model.number="srvCfg.vhostHttpsPort" type="number" placeholder="0"></div>
+          <div class="field"><label>{{ t('config.vhostHttp') }}</label><input v-model.number="srvCfg.vhostHttpPort" type="number" placeholder="0" :disabled="cfgLocked"></div>
+          <div class="field"><label>{{ t('config.vhostHttps') }}</label><input v-model.number="srvCfg.vhostHttpsPort" type="number" placeholder="0" :disabled="cfgLocked"></div>
         </div>
-        <div class="field"><label>{{ t('config.subdomain') }}</label><input v-model="srvCfg.subdomainHost" :placeholder="t('config.subdomainPh')"></div>
-        <div class="field"><label>{{ t('config.allowPorts') }}</label><input v-model="srvCfg.allowPortsStr" :placeholder="t('config.allowPortsPh')"></div>
+        <div class="field"><label>{{ t('config.subdomain') }}</label><input v-model="srvCfg.subdomainHost" :placeholder="t('config.subdomainPh')" :disabled="cfgLocked"></div>
+        <div class="field"><label>{{ t('config.allowPorts') }}</label><input v-model="srvCfg.allowPortsStr" :placeholder="t('config.allowPortsPh')" :disabled="cfgLocked"></div>
         <div class="field"><label>{{ t('config.authToken') }}<span v-if="authMode === 'key' && authFp" style="margin-left:8px;color:var(--tx-4);font-family:var(--mono)">公钥 {{ authFp }}</span></label>
           <div style="position:relative">
             <input v-model="srvCfg.authToken" :type="tokenGenerated ? 'text' : 'password'" autocomplete="off" readonly
@@ -746,7 +766,7 @@ function closeMenu(e: MouseEvent) {
             ⚠ 保存前先复制！保存后服务端只存公钥，令牌永久不可再查看；所有现有连接会断开，需把新令牌填到客户端。
           </div>
           <div style="margin-top:6px">
-            <button class="btn ghost sm" type="button" @click="generateToken">生成新令牌</button>
+            <button class="btn ghost sm" type="button" :disabled="cfgLocked" @click="generateToken">生成新令牌</button>
           </div>
         </div>
         <div class="sw-list">
@@ -762,7 +782,7 @@ function closeMenu(e: MouseEvent) {
         <div class="note">{{ locale === 'zh' ? '注意：隧道端口与 KCP 端口保存后立即生效，HTTP/HTTPS 虚拟主机端口需重启 lumos' : 'Note: port changes take effect after a lumos restart' }}</div>
       </div>
       <div class="cbody" v-else><div class="note">读取配置…</div></div>
-      <div class="cfoot" v-if="cfgLoaded">
+      <div class="cfoot" v-if="cfgLoaded && !cfgLocked">
         <button class="btn ghost sm" @click="resetCfg">{{ t('config.reset') }}</button>
         <span class="spacer"></span>
         <button class="btn sm" :disabled="savingCfg" @click="saveServerConfig">{{ savingCfg ? t('config.saving') : t('config.save') }}</button>

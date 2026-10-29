@@ -2,6 +2,7 @@
 //   GET /api/serverinfo · GET /api/proxies · GET /api/logs · GET /healthz
 
 export interface ServerInfo {
+  configLocked: boolean
   version: string
   bindPort: number
   kcpPort: number
@@ -157,6 +158,7 @@ export async function serverInfo(): Promise<ServerInfo> {
   const d = await get<any>('/api/serverinfo')
   const s = d.conf || d
   return {
+    configLocked: !!pick(s, ['configLocked', 'config_locked'], false),
     version: pick(s, ['version'], '—'),
     bindPort: pick(s, ['bindPort', 'bind_port'], 0),
     kcpPort: pick(s, ['kcpPort', 'kcpBindPort', 'kcp_bind_port'], 0),

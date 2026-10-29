@@ -107,6 +107,8 @@ const zh: Dict = {
   'config.allowPortsPh': '不限制',
   'config.authToken': '认证令牌 auth.token',
   'config.authTokenPh': '留空保持不变；粘贴 lumoc token 生成的令牌',
+  'config.lockHint': '首次保存后配置面板将锁定：端口与令牌只能登录服务器修改 lumos.toml',
+  'config.locked': '配置已锁定：端口与令牌不再从面板修改；如需调整请登录服务器编辑 lumos.toml 后重启 lumo-server',
   // logs
   'logs.title': '运行事件',
   'logs.live': '实时刷新',
@@ -395,6 +397,8 @@ const en: Dict = {
   'config.allowPortsPh': 'Unrestricted',
   'config.authToken': 'Auth token',
   'config.authTokenPh': 'Leave blank to keep; paste a token from "lumoc token"',
+  'config.lockHint': 'The panel locks after the first save: ports and token become editable only on the server (lumos.toml)',
+  'config.locked': 'Config locked: ports and token are no longer editable here; edit lumos.toml on the server and restart lumo-server',
   'logs.title': 'Events',
   'logs.live': 'Live',
   'tfa.title': 'Account · Two-factor',

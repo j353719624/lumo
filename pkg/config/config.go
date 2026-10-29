@@ -40,7 +40,11 @@ type ServerConfig struct {
 	// Revision increments on every config save; the console must send the
 	// revision it based its edit on, or the save is rejected as stale.
 	Revision int
-	Web      WebServer
+	// ConfigLocked freezes the dashboard config panel: after the first
+	// panel save the ports/token are read-only and edits happen by editing
+	// the toml on the server directly.
+	ConfigLocked bool
+	Web          WebServer
 }
 
 // ProxyConfig describes one tunnel registered by a client.
@@ -133,6 +137,7 @@ func LoadServer(path string) (*ServerConfig, error) {
 	c.SubdomainHost = getStr(root, "subdomainHost", "")
 	c.AllowPorts = getStr(root, "allowPorts", "")
 	c.Revision = getInt(root, "revision", 1)
+	c.ConfigLocked = getBool(root, "configLocked")
 	c.Web = loadWeb(root, WebServer{Addr: "127.0.0.1"})
 	if err := c.validate(); err != nil {
 		return nil, err
@@ -398,6 +403,9 @@ func SaveServer(path string, c *ServerConfig) error {
 	}
 	b.WriteString(fmt.Sprintf("user = %q\n", c.Web.User))
 	b.WriteString(fmt.Sprintf("password = %q\n", c.Web.Password))
+	if c.ConfigLocked {
+		b.WriteString("configLocked = true\n")
+	}
 	if len(c.Web.TOTPSecrets) > 0 {
 		quoted := make([]string, 0, len(c.Web.TOTPSecrets))
 		for _, sec := range c.Web.TOTPSecrets {
