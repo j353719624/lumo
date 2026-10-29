@@ -403,7 +403,6 @@ func (s *Server) newSession(c net.Conn, hello proto.Msg) {
 	if s.cfg.AuthPubKey != "" {
 		// 公钥模式：验证 Ed25519 签名（服务端不保存令牌本身）
 		rcv := hello.Str("authp")
-		log.Warnf("AUTHDBG pub=%s nonce=%s authp=%s authpLen=%d", s.cfg.AuthPubKey, hex.EncodeToString(nonce), rcv, len(rcv))
 		if !token.VerifyProof(s.cfg.AuthPubKey, nonce, rcv) {
 			who := hello.Str("client")
 			if n := hello.Str("name"); n != "" {
