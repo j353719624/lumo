@@ -95,7 +95,10 @@ type ClientConfig struct {
 	ProtocolVersion int
 	// StunServer is used for PUNCH hole punching (host:port).
 	StunServer string
-	AuthToken  string
+	// AutoVisitors: after connecting, ask the server for all sealed-tcp/sealed-udp
+	// services and bind a local port for each automatically.
+	AutoVisitors bool
+	AuthToken    string
 	TLSEnable  bool
 	Web        WebServer
 	Proxies    []ProxyConfig
@@ -181,6 +184,7 @@ func LoadClient(path string) (*ClientConfig, error) {
 	c.KCPPort = getInt(root, "kcpPort", 0)
 	c.ProtocolVersion = getInt(root, "protocolVersion", 2)
 	c.StunServer = getStr(root, "stunServer", "stun.easyvoip.com:3478")
+	c.AutoVisitors = getBool(root, "autoVisitors")
 	if a := getTable(root, "auth"); a != nil {
 		c.AuthToken = getStr(a, "token", "")
 	}

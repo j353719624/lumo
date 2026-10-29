@@ -142,6 +142,9 @@ func (c *Client) Run(ctx context.Context) error {
 	if len(c.cfg.Visitors) > 0 {
 		go c.runVisitors(ctx)
 	}
+	if c.cfg.AutoVisitors {
+		go c.autoDiscoverVisitors(ctx)
+	}
 	c.logi("lumoc %s starting (server %s)", version.Version, log.MaskAddr(c.addr()))
 	backoff := time.Second
 	for {

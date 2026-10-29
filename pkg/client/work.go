@@ -385,3 +385,28 @@ func (c *Client) visitorUDPPacket(ctx context.Context, ln *net.UDPConn, src *net
 		_, _ = ln.WriteToUDP(resp, src)
 	}
 }
+
+// autoDiscoverVisitors asks the server for all sealed-tcp/sealed-udp services after
+// the control connection is up, then binds a local port for each.
+func (c *Client) autoDiscoverVisitors(ctx context.Context) {
+	// 等控制连接建立
+	for i := 0; i < 30; i++ {
+		c.mu.Lock()
+		up := c.ctrl != nil
+		c.mu.Unlock()
+		if up { break }
+		time.Sleep(time.Second)
+	}
+	c.mu.Lock()
+	if c.ctrl == nil { c.mu.Unlock(); return }
+	c.mu.Unlock()
+
+	if err := proto.Send(c.ctrl, proto.Msg{"type": "list-services"}); err != nil {
+		c.logw("auto-discover: send list-services: %v", err)
+		return
+	}
+
+	// readLoop 收到 "services" 回复后通过 channel 转发过来 — 简化：用超时轮询
+	// 实际上 readLoop 的 case "services" 会处理。这里直接等 3 秒让 readLoop 收到。
+	time.Sleep(3 * time.Second)
+}
