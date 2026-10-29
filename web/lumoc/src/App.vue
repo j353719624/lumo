@@ -976,7 +976,7 @@ setInterval(() => refresh(true), 2500)
       </template>
       <template v-else>
         <div class="qrwrap" v-if="twofaQr"><img :src="twofaQr" alt="TOTP QR" width="184" height="184"></div>
-        <p class="setnote" style="text-align:center;margin:0">{{ t('tfa.scanTip') }} <b class="mono">{{ twofaSecret }}</b></p>
+        <p class="setnote" style="text-align:center;margin:0">{{ t('c.tfa.scanNote') }} <b class="mono">{{ twofaSecret }}</b></p>
         <div class="field" style="margin-top:12px"><label>{{ t('c.tfa.codeToEnable') }}</label>
           <input v-model="twofaCode" class="mono" maxlength="6" :placeholder="t('login.2faPlaceholder')">
         </div>

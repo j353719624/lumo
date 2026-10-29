@@ -770,45 +770,40 @@ function closeMenu(e: MouseEvent) {
   <div class="modal-mask" v-if="tfaOpen" @click.self="tfaOpen = false">
     <div class="modal tfa">
       <header>
-        <h3>{{ t('tfa.title') }}</h3>
+        <div class="thd">
+          <h3>{{ t('tfa.title') }}</h3>
+          <p>{{ t('c.tfa.sub') }}</p>
+        </div>
         <button class="x" type="button" @click="tfaOpen = false">✕</button>
       </header>
-      <p class="tdesc">{{ t('tfa.desc') }}</p>
 
       <template v-if="tfaEnabled">
-        <p class="tnote ok">{{ t('tfa.enabled') }}</p>
+        <p class="tnote">{{ t('c.tfa.onNote') }}</p>
         <div class="tfield">
           <label>{{ t('tfa.code') }}</label>
           <input v-model="tfaCode" type="text" inputmode="numeric" maxlength="6"
-                 :placeholder="t('tfa.codePh')" autocomplete="one-time-code">
+                 :placeholder="t('login.2faPlaceholder')" autocomplete="one-time-code">
         </div>
         <div class="tactions">
-          <button class="btn ghost sm" type="button" @click="tfaOpen = false">{{ t('tfa.close') }}</button>
-          <button class="btn danger sm" type="button" :disabled="tfaBusy" @click="unbind2FA">{{ t('tfa.confirmUnbind') }}</button>
+          <button class="btn ghost sm" type="button" @click="tfaOpen = false">{{ t('c.n.cancel') }}</button>
+          <button class="btn danger sm" type="button" :disabled="tfaBusy" @click="unbind2FA">{{ t('c.tfa.disable') }}</button>
         </div>
       </template>
 
       <template v-else>
-        <p class="tnote">{{ t('tfa.disabled') }}</p>
         <div class="tqr" v-if="tfaQr">
-          <img :src="tfaQr" alt="TOTP QR" width="168" height="168">
+          <img :src="tfaQr" alt="TOTP QR" width="184" height="184">
         </div>
-        <div class="tfield" v-if="tfaSecret">
-          <label>{{ t('tfa.scanTip') }}</label>
-          <div class="secret-row">
-            <code>{{ tfaSecret }}</code>
-            <button class="btn ghost sm" type="button" @click="copy(tfaSecret, t('copied'))">{{ t('config.copy') }}</button>
-          </div>
-        </div>
+        <p class="tnote" style="text-align:center;margin:0">{{ t('c.tfa.scanNote') }} <b class="mono">{{ tfaSecret }}</b></p>
         <div class="tfield">
-          <label>{{ t('tfa.code') }}</label>
+          <label>{{ t('c.tfa.codeToEnable') }}</label>
           <input v-model="tfaCode" type="text" inputmode="numeric" maxlength="6"
-                 :placeholder="t('tfa.codePh')" autocomplete="one-time-code">
+                 :placeholder="t('login.2faPlaceholder')" autocomplete="one-time-code">
         </div>
         <p class="tmsg" v-if="tfaMsg" :class="{ ok: tfaMsg.ok }">{{ tfaMsg.text }}</p>
         <div class="tactions">
-          <button class="btn ghost sm" type="button" @click="tfaOpen = false">{{ t('tfa.close') }}</button>
-          <button class="btn sm" type="button" :disabled="tfaBusy" @click="bind2FA">{{ tfaBusy ? '…' : t('tfa.confirmBind') }}</button>
+          <button class="btn ghost sm" type="button" @click="tfaOpen = false">{{ t('c.n.cancel') }}</button>
+          <button class="btn sm" type="button" :disabled="tfaBusy" @click="bind2FA">{{ tfaBusy ? '…' : t('c.tfa.enable') }}</button>
         </div>
       </template>
     </div>
