@@ -184,7 +184,7 @@ function normTime(t: string): string {
 const menu = ref<{ x: number; y: number; proxy: ProxyItem | null }>({ x: 0, y: 0, proxy: null })
 
 /* ---------------- 服务配置（可编辑） ---------------- */
-const srvCfg = ref({ bindPort: null as number | null, vhostHttpPort: 0, vhostHttpsPort: 0, authToken: '', subdomainHost: '', allowPortsStr: '', webPort: 0, webPassword: '' })
+const srvCfg = ref({ bindPort: null as number | null, kcpPort: 0, vhostHttpPort: 0, vhostHttpsPort: 0, authToken: '', subdomainHost: '', allowPortsStr: '', webPort: 0, webPassword: '' })
 const showToken = ref(false)
 const savedCfg = ref(null)
 const cfgLoaded = ref(false)
@@ -194,6 +194,7 @@ watch(info, (v) => {
   if (!v || cfgLoaded.value) return
   cfgLoaded.value = true
   srvCfg.value.bindPort = v.bindPort
+  srvCfg.value.kcpPort = v.kcpPort || 0
   srvCfg.value.vhostHttpPort = v.vhostHttpPort
   srvCfg.value.vhostHttpsPort = v.vhostHttpsPort
   srvCfg.value.subdomainHost = v.subdomainHost
@@ -392,7 +393,7 @@ function tomlSnippet(): string {
   const i = info.value || ({} as ServerInfo)
   const lines = [
     `bindPort = ${i.bindPort || 7000}`,
-    i.kcpPort ? `kcpBindPort = ${i.kcpPort}` : '',
+    i.kcpPort ? `kcpPort = ${i.kcpPort}` : '',
     i.quicPort ? `quicBindPort = ${i.quicPort}` : '',
     i.vhostHttpPort ? `vhostHTTPPort = ${i.vhostHttpPort}` : '',
     i.vhostHttpsPort ? `vhostHTTPSPort = ${i.vhostHttpsPort}` : '',
@@ -625,7 +626,7 @@ function closeMenu(e: MouseEvent) {
       <div class="cbody" v-if="cfgLoaded">
         <div class="field-row">
           <div class="field"><label>{{ t('config.bindPort') }}</label><input v-model.number="srvCfg.bindPort" type="number"></div>
-          <div class="field"><label>{{ t('config.kcpPort') }}</label><input :value="t('config.kcpOff')" readonly disabled></div>
+          <div class="field"><label>{{ t('config.kcpPort') }}</label><input v-model.number="srvCfg.kcpPort" type="number" min="0" max="65535" :placeholder="t('config.kcpOff')"></div>
         </div>
         <div class="field-row">
           <div class="field"><label>{{ t('config.vhostHttp') }}</label><input v-model.number="srvCfg.vhostHttpPort" type="number" placeholder="0"></div>

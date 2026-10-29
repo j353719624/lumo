@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/j353719624/lumo/pkg/log"
 	"github.com/j353719624/lumo/pkg/proto"
 	"github.com/j353719624/lumo/pkg/relay"
+	"github.com/j353719624/lumo/pkg/udpstream"
 	"github.com/j353719624/lumo/pkg/version"
 )
 
@@ -36,6 +38,8 @@ type Client struct {
 	lastErr string
 
 	muxPort int
+	// usess is the multiplexed KCP session when Protocol is "kcp".
+	usess *udpstream.Session
 
 	pendMu  sync.Mutex
 	pending map[string]chan proto.Msg
@@ -78,6 +82,18 @@ func New(cfg *config.ClientConfig, cfgPath string) *Client {
 
 func (c *Client) addr() string {
 	return net.JoinHostPort(c.cfg.ServerAddr, fmt.Sprintf("%d", c.cfg.ServerPort))
+}
+
+// dataConn opens a data connection to the server: a multiplexed KCP stream
+// when the KCP transport is active, otherwise a plain TCP connection.
+func (c *Client) dataConn() (net.Conn, error) {
+	c.mu.Lock()
+	us := c.usess
+	c.mu.Unlock()
+	if us != nil {
+		return us.Open()
+	}
+	return net.DialTimeout("tcp", c.addr(), 10*time.Second)
 }
 
 // logi/logw/loge/logd route messages to the scoped instance when present.
@@ -156,25 +172,47 @@ func (c *Client) markAllOffline() {
 
 // serve runs one connection lifetime and returns when it breaks.
 func (c *Client) serve(ctx context.Context) error {
-	rawConn, err := net.DialTimeout("tcp", c.addr(), 10*time.Second)
-	if err != nil {
-		return fmt.Errorf("dial %s: %w", c.addr(), err)
-	}
-	defer rawConn.Close()
-
-	// TLS 传输加密
 	var conn net.Conn
-	if c.cfg.TLSEnable {
-		tlsConn := tls.Client(rawConn, &tls.Config{InsecureSkipVerify: true})
-		if err := tlsConn.Handshake(); err != nil {
-			return fmt.Errorf("tls handshake: %w", err)
+	if c.cfg.Protocol == "kcp" {
+		// KCP：一条 UDP 会话多路复用，控制流与数据流共用
+		kaddr := net.JoinHostPort(c.cfg.ServerAddr, strconv.Itoa(c.cfg.KCPPort))
+		kudp, err := net.ResolveUDPAddr("udp", kaddr)
+		if err != nil {
+			return fmt.Errorf("kcp addr %s: %w", kaddr, err)
 		}
-		conn = tlsConn
-		c.logi("TLS transport enabled")
+		us, err := udpstream.Dial(kudp, 10*time.Second)
+		if err != nil {
+			return fmt.Errorf("kcp dial %s: %w", kaddr, err)
+		}
+		defer us.Close()
+		c.mu.Lock()
+		c.usess = us
+		c.mu.Unlock()
+		ctrl, err := us.Open()
+		if err != nil {
+			return fmt.Errorf("kcp control stream: %w", err)
+		}
+		conn = ctrl
+		c.logi("KCP transport enabled (udp %s)", kaddr)
 	} else {
-		conn = rawConn
-	}
+		rawConn, err := net.DialTimeout("tcp", c.addr(), 10*time.Second)
+		if err != nil {
+			return fmt.Errorf("dial %s: %w", c.addr(), err)
+		}
+		defer rawConn.Close()
 
+		// TLS 传输加密
+		if c.cfg.TLSEnable {
+			tlsConn := tls.Client(rawConn, &tls.Config{InsecureSkipVerify: true})
+			if err := tlsConn.Handshake(); err != nil {
+				return fmt.Errorf("tls handshake: %w", err)
+			}
+			conn = tlsConn
+			c.logi("TLS transport enabled")
+		} else {
+			conn = rawConn
+		}
+	}
 	defer conn.Close()
 	c.mu.Lock()
 	c.ctrl = conn
@@ -200,6 +238,10 @@ func (c *Client) serve(ctx context.Context) error {
 	}
 	c.mu.Lock()
 	c.muxPort = welcome.Int("mux_port")
+	if kp := welcome.Int("kcp_port"); kp > 0 && kp != c.cfg.KCPPort {
+		c.cfg.KCPPort = kp // 服务端改了 KCP 端口：下次重连直接用新端口
+		c.logi("server kcp port updated to %d", kp)
+	}
 	c.mu.Unlock()
 	c.mu.Lock()
 	c.lastErr = ""

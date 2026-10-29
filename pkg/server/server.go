@@ -23,6 +23,7 @@ import (
 	"github.com/j353719624/lumo/pkg/proto"
 	"github.com/j353719624/lumo/pkg/relay"
 	"github.com/j353719624/lumo/pkg/tlsgen"
+	"github.com/j353719624/lumo/pkg/udpstream"
 	"github.com/j353719624/lumo/pkg/version"
 )
 
@@ -33,8 +34,10 @@ type Server struct {
 
 	ln       net.Listener
 	muxLn net.Listener
-	closed   atomic.Bool
-	dashSrv  *http.Server
+	// kcpLn hosts KCP (UDP) client sessions when kcpPort is configured.
+	kcpLn   *udpstream.Listener
+	closed  atomic.Bool
+	dashSrv *http.Server
 
 	mu       sync.Mutex
 	sessions map[string]*session
@@ -120,6 +123,11 @@ func (s *Server) Run(ctx context.Context) error {
 	if s.cfg.MuxPort > 0 {
 		go s.runMux()
 	}
+	if s.cfg.KCPPort > 0 {
+		if err := s.StartKCP(s.cfg.KCPPort); err != nil {
+			return fmt.Errorf("kcp port %d: %w", s.cfg.KCPPort, err)
+		}
+	}
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.cfg.BindPort))
 	if err != nil {
 		return fmt.Errorf("bind port %d: %w", s.cfg.BindPort, err)
@@ -203,12 +211,68 @@ func (s *Server) Rebind(port int) error {
 	return nil
 }
 
+// StartKCP brings up (or re-binds) the UDP tunnel listener. Port 0 stops it.
+func (s *Server) StartKCP(port int) error {
+	if port < 0 || port > 65535 {
+		return fmt.Errorf("port %d out of range", port)
+	}
+	s.mu.Lock()
+	old := s.kcpLn
+	s.kcpLn = nil
+	s.mu.Unlock()
+	if old != nil {
+		_ = old.Close()
+	}
+	if port == 0 {
+		log.Infof("kcp transport stopped")
+		return nil
+	}
+	pc, err := net.ListenUDP("udp", &net.UDPAddr{Port: port})
+	if err != nil {
+		return err
+	}
+	l := udpstream.NewListener(pc)
+	s.mu.Lock()
+	s.kcpLn = l
+	s.mu.Unlock()
+	go s.kcpAcceptLoop(l)
+	log.Infof("kcp transport listening on udp :%d", port)
+	return nil
+}
+
+// kcpAcceptLoop accepts client sessions; every multiplexed stream is treated
+// like an incoming TCP connection (first message disambiguates control/data).
+func (s *Server) kcpAcceptLoop(l *udpstream.Listener) {
+	for {
+		sess, err := l.AcceptSession()
+		if err != nil {
+			return
+		}
+		go func(us *udpstream.Session) {
+			for {
+				st, err := us.Accept()
+				if err != nil {
+					return
+				}
+				go s.handleConn(st)
+			}
+		}(sess)
+	}
+}
+
 // Close shuts everything down.
 func (s *Server) Close() {
 	if s.closed.Swap(true) {
 		return
 	}
 	_ = s.ln.Close()
+	s.mu.Lock()
+	kcpLn := s.kcpLn
+	s.kcpLn = nil
+	s.mu.Unlock()
+	if kcpLn != nil {
+		_ = kcpLn.Close()
+	}
 	if s.dashSrv != nil {
 		_ = s.dashSrv.Close()
 	}
@@ -315,7 +379,7 @@ func (s *Server) newSession(c net.Conn, hello proto.Msg) {
 	s.mu.Unlock()
 	log.Infof("client %q connected (session %s)", sid, sid[:6])
 
-	if err := ses.send(proto.Msg{"type": "welcome", "sid": sid, "version": version.Version, "mux_port": s.cfg.MuxPort}); err != nil {
+	if err := ses.send(proto.Msg{"type": "welcome", "sid": sid, "version": version.Version, "mux_port": s.cfg.MuxPort, "kcp_port": s.cfg.KCPPort}); err != nil {
 		ses.drop("write welcome: " + err.Error())
 		return
 	}

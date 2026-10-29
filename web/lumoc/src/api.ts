@@ -17,6 +17,7 @@ export interface ConnConfig {
   serverPort: number
   token: string
   protocol?: string
+  kcpPort?: number
   tls: boolean
   enabled: boolean
   autoReconnect?: boolean

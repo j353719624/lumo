@@ -25,6 +25,7 @@ type ServerConfig struct {
 	VhostHTTPPort  int
 	VhostHTTPSPort int
 	MuxPort     int
+	KCPPort        int
 	AuthToken      string
 	Web            WebServer
 }
@@ -55,11 +56,15 @@ type VisitorConfig struct {
 type ClientConfig struct {
 	ServerAddr string
 	ServerPort int
-	AuthToken  string
-	TLSEnable  bool
-	Web        WebServer
-	Proxies    []ProxyConfig
-	Visitors   []VisitorConfig
+	// Protocol selects the transport to the server: "tcp" (default) or "kcp".
+	Protocol string
+	// KCPPort is the server's UDP tunnel port, used when Protocol is "kcp".
+	KCPPort   int
+	AuthToken string
+	TLSEnable bool
+	Web       WebServer
+	Proxies   []ProxyConfig
+	Visitors  []VisitorConfig
 }
 
 // ValidProxyTypes lists the proxy kinds this build supports.
@@ -88,6 +93,7 @@ func LoadServer(path string) (*ServerConfig, error) {
 	c.VhostHTTPPort = getInt(root, "vhostHTTPPort", 0)
 	c.VhostHTTPSPort = getInt(root, "vhostHTTPSPort", 0)
 	c.MuxPort = getInt(root, "muxPort", 0)
+	c.KCPPort = getInt(root, "kcpPort", 0)
 	if a := getTable(root, "auth"); a != nil {
 		c.AuthToken = getStr(a, "token", "")
 	}
@@ -129,6 +135,8 @@ func LoadClient(path string) (*ClientConfig, error) {
 	c := &ClientConfig{}
 	c.ServerAddr = getStr(root, "serverAddr", "127.0.0.1")
 	c.ServerPort = getInt(root, "serverPort", 7000)
+	c.Protocol = getStr(root, "protocol", "tcp")
+	c.KCPPort = getInt(root, "kcpPort", 0)
 	if a := getTable(root, "auth"); a != nil {
 		c.AuthToken = getStr(a, "token", "")
 	}
@@ -170,6 +178,14 @@ func (c *ClientConfig) Validate() error {
 	}
 	if c.ServerPort < 1 || c.ServerPort > 65535 {
 		return fmt.Errorf("serverPort %d out of range", c.ServerPort)
+	}
+	switch c.Protocol {
+	case "", "tcp", "kcp":
+	default:
+		return fmt.Errorf("protocol %q not supported yet (tcp/kcp)", c.Protocol)
+	}
+	if c.Protocol == "kcp" && (c.KCPPort < 1 || c.KCPPort > 65535) {
+		return fmt.Errorf("kcpPort %d out of range", c.KCPPort)
 	}
 	if c.AuthToken == "" {
 		return fmt.Errorf("auth.token is required")

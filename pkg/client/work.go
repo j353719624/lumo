@@ -38,7 +38,7 @@ func (c *Client) handleWork(m proto.Msg) {
 		return
 	}
 
-	dc, err := net.DialTimeout("tcp", c.addr(), 10*time.Second)
+	dc, err := c.dataConn()
 	if err != nil {
 		c.loge("proxy %q: dial for work connection: %v", name, err)
 		return
@@ -285,7 +285,7 @@ func (c *Client) runVisitorTCP(ctx context.Context, v config.VisitorConfig) erro
 			return err
 		}
 		go func(lc net.Conn) {
-			dc, err := net.DialTimeout("tcp", c.addr(), 10*time.Second)
+			dc, err := c.dataConn()
 			if err != nil {
 				_ = lc.Close()
 				return
@@ -339,7 +339,7 @@ func (c *Client) runVisitorUDP(ctx context.Context, v config.VisitorConfig) erro
 // tunnel per datagram keeps the implementation simple and connectionless,
 // matching UDP semantics.
 func (c *Client) visitorUDPPacket(ctx context.Context, ln *net.UDPConn, src *net.UDPAddr, payload []byte, v config.VisitorConfig) {
-	dc, err := net.DialTimeout("tcp", c.addr(), 10*time.Second)
+	dc, err := c.dataConn()
 	if err != nil {
 		return
 	}

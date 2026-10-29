@@ -359,11 +359,16 @@ func renderToml(cfg ConnConfig) string {
 	L := []string{
 		`serverAddr = "` + esc(cfg.ServerAddr) + `"`,
 		"serverPort = " + strconv.Itoa(cfg.ServerPort),
+	}
+	if cfg.Protocol == "kcp" {
+		L = append(L, `protocol = "kcp"`, "kcpPort = "+strconv.Itoa(cfg.KCPPort))
+	}
+	L = append(L,
 		"",
 		"[auth]",
-		`token = "` + esc(cfg.Token) + `"`,
+		`token = "`+esc(cfg.Token)+`"`,
 		"",
-	}
+	)
 	for _, mp := range cfg.Mappings {
 		if !mp.active() {
 			continue

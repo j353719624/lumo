@@ -33,6 +33,7 @@ type ConnConfig struct {
 	ServerPort    int       `json:"serverPort"`
 	Token         string    `json:"token"`
 	Protocol      string    `json:"protocol,omitempty"`
+	KCPPort       int       `json:"kcpPort,omitempty"`
 	TLS           bool      `json:"tls"`
 	Enabled       bool      `json:"enabled"`
 	AutoReconnect bool      `json:"autoReconnect,omitempty"`
@@ -45,6 +46,8 @@ func (c *ConnConfig) toClientConfig() (*config.ClientConfig, error) {
 	out := &config.ClientConfig{
 		ServerAddr: c.ServerAddr,
 		ServerPort: c.ServerPort,
+		Protocol:   c.Protocol,
+		KCPPort:    c.KCPPort,
 		AuthToken:  c.Token,
 		TLSEnable:  c.TLS,
 	}

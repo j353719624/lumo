@@ -19,6 +19,7 @@ let toastTimer: number | undefined
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 const startNow = ref(true)
+const nProto = ref('tcp')
 const consoleHost = location.host || '本机'
 const clone = (o: any) => JSON.parse(JSON.stringify(o))
 
@@ -167,7 +168,8 @@ async function save() {
   try {
     const r = await api.update(c.id, {
       name: c.name, serverAddr: c.serverAddr, serverPort: c.serverPort,
-      protocol: c.protocol || 'tcp', token: c.token, tls: c.tls, mappings: c.mappings,
+      protocol: c.protocol || 'tcp', kcpPort: c.protocol === 'kcp' ? Number(c.kcpPort) || 0 : 0,
+      token: c.token, tls: c.tls, mappings: c.mappings,
     })
     await refresh()
     toast(r?.restarted || wasRunning ? '已保存，正在重启该连接' : '已保存')
@@ -217,8 +219,10 @@ async function createAndConnect() {
   const startNowVal = startNow.value
 
   try {
+    const nKcp = document.getElementById('nKcpPort') as HTMLInputElement | null
     const cfg = await api.create({
       name: name || '未命名配置', serverAddr: addr, serverPort: port,
+      protocol: nProto.value, kcpPort: nProto.value === 'kcp' ? Number(nKcp?.value) || 0 : 0,
       token: token || '', mappings: [mapping], enabled: startNowVal,
     })
     closeModal('modalNew')
@@ -475,12 +479,11 @@ setInterval(() => refresh(true), 2500)
               <div class="field"><label>连接协议</label>
                 <select v-model="draft.protocol">
                   <option value="tcp">TCP</option>
-                  <option value="kcp">KCP（开发中）</option>
-                  <option value="quic">QUIC（开发中）</option>
-                  <option value="websocket">WebSocket（开发中）</option>
+                  <option value="kcp">KCP（UDP）</option>
                 </select>
               </div>
             </div>
+            <div class="field" v-if="draft.protocol === 'kcp'"><label>KCP 端口（服务端 UDP）</label><input v-model.number="draft.kcpPort" class="mono" type="number" min="1" max="65535" placeholder="如 47011"></div>
             <div class="field"><label>认证令牌 · auth.token</label>
               <div class="token-wrap">
                 <input v-model="draft.token" class="mono" :type="showToken ? 'text' : 'password'" placeholder="与服务端一致" autocomplete="off">
@@ -582,6 +585,15 @@ setInterval(() => refresh(true), 2500)
       <div class="field-row">
         <div class="field"><label>服务器地址</label><input id="nAddr" class="mono" placeholder="hk-01.example.net"></div>
         <div class="field"><label>服务端口</label><input id="nPort" class="mono" value="7000"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>连接协议</label>
+          <select id="nProto" v-model="nProto">
+            <option value="tcp">TCP</option>
+            <option value="kcp">KCP（UDP）</option>
+          </select>
+        </div>
+        <div class="field" v-if="nProto === 'kcp'"><label>KCP 端口（服务端 UDP）</label><input id="nKcpPort" class="mono" value="0" placeholder="如 47011"></div>
       </div>
       <div class="field"><label>配置名称</label><input id="nName" placeholder="例如 家庭 NAS"></div>
       <div class="field"><label>认证令牌（与服务端一致，可自动生成或手动输入）</label>

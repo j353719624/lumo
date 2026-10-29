@@ -383,7 +383,7 @@ func (s *Server) apiServerInfo(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, map[string]any{
 		"version":          version.Version,
 		"bindPort":         s.cfg.BindPort,
-		"kcpPort":          0,
+		"kcpPort":          s.cfg.KCPPort,
 		"quicPort":         0,
 		"vhostHttpPort":    s.cfg.VhostHTTPPort,
 		"vhostHttpsPort":   s.cfg.VhostHTTPSPort,
@@ -480,6 +480,7 @@ func serveConsole(fsys http.FileSystem) http.Handler {
 func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		BindPort       int    `json:"bindPort"`
+		KCPPort        int    `json:"kcpPort"`
 		VhostHTTPPort  int    `json:"vhostHttpPort"`
 		VhostHTTPSPort int    `json:"vhostHttpsPort"`
 		AuthToken      string `json:"authToken"`
@@ -495,6 +496,10 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 		failJSON(w, http.StatusBadRequest, "bindPort 必须在 1-65535 之间")
 		return
 	}
+	if req.KCPPort < 0 || req.KCPPort > 65535 {
+		failJSON(w, http.StatusBadRequest, "kcpPort 必须在 0-65535 之间（0 表示关闭 KCP）")
+		return
+	}
 	for name, port := range map[string]int{
 		"vhostHttpPort": req.VhostHTTPPort, "vhostHttpsPort": req.VhostHTTPSPort,
 	} {
@@ -506,6 +511,7 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 	oldVhostHTTP := s.cfg.VhostHTTPPort
 	oldVhostHTTPS := s.cfg.VhostHTTPSPort
 	oldBind := s.cfg.BindPort
+	oldKCP := s.cfg.KCPPort
 	oldToken := s.cfg.AuthToken
 	if req.BindPort != oldBind {
 		if err := s.Rebind(req.BindPort); err != nil {
@@ -514,7 +520,19 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 		}
 		persistFirewallPort(req.BindPort)
 	}
+	if req.KCPPort != oldKCP {
+		if err := s.StartKCP(req.KCPPort); err != nil {
+			// 恢复旧监听，避免服务处于半开状态
+			_ = s.StartKCP(oldKCP)
+			failJSON(w, http.StatusBadRequest, "切换 KCP 端口失败："+err.Error())
+			return
+		}
+		if req.KCPPort > 0 {
+			persistFirewallPort(req.KCPPort)
+		}
+	}
 	s.cfg.BindPort = req.BindPort
+	s.cfg.KCPPort = req.KCPPort
 	s.cfg.VhostHTTPPort = req.VhostHTTPPort
 	s.cfg.VhostHTTPSPort = req.VhostHTTPSPort
 	// 令牌由客户端生成：面板不回显、提交空值表示维持原令牌不变
