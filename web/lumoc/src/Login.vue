@@ -170,8 +170,6 @@ try {
         </div>
 
         <div class="brandfoot">
-          <span class="pill"><span class="dot"></span>引擎就绪</span>
-          <span class="sep"></span>
           <span>登录后即可管理全部隧道</span>
         </div>
       </aside>
