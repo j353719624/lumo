@@ -111,10 +111,10 @@ function diffEvents(next: ProxyItem[]) {
   for (const p of next) {
     seen.add(p.name)
     const old = prev.get(p.name)
-    if (!old) pushEvent('INFO', `代理上线 ${p.name} · ${p.type} · ${p.entry}`)
+    if (!old) pushEvent('INFO', `代理上线 ${p.label || p.name} · ${p.type.toUpperCase()} · ${p.entry}`)
     else if (old.online !== p.online) {
       pushEvent(p.online ? 'INFO' : 'WARN',
-        p.online ? `代理恢复 ${p.name}` : `代理离线 ${p.name}（心跳超时或客户端退出）`)
+        p.online ? `代理恢复 ${p.label || p.name}` : `代理离线 ${p.label || p.name}（心跳超时或客户端退出）`)
     }
   }
   for (const [name, old] of prev) {

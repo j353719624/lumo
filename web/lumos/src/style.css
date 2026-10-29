@@ -237,7 +237,7 @@ a{color:inherit;text-decoration:none}
 /* ---------------- ④ 日志 ---------------- */
 .lbody{flex:1 1 auto;min-height:0;overflow:auto;padding:8px 0;background:#0D1219}
 .lline{display:grid;grid-template-columns:92px 46px minmax(0,1fr);gap:10px;padding:0 16px;
-  height:24px;align-items:center;font:10.5px/1 var(--mono)}
+  height:24px;align-items:center;font:10.5px/1.4 var(--mono)}
 .lline:hover{background:#111823}
 .lline .ts{color:var(--tx-5);font-size:10px}
 .lline .lv{font-size:9.5px;font-weight:700}

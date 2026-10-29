@@ -69,9 +69,9 @@ func (s *Server) handleReg(ses *session, m proto.Msg) {
 	s.mu.Unlock()
 
 	if ent.label != "" {
-		log.Infof("proxy %q (%s, label %q) registered by client %q", name, kind, ent.label, ses.id)
+		log.Infof("proxy %q (%s) registered by client %q", ent.label, kind, ses.display())
 	} else {
-		log.Infof("proxy %q (%s) registered by client %q", name, kind, ses.id)
+		log.Infof("proxy %q (%s) registered by client %q", name, kind, ses.display())
 	}
 	reply(true, "")
 

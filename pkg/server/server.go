@@ -62,6 +62,14 @@ type pendEntry struct {
 	name string
 }
 
+// display returns the client's display name when it provided one, else the id.
+func (ses *session) display() string {
+	if ses.name != "" {
+		return ses.name
+	}
+	return ses.id
+}
+
 type session struct {
 	srv     *Server
 	id      string
@@ -368,7 +376,11 @@ func (s *Server) newSession(c net.Conn, hello proto.Msg) {
 	}
 	expect := proto.Sign(s.cfg.AuthToken, nonce)
 	if !hmac.Equal([]byte(expect), []byte(hello.Str("auth"))) {
-		log.Warnf("client %q failed authentication", hello.Str("client"))
+		who := hello.Str("client")
+		if n := hello.Str("name"); n != "" {
+			who = n + " (" + who + ")"
+		}
+		log.Warnf("client %q failed authentication", who)
 		_ = proto.Send(c, proto.Msg{"type": "error", "message": "authentication failed"})
 		_ = c.Close()
 		return
@@ -396,7 +408,11 @@ func (s *Server) newSession(c net.Conn, hello proto.Msg) {
 	}
 	s.sessions[sid] = ses
 	s.mu.Unlock()
-	log.Infof("client %q connected (session %s)", sid, sid[:6])
+	name := hello.Str("name")
+	if name == "" {
+		name = sid
+	}
+	log.Infof("client %q connected (session %s)", name, sid[:6])
 
 	if err := ses.send(proto.Msg{"type": "welcome", "sid": sid, "version": version.Version, "mux_port": s.cfg.MuxPort, "kcp_port": s.cfg.KCPPort}); err != nil {
 		ses.drop("write welcome: " + err.Error())
@@ -442,7 +458,7 @@ func (s *session) drop(reason string) {
 	if s.closed.Swap(true) {
 		return
 	}
-	log.Infof("client %q disconnected: %s", s.id, reason)
+	log.Infof("client %q disconnected: %s", s.display(), reason)
 	s.srv.mu.Lock()
 	for name, ent := range s.names {
 		s.srv.removeProxyLocked(name, ent)
