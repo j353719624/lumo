@@ -52,6 +52,14 @@ async function submit() {
       body: JSON.stringify({ account: acc, password: pass }),
     })
     const d = await res.json()
+    if (res.ok && d.need2fa && d.ticket) {
+      // 两步验证已启用：先进入动态码步骤，验证通过才发会话
+      otpTicket.value = d.ticket
+      otpStep.value = true
+      state.value = 'idle'
+      otpCode.value = ''
+      return
+    }
     if (res.ok) {
       try {
         if (remember.value) localStorage.setItem('lumo.client.account', acc)
@@ -61,11 +69,6 @@ async function submit() {
       state.value = 'done'
       successShow.value = true
       setTimeout(() => { location.href = '/' }, 350)
-    } else if (d.need2fa && d.ticket) {
-      otpTicket.value = d.ticket
-      otpStep.value = true
-      state.value = 'idle'
-      otpCode.value = ''
     } else {
       state.value = 'idle'
       showError(d.error || '账号或密码不正确。连续 5 次失败会锁定 10 分钟')
@@ -78,7 +81,7 @@ async function submit() {
 
 async function submit2fa() {
   if (state.value !== 'idle') return
-  if (!/^d{6}$/.test(otpCode.value.trim())) { showError('请输入 6 位动态验证码'); return }
+  if (!/^\d{6}$/.test(otpCode.value.trim())) { showError('请输入 6 位动态验证码'); return }
   clearError()
   state.value = 'loading'
   try {
@@ -263,15 +266,6 @@ try {
           </button>
         </form>
 
-        <div class="or">或</div>
-
-        <button class="alt" type="button" @click="showError('访问令牌登录：粘贴服务端生成的 token 即可，无需密码')">
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-            <circle cx="5.6" cy="10.4" r="2.6" stroke="currentColor" stroke-width="1.4"/>
-            <path d="M7.5 8.5L12.6 3.4M10.6 5.4L12.2 7M12 4L13.6 5.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          </svg>
-          使用访问令牌登录
-        </button>
       </div>
     </section>
 
