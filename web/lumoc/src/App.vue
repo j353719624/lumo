@@ -508,16 +508,18 @@ setInterval(() => refresh(true), 2500)
                 <input class="mname" v-model="m.name" placeholder="名称" aria-label="映射名称">
                 <select :value="m.type" @change="setMappingType(m, ($event.target as HTMLSelectElement).value)">
                   <option value="tcp">TCP</option><option value="http">HTTP</option>
-                  <option value="udp">UDP</option><option value="sealed-tcp">sealed-tcp（开发中）</option>
+                  <option value="udp">UDP</option><option value="sealed-tcp">sealed-tcp</option>
                 </select>
                 <input class="local" :value="(m.localIP || '127.0.0.1') + ':' + (m.localPort || '')" aria-label="本地地址" @input="updateLocal(m, ($event.target as HTMLInputElement).value)">
-                <span style="color:#5A7BFF">→</span>
-                <input class="remote" :value="(m.type === 'http' || m.type === 'https') ? (m.domain || '') : (m.remotePort || '')"
-                       :placeholder="(m.type === 'http' || m.type === 'https') ? '域名' : '公网端口'" aria-label="公网入口"
-                       @input="updateRemote(m, ($event.target as HTMLInputElement).value)">
-                <button class="del" aria-label="删除这条映射" @click="removeMapping(idx)">
-                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3.5 4.5H12.5M6.5 4.5V3.2H9.5V4.5M5 4.5L5.6 12.6H10.4L11 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </button>
+                <div class="mapto">
+                  <span style="color:#5A7BFF">→</span>
+                  <input class="remote" :value="(m.type === 'http' || m.type === 'https') ? (m.domain || '') : (m.remotePort || '')"
+                         :placeholder="(m.type === 'http' || m.type === 'https') ? '域名' : '公网端口'" aria-label="公网入口"
+                         @input="updateRemote(m, ($event.target as HTMLInputElement).value)">
+                  <button class="del" aria-label="删除这条映射" @click="removeMapping(idx)">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3.5 4.5H12.5M6.5 4.5V3.2H9.5V4.5M5 4.5L5.6 12.6H10.4L11 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -617,8 +619,7 @@ setInterval(() => refresh(true), 2500)
         <input class="mname" placeholder="名称" aria-label="映射名称">
         <select class="mtype"><option value="tcp">TCP</option><option value="http">HTTP</option><option value="udp">UDP</option><option value="sealed-tcp">sealed-tcp</option></select>
         <input class="local" placeholder="127.0.0.1:5000">
-        <span style="color:#5A7BFF">→</span>
-        <input class="remote" placeholder="15000">
+        <div class="mapto"><span style="color:#5A7BFF">→</span><input class="remote" placeholder="15000"></div>
       </div>
 
       <div class="grp"><span class="gnum">3</span><b>启动方式</b><em>可随时在列表里开关</em></div>

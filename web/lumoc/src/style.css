@@ -147,15 +147,16 @@ input,select,textarea{font:inherit;color:inherit}
 .field-row{display:grid;grid-template-columns:1fr 124px;gap:10px}
 .field-row.even{grid-template-columns:1fr 1fr}
 
-.map{display:flex;align-items:center;gap:8px;padding:0 10px;height:42px;border-radius:var(--r-sm);
+.map{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 10px;min-height:42px;border-radius:var(--r-sm);
   background:var(--panel-2);border:1px solid var(--line)}
 .map select{height:30px;padding:0 6px;background:#151B26;border:1px solid var(--line-3);
-  border-radius:7px;font:500 10.5px/1 var(--mono);color:var(--accent-soft);outline:none;flex:0 0 auto}
+  border-radius:7px;font:500 10.5px/1 var(--mono);color:var(--accent-soft);outline:none;flex:0 0 auto;max-width:76px}
 .map input{height:30px;padding:0 9px;background:#151B26;border:1px solid var(--line-3);
   border-radius:7px;font:11px/1 var(--mono);outline:none;min-width:0}
 .map input.mname{flex:0 0 76px}
-.map input.local{flex:1 1 auto}
-.map input.remote{width:96px;color:var(--ok)}
+.map input.local{flex:1 1 140px;min-width:110px}
+.map .mapto{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.map input.remote{flex:0 0 86px;width:86px;color:var(--ok)}
 .map .del{width:18px;height:18px;border-radius:5px;display:grid;place-items:center;color:var(--tx-4);flex:0 0 auto}
 .map .del:hover{background:#2A1418;color:var(--bad)}
 .addmap{height:34px;border-radius:var(--r-sm);border:1px solid var(--line-3);background:#0F141E;
