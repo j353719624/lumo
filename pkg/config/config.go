@@ -339,21 +339,48 @@ func getStrs(m map[string]any, key string) []string {
 	return out
 }
 
-// SaveServer writes a ServerConfig back to a toml file.
+// SaveServer writes a ServerConfig back to a toml file. It persists every
+// field LoadServer reads — a partial write here used to erase pubKey/kcpPort/
+// revision and leave a config the server could not start from.
 func SaveServer(path string, c *ServerConfig) error {
+	if c.AuthPubKey == "" && c.AuthToken == "" {
+		return fmt.Errorf("auth.token or auth.pubKey is required")
+	}
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("bindPort = %d\n", c.BindPort))
+	if c.KCPPort > 0 {
+		b.WriteString(fmt.Sprintf("kcpPort = %d\n", c.KCPPort))
+	}
 	if c.VhostHTTPPort > 0 {
 		b.WriteString(fmt.Sprintf("vhostHTTPPort = %d\n", c.VhostHTTPPort))
 	}
 	if c.VhostHTTPSPort > 0 {
 		b.WriteString(fmt.Sprintf("vhostHTTPSPort = %d\n", c.VhostHTTPSPort))
 	}
+	if c.MuxPort > 0 {
+		b.WriteString(fmt.Sprintf("muxPort = %d\n", c.MuxPort))
+	}
+	if c.SubdomainHost != "" {
+		b.WriteString(fmt.Sprintf("subdomainHost = %q\n", c.SubdomainHost))
+	}
+	if c.AllowPorts != "" {
+		b.WriteString(fmt.Sprintf("allowPorts = %q\n", c.AllowPorts))
+	}
+	if c.Revision > 0 {
+		b.WriteString(fmt.Sprintf("revision = %d\n", c.Revision))
+	}
 	b.WriteString("\n[auth]\n")
-	b.WriteString(fmt.Sprintf("token = %q\n", c.AuthToken))
+	// 公钥模式只写公钥；明文令牌模式才写 token，两者不混存
+	if c.AuthPubKey != "" {
+		b.WriteString(fmt.Sprintf("pubKey = %q\n", c.AuthPubKey))
+	} else {
+		b.WriteString(fmt.Sprintf("token = %q\n", c.AuthToken))
+	}
 	b.WriteString("\n[webServer]\n")
 	b.WriteString(fmt.Sprintf("addr = %q\n", c.Web.Addr))
-	b.WriteString(fmt.Sprintf("port = %d\n", c.Web.Port))
+	if c.Web.Port > 0 {
+		b.WriteString(fmt.Sprintf("port = %d\n", c.Web.Port))
+	}
 	b.WriteString(fmt.Sprintf("user = %q\n", c.Web.User))
 	b.WriteString(fmt.Sprintf("password = %q\n", c.Web.Password))
 	if c.Web.TOTPSecret != "" {

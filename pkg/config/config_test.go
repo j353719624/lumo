@@ -110,3 +110,62 @@ func TestLoadServerKeepsConfigPath(t *testing.T) {
 		t.Fatalf("ConfigPath = %q, want %q (needed so the console can persist changes)", c.ConfigPath, p)
 	}
 }
+
+// 回归：控制台保存（2FA 绑定/解绑、面板保存）走 SaveServer，
+// 任何一次保存都不能丢掉 pubKey/kcpPort/revision 等其余字段。
+func TestSaveServerRoundTripKeepsAllFields(t *testing.T) {
+	dir := t.TempDir()
+	p := dir + "/lumos.toml"
+	c := &ServerConfig{
+		ConfigPath: p, BindPort: 58619, KCPPort: 47011,
+		VhostHTTPPort: 18080, SubdomainHost: "tunnel.example.com",
+		AllowPorts: "1000-2000,3000", AuthPubKey: "pubkey-b64", Revision: 7,
+		Web: WebServer{Addr: "0.0.0.0", Port: 46351, User: "u", Password: "p", TOTPSecret: "SECRET234"},
+	}
+	if err := SaveServer(p, c); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadServer(p)
+	if err != nil {
+		t.Fatalf("round-trip reload failed: %v", err)
+	}
+	if got.BindPort != 58619 || got.KCPPort != 47011 || got.VhostHTTPPort != 18080 ||
+		got.SubdomainHost != "tunnel.example.com" || got.AllowPorts != "1000-2000,3000" ||
+		got.AuthPubKey != "pubkey-b64" || got.Revision != 7 ||
+		got.Web.Port != 46351 || got.Web.TOTPSecret != "SECRET234" {
+		t.Fatalf("fields lost on save: %+v", got)
+	}
+
+	// 解绑 2FA = 清空 TOTPSecret 再保存：pubKey/kcpPort/revision 必须原样保留
+	c.Web.TOTPSecret = ""
+	if err := SaveServer(p, c); err != nil {
+		t.Fatal(err)
+	}
+	got, err = LoadServer(p)
+	if err != nil {
+		t.Fatalf("reload after 2FA unbind failed: %v", err)
+	}
+	if got.AuthPubKey != "pubkey-b64" || got.KCPPort != 47011 || got.Revision != 7 || got.Web.TOTPSecret != "" {
+		t.Fatalf("2FA unbind lost or resurrected fields: %+v", got)
+	}
+
+	// 明文令牌模式：写 token 而不是空 pubKey
+	c2 := &ServerConfig{BindPort: 7000, AuthToken: "plain", Web: WebServer{Addr: "127.0.0.1", User: "a", Password: "b"}}
+	p2 := dir + "/plain.toml"
+	if err := SaveServer(p2, c2); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadServer(p2); err != nil {
+		t.Fatalf("plain token round-trip failed: %v", err)
+	}
+
+	// 两种凭据都没有：拒绝写出无法登录的配置
+	c3 := &ServerConfig{BindPort: 7000, Web: WebServer{Addr: "127.0.0.1"}}
+	p3 := dir + "/bad.toml"
+	if err := SaveServer(p3, c3); err == nil {
+		t.Fatal("expected refusal to write an auth-less config")
+	}
+	if _, err := os.Stat(p3); err == nil {
+		t.Fatal("no file must be written when auth is missing")
+	}
+}

@@ -74,7 +74,7 @@ const tomlSaving = ref(false)
 const logView = ref<HTMLElement | null>(null)
 
 const q = ref('')
-const view = ref<'list' | 'logs'>('list')
+const view = ref<'list' | 'logs' | 'security'>('list')
 const detailSection = ref<'overview' | 'server' | 'mappings' | 'visitors' | 'files'>('overview')
 watch(detailSection, async (sec) => {
   if (sec === 'files' && draft.value && !tomlText.value) {
@@ -478,7 +478,7 @@ function scrollLogsToEnd() {
   })
 }
 
-function setView(v: 'list' | 'logs') {
+function setView(v: 'list' | 'logs' | 'security') {
   view.value = v
 }
 
@@ -577,6 +577,10 @@ setInterval(() => refresh(true), 2500)
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 3H13M3 6.5H13M3 10H9M3 13.5H11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
         <span>运行日志</span>
       </button>
+      <button class="nav" :aria-current="view === 'security' ? 'page' : undefined" @click="setView('security')">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 1.5L13.5 3.5V7.2C13.5 10.9 11.2 13.6 8 14.8C4.8 13.6 2.5 10.9 2.5 7.2V3.5L8 1.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M5.6 7.9L7.3 9.6L10.6 6.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>安全</span>
+      </button>
 
       <div class="spacer"></div>      <div class="spacer"></div>
 
@@ -590,8 +594,8 @@ setInterval(() => refresh(true), 2500)
     <main class="main">
       <div class="topbar">
         <div class="titleblock">
-          <h1>{{ { list: '连接配置', logs: '运行日志' }[view] }}<template v-if="view === 'list'">{{ { overview: ' · 概览', server: ' · 服务器', mappings: ' · 端口映射', visitors: ' · 访问端', files: ' · 配置文件' }[detailSection] }}</template></h1>
-          <p>{{ view === 'list' ? (configs.length ? `共 ${configs.length} 个配置 · ${enabledCount} 个正在运行` : '还没有配置') : '本地引擎的实时运行事件' }}</p>
+          <h1>{{ { list: '连接配置', logs: '运行日志', security: '安全' }[view] }}<template v-if="view === 'list'">{{ { overview: ' · 概览', server: ' · 服务器', mappings: ' · 端口映射', visitors: ' · 访问端', files: ' · 配置文件' }[detailSection] }}</template></h1>
+          <p>{{ view === 'list' ? (configs.length ? `共 ${configs.length} 个配置 · ${enabledCount} 个正在运行` : '还没有配置') : view === 'security' ? '控制台登录的两步验证（2FA）' : '本地引擎的实时运行事件' }}</p>
         </div>
         <span class="spacer"></span>
         <button class="themebtn" :title="theme === 'dark' ? '日间模式' : '黑夜模式'" @click="toggleTheme">
@@ -678,14 +682,7 @@ setInterval(() => refresh(true), 2500)
                 <div class="kv"><span>数据位置</span><b>{{ info?.dataDir || '—' }}</b></div>
                 <div class="kv"><span>版本</span><b>v{{ info?.version || '—' }}</b></div>
               </div>
-              <p class="setnote">外观主题在左侧栏底部切换（跟随系统 / 日间 / 黑夜）。</p>
-              <div class="sec" style="padding-top:10px"><span>账号安全</span></div>
-              <div class="setcard">
-                <div class="kv"><span>两步验证（2FA）</span>
-                  <button class="btn ghost sm" @click="open2fa">{{ twofaEnabled ? '管理' : '开启 2FA' }}</button>
-                </div>
-                <p class="setnote" style="margin:0">开启后，控制台登录需要输入令牌 App 的 6 位动态验证码。客户端控制台的 2FA 与服务端相互独立，扫码后手机上显示为 LUMO:C。</p>
-              </div>
+              <p class="setnote">外观主题在左侧栏底部切换（跟随系统 / 日间 / 黑夜）。账号安全（2FA）在左侧栏「安全」栏目。</p>
             </div>
             <div v-show="detailSection === 'server'">
             <div class="sec"><span>连接信息</span><span class="flex1"></span><span class="sechint">对应 lumoc.toml 基础段</span></div>
@@ -851,6 +848,16 @@ setInterval(() => refresh(true), 2500)
           </div>
         </template>
         <div v-else class="hint" style="margin:16px">没有正在运行的连接。启用一个配置后，这里会显示 lumoc 的实时事件。</div>
+      </div>
+
+      <!-- 安全视图（控制台级，不依赖任何连接配置） -->
+      <div class="content" v-show="view === 'security'">
+        <div class="setcard" style="max-width:640px">
+          <div class="kv"><span>两步验证（2FA）</span>
+            <button class="btn ghost sm" @click="open2fa">{{ twofaEnabled ? '管理' : '开启 2FA' }}</button>
+          </div>
+          <p class="setnote" style="margin:0">开启后，控制台登录需要输入令牌 App 的 6 位动态验证码。客户端控制台的 2FA 与服务端相互独立，扫码后手机上显示为 LUMO:C。</p>
+        </div>
       </div>
 
     </main>

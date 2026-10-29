@@ -100,7 +100,7 @@ a{color:inherit;text-decoration:none}
   background:#12281F;border:1px solid rgba(61,220,151,.3);color:var(--ok);font-size:10.5px;
 }
 .pill .dot{width:5px;height:5px;border-radius:3px;background:currentColor;
-  box-shadow:0 0 8px 1px rgba(61,220,151,.6)}
+  }
 .sep{width:1px;height:10px;background:#232C3C}
 
 /* ---------------- 右：表单侧 ---------------- */
@@ -110,7 +110,6 @@ a{color:inherit;text-decoration:none}
 .panel{
   width:100%;max-width:400px;padding:32px;
   background:var(--panel);border:1px solid var(--line);border-radius:20px;
-  box-shadow:0 28px 70px -28px rgba(0,0,0,.85);
   animation:rise .4s cubic-bezier(.22,.68,.28,1) both;
 }
 /* 只做位移，不碰 opacity —— 动画未播放时也能正常显示 */
@@ -128,7 +127,7 @@ a{color:inherit;text-decoration:none}
   width:100%;height:44px;padding:0 12px 0 38px;border-radius:10px;
   background:var(--panel-2);border:1px solid var(--line);
   font-size:13px;letter-spacing:.2px;outline:none;
-  transition:border-color .16s,box-shadow .16s,background .16s;
+  transition:border-color .16s,background .16s;
 }
 .ctrl input::placeholder{color:#3E4859;letter-spacing:0}
 .ctrl input:hover{border-color:#2F3A4D}
@@ -182,10 +181,9 @@ a{color:inherit;text-decoration:none}
   display:flex;align-items:center;justify-content:center;gap:9px;
   background:var(--grad);color:#08101A;
   font-size:13px;font-weight:700;letter-spacing:.4px;
-  box-shadow:0 12px 28px -14px rgba(53,224,200,.62);
-  transition:filter .16s,transform .07s,box-shadow .16s;
+  transition:filter .16s,transform .07s;
 }
-.submit:hover{filter:brightness(1.06);box-shadow:0 14px 32px -13px rgba(53,224,200,.7)}
+.submit:hover{filter:brightness(1.06)}
 .submit:active{transform:translateY(1px)}
 .submit[data-state="loading"],.submit[data-state="done"]{cursor:default;filter:none}
 .spinner{
@@ -271,7 +269,6 @@ a{color:inherit;text-decoration:none}
 .langmenu{
   position:absolute;right:0;top:calc(100% + 8px);min-width:140px;z-index:60;
   background:#141B29;border:1px solid var(--line-3);border-radius:9px;padding:5px;
-  box-shadow:0 14px 34px rgba(0,0,0,.5);
 }
 .langmenu button{
   width:100%;height:32px;padding:0 10px;border-radius:6px;display:flex;align-items:center;gap:8px;
@@ -311,7 +308,6 @@ html[data-theme="light"] .divider,html[data-theme="light"] .brandmark .divider{b
 html[data-theme="light"] .feat .ic{background:#F2F5FA}
 html[data-theme="light"] .pill{background:#E3F5EC;border-color:rgba(15,157,106,.35)}
 html[data-theme="light"] .sep,html[data-theme="light"] .foot .sep{background:#DCE3EE}
-html[data-theme="light"] .panel{box-shadow:0 28px 70px -30px rgba(23,32,46,.35)}
 html[data-theme="light"] .ctrl input::placeholder{color:#98A3B4}
 html[data-theme="light"] .ctrl input:hover{border-color:#B8C4D6}
 html[data-theme="light"] .ctrl input:focus{background:#FFFFFF}
@@ -320,5 +316,5 @@ html[data-theme="light"] .link:hover{color:#2B44B8}
 html[data-theme="light"] .err{background:#FBE7E9;border-color:rgba(217,63,74,.35);color:#B02734}
 html[data-theme="light"] .ok{background:#E3F5EC;border-color:rgba(15,157,106,.35);color:#0B7A51}
 html[data-theme="light"] .foot{color:#7A8598}
-html[data-theme="light"] .langmenu{background:#FFFFFF;box-shadow:0 12px 30px rgba(23,32,46,.16)}
+html[data-theme="light"] .langmenu{background:#FFFFFF}
 html[data-theme="light"] .langmenu button:hover{background:#EEF2FB}
