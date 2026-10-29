@@ -415,6 +415,13 @@ func (s *Server) apiProxies(w http.ResponseWriter, _ *http.Request) {
 		if ent.owner.name != "" {
 			label = ent.owner.name
 		}
+		if ent.label != "" {
+			if ent.owner.name != "" {
+				label = ent.owner.name + " · " + ent.label
+			} else {
+				label = ent.label
+			}
+		}
 		switch ent.kind {
 		case "tcp", "udp":
 			conf["localIP"] = "—"

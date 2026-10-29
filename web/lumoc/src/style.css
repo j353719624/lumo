@@ -153,6 +153,7 @@ input,select,textarea{font:inherit;color:inherit}
   border-radius:7px;font:500 10.5px/1 var(--mono);color:var(--accent-soft);outline:none;flex:0 0 auto}
 .map input{height:30px;padding:0 9px;background:#151B26;border:1px solid var(--line-3);
   border-radius:7px;font:11px/1 var(--mono);outline:none;min-width:0}
+.map input.mname{flex:0 0 76px}
 .map input.local{flex:1 1 auto}
 .map input.remote{width:96px;color:var(--ok)}
 .map .del{width:18px;height:18px;border-radius:5px;display:grid;place-items:center;color:var(--tx-4);flex:0 0 auto}

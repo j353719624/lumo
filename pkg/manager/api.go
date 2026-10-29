@@ -381,6 +381,9 @@ func renderToml(cfg ConnConfig) string {
 			`type = "`+esc(mp.Type)+`"`,
 			`localIP = "`+esc(cmpOr(mp.LocalIP, "127.0.0.1"))+`"`,
 			"localPort = "+strconv.Itoa(mp.LocalPort))
+		if mp.Name != "" {
+			L = append(L, `label = "`+esc(mp.Name)+`"`)
+		}
 		if mp.Type == "http" || mp.Type == "https" {
 			L = append(L, `customDomains = ["`+esc(mp.Domain)+`"]`)
 		} else {

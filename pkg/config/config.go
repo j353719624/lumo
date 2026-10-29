@@ -32,7 +32,9 @@ type ServerConfig struct {
 
 // ProxyConfig describes one tunnel registered by a client.
 type ProxyConfig struct {
-	Name          string
+	Name string
+	// Label is an optional display name shown in the server console.
+	Label         string
 	Type          string
 	LocalIP       string
 	LocalPort     int
@@ -147,6 +149,7 @@ func LoadClient(path string) (*ClientConfig, error) {
 	for _, item := range getTables(root, "proxies") {
 		p := ProxyConfig{
 			Name:          getStr(item, "name", ""),
+			Label:         getStr(item, "label", ""),
 			Type:          getStr(item, "type", ""),
 			LocalIP:       getStr(item, "localIP", "127.0.0.1"),
 			LocalPort:     getInt(item, "localPort", 0),

@@ -71,7 +71,8 @@ function mappingSummary(c: ConnConfig): string {
   const local = `${m.localIP || '127.0.0.1'}:${m.localPort || '—'}`
   const remote = (m.type === 'http' || m.type === 'https') ? (m.domain || '未填域名') : String(m.remotePort || '—')
   const more = c.mappings.length > 1 ? `  +${c.mappings.length - 1}` : ''
-  return `${c.serverAddr}:${c.serverPort}  →  ${local}  ⇒  ${remote}${more}`
+  const tag = m.name ? `[${m.name}] ` : ''
+  return `${c.serverAddr}:${c.serverPort}  →  ${tag}${local}  ⇒  ${remote}${more}`
 }
 
 const runningConfigs = computed(() => {
@@ -130,7 +131,7 @@ async function toggleConfig(c: ConnConfig) {
 function addMapping() {
   const c = draft.value
   if (!c) return
-  c.mappings.push({ id: uid(), type: 'tcp', localIP: '127.0.0.1', localPort: 0, remotePort: 0 })
+  c.mappings.push({ id: uid(), name: '', type: 'tcp', localIP: '127.0.0.1', localPort: 0, remotePort: 0 })
 }
 
 function removeMapping(idx: number) {
@@ -213,6 +214,8 @@ async function createAndConnect() {
     localIP: i > -1 ? localRaw.slice(0, i) : '127.0.0.1',
     localPort: Number(i > -1 ? localRaw.slice(i + 1) : localRaw) || 0,
   }
+  const mapName = (document.querySelector('#nMap .mname') as HTMLInputElement)?.value.trim() || ''
+  if (mapName) mapping.name = mapName
   if (type === 'http' || type === 'https') mapping.domain = remoteRaw
   else mapping.remotePort = Number(remoteRaw) || 0
 
@@ -502,6 +505,7 @@ setInterval(() => refresh(true), 2500)
             </div>
             <div class="cards" style="gap:8px">
               <div v-for="(m, idx) in draft.mappings" :key="m.id" class="map">
+                <input class="mname" v-model="m.name" placeholder="名称" aria-label="映射名称">
                 <select :value="m.type" @change="setMappingType(m, ($event.target as HTMLSelectElement).value)">
                   <option value="tcp">TCP</option><option value="http">HTTP</option>
                   <option value="udp">UDP</option><option value="sealed-tcp">sealed-tcp（开发中）</option>
@@ -610,6 +614,7 @@ setInterval(() => refresh(true), 2500)
 
       <div class="grp"><span class="gnum">2</span><b>配置端口映射</b><em>内网端口 → 公网端口</em></div>
       <div class="map" id="nMap">
+        <input class="mname" placeholder="名称" aria-label="映射名称">
         <select class="mtype"><option value="tcp">TCP</option><option value="http">HTTP</option><option value="udp">UDP</option><option value="sealed-tcp">sealed-tcp</option></select>
         <input class="local" placeholder="127.0.0.1:5000">
         <span style="color:#5A7BFF">→</span>

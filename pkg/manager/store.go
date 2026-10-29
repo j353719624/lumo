@@ -15,6 +15,7 @@ import (
 // Mapping is one port forwarding rule inside a connection config.
 type Mapping struct {
 	ID         string `json:"id"`
+	Name       string `json:"name,omitempty"`
 	Enabled    *bool  `json:"enabled,omitempty"`
 	Type       string `json:"type"`
 	LocalIP    string `json:"localIP,omitempty"`
@@ -68,6 +69,7 @@ func (c *ConnConfig) toClientConfig() (*config.ClientConfig, error) {
 		}
 		p := config.ProxyConfig{
 			Name:       safe(c.ID + "-" + m.ID),
+			Label:      m.Name,
 			Type:       m.Type,
 			LocalIP:    cmpOr(m.LocalIP, "127.0.0.1"),
 			LocalPort:  m.LocalPort,

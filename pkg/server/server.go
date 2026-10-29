@@ -77,6 +77,7 @@ type session struct {
 
 type proxyEnt struct {
 	name       string
+	label      string // client-provided display name for this mapping
 	kind       string
 	sk         string
 	remotePort int

@@ -2,6 +2,7 @@
 
 export interface Mapping {
   id: string
+  name?: string
   enabled?: boolean
   type: string
   localIP?: string

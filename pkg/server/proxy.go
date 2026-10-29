@@ -48,6 +48,7 @@ func (s *Server) handleReg(ses *session, m proto.Msg) {
 	}
 	ent := &proxyEnt{
 		name:       name,
+		label:      m.Str("label"),
 		kind:       kind,
 		sk:         m.Str("sk"),
 		remotePort: m.Int("remote_port"),
@@ -67,7 +68,11 @@ func (s *Server) handleReg(ses *session, m proto.Msg) {
 	ses.mu.Unlock()
 	s.mu.Unlock()
 
-	log.Infof("proxy %q (%s) registered by client %q", name, kind, ses.id)
+	if ent.label != "" {
+		log.Infof("proxy %q (%s, label %q) registered by client %q", name, kind, ent.label, ses.id)
+	} else {
+		log.Infof("proxy %q (%s) registered by client %q", name, kind, ses.id)
+	}
 	reply(true, "")
 
 	// 新实例带来的公网端口自动放行，客户端侧零配置

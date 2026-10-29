@@ -394,6 +394,7 @@ func (c *Client) registerAll() error {
 		reply := c.request(proto.Msg{
 			"type":        "reg",
 			"name":        p.Name,
+			"label":       p.Label,
 			"kind":        p.Type,
 			"remote_port": p.RemotePort,
 			"sk":          p.SK,
@@ -437,6 +438,7 @@ func (c *Client) retryFailedRegistrations(ctx context.Context, conn net.Conn) {
 			reply := c.request(proto.Msg{
 				"type":        "reg",
 				"name":        p.Name,
+				"label":       p.Label,
 				"kind":        p.Type,
 				"remote_port": p.RemotePort,
 				"sk":          p.SK,
