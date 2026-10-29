@@ -1,6 +1,19 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { applyThemePref, type Theme } from './theme'
+import { locale, setLocale, t } from 'lumo-shared'
+
+/* ---------------- 语言切换 ---------------- */
+const langOpen = ref(false)
+function pickLang(l: 'zh' | 'en') {
+  setLocale(l)
+  langOpen.value = false
+}
+function closeLangMenu(e: MouseEvent) {
+  if (!(e.target as HTMLElement).closest('.corner')) langOpen.value = false
+}
+onMounted(() => document.addEventListener('click', closeLangMenu as EventListener))
+onBeforeUnmount(() => document.removeEventListener('click', closeLangMenu as EventListener))
 
 const theme = ref<Theme>((document.documentElement.dataset.theme as Theme) || 'dark')
 function toggleTheme() {
@@ -34,12 +47,12 @@ async function submit() {
   const acc = account.value.trim()
   const pass = password.value
 
-  if (!acc) { showError('请输入账号，可以是邮箱或用户名'); return }
+  if (!acc) { showError(t('cl.err.acc')); return }
   if (acc.includes('@') && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(acc)) {
-    showError('邮箱格式看起来不对，请检查 @ 前后的内容'); return
+    showError(t('cl.err.email')); return
   }
-  if (!pass) { showError('请输入密码'); return }
-  if (pass.length < 6) { showError('密码至少 6 位'); return }
+  if (!pass) { showError(t('cl.err.pwd')); return }
+  if (pass.length < 6) { showError(t('cl.err.pwdlen')); return }
 
   clearError()
   state.value = 'loading'
@@ -64,17 +77,17 @@ async function submit() {
       setTimeout(() => { location.href = '/' }, 350)
     } else {
       state.value = 'idle'
-      showError(d.error || '账号或密码不正确。连续 5 次失败会锁定 10 分钟')
+      showError(d.error || t('cl.err.cred'))
     }
   } catch {
     state.value = 'idle'
-    showError('无法连接本地服务，请确认进程正在运行')
+    showError(t('cl.err.net'))
   }
 }
 
 async function submit2fa() {
   if (state.value !== 'idle') return
-  if (!/^\d{6}$/.test(otpCode.value.trim())) { showError('请输入 6 位动态验证码'); return }
+  if (!/^\d{6}$/.test(otpCode.value.trim())) { showError(t('cl.err.otp6')); return }
   clearError()
   state.value = 'loading'
   try {
@@ -90,21 +103,36 @@ async function submit2fa() {
       setTimeout(() => { location.href = '/' }, 350)
     } else {
       state.value = 'idle'
-      showError(d.error || '动态验证码不正确或已过期')
+      showError(d.error || t('cl.err.otp'))
     }
   } catch {
     state.value = 'idle'
-    showError('无法连接本地服务，请确认进程正在运行')
+    showError(t('cl.err.net'))
   }
 }
 
 </script>
 
 <template>
-  <button class="themefab" type="button" :title="theme === 'dark' ? '日间模式' : '黑夜模式'" @click="toggleTheme">
-    <svg v-if="theme === 'dark'" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3.2" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.2V3M8 13V14.8M1.2 8H3M13 8H14.8M3.2 3.2L4.5 4.5M11.5 11.5L12.8 12.8M12.8 3.2L11.5 4.5M4.5 11.5L3.2 12.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-    <svg v-else width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M13.4 9.6A5.8 5.8 0 0 1 6.4 2.6A5.8 5.8 0 1 0 13.4 9.6Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
-  </button>
+  <div class="corner">
+    <button class="themefab" type="button" :title="theme === 'dark' ? t('cl.theme.light') : t('cl.theme.dark')" @click="toggleTheme">
+      <svg v-if="theme === 'dark'" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3.2" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.2V3M8 13V14.8M1.2 8H3M13 8H14.8M3.2 3.2L4.5 4.5M11.5 11.5L12.8 12.8M12.8 3.2L11.5 4.5M4.5 11.5L3.2 12.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <svg v-else width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M13.4 9.6A5.8 5.8 0 0 1 6.4 2.6A5.8 5.8 0 1 0 13.4 9.6Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="langsel" :class="{ open: langOpen }">
+      <button class="langbtn" type="button" @click.stop="langOpen = !langOpen">
+        <span class="flag">{{ locale === 'zh' ? '🇨🇳' : '🇺🇸' }}</span>
+        <span>{{ locale === 'zh' ? '简体中文' : 'English' }}</span>
+        <svg class="caret" width="9" height="9" viewBox="0 0 10 10" fill="none">
+          <path d="M2 3.8L5 6.8L8 3.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div class="langmenu" v-if="langOpen">
+        <button type="button" :class="{ cur: locale === 'zh' }" @click="pickLang('zh')"><span>🇨🇳</span> 简体中文</button>
+        <button type="button" :class="{ cur: locale === 'en' }" @click="pickLang('en')"><span>🇺🇸</span> English</button>
+      </div>
+    </div>
+  </div>
   <div class="backdrop"></div>
   <main class="wrap">
     <section class="window">
@@ -119,11 +147,11 @@ async function submit2fa() {
         <div class="brandname">LUMO</div>
         <div class="brandcn">隧光</div>
         <span class="hairline"></span>
-        <div class="brandtag">把内网服务带在身边</div>
+        <div class="brandtag">{{ t('cl.tag') }}</div>
 
         <div class="pitch">
-          <h1>连接，<br>像在本地一样。</h1>
-          <p>一条隧道，两端点亮：为每台设备建一套配置，端口映射、密钥与压缩收在同一张表单里。</p>
+          <h1>{{ t('cl.pitch.l1') }}<br>{{ t('cl.pitch.l2') }}</h1>
+          <p>{{ t('cl.pitch.p') }}</p>
         </div>
 
         <div class="feats">
@@ -134,7 +162,7 @@ async function submit2fa() {
                 <rect x="2" y="9" width="12" height="5" rx="1.2" stroke="currentColor" stroke-width="1.4"/>
               </svg>
             </span>
-            <div><b>本地引擎</b><span>单进程托管全部连接，开机自启</span></div>
+            <div><b>{{ t('cl.feat.1t') }}</b><span>{{ t('cl.feat.1d') }}</span></div>
           </div>
           <div class="feat">
             <span class="ic">
@@ -143,7 +171,7 @@ async function submit2fa() {
                 <path d="M6.1 8L7.5 9.4L10 6.7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </span>
-            <div><b>安全访问</b><span>sealed-tcp / sealed-udp / PUNCH 密钥直连</span></div>
+            <div><b>{{ t('cl.feat.2t') }}</b><span>{{ t('cl.feat.2d') }}</span></div>
           </div>
           <div class="feat">
             <span class="ic">
@@ -153,22 +181,22 @@ async function submit2fa() {
                 <circle cx="10.2" cy="10.6" r="1.7" fill="currentColor" stroke="currentColor" stroke-width="1.4"/>
               </svg>
             </span>
-            <div><b>多种协议</b><span>TCP / UDP / HTTP(S) / MUX</span></div>
+            <div><b>{{ t('cl.feat.3t') }}</b><span>{{ t('cl.feat.3d') }}</span></div>
           </div>
         </div>
 
         <div class="brandfoot">
-          <span>登录后即可管理全部隧道</span>
+          <span>{{ t('cl.foot.note') }}</span>
         </div>
       </aside>
 
       <!-- 右：表单 -->
       <div class="formside">
-        <h1>登录</h1>
+        <h1>{{ t('login.title') }}</h1>
 
         <form @submit.prevent="submit" novalidate>
           <div class="field">
-            <label for="acc">账号</label>
+            <label for="acc">{{ t('login.account') }}</label>
             <div class="ctrl">
               <span class="lead">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -176,13 +204,13 @@ async function submit2fa() {
                   <path d="M3 13.4C3.5 11.2 5.5 9.8 8 9.8C10.5 9.8 12.5 11.2 13 13.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
                 </svg>
               </span>
-              <input id="acc" v-model="account" type="text" placeholder="邮箱或用户名"
+              <input id="acc" v-model="account" type="text" :placeholder="t('cl.accPh')"
                      autocomplete="username" spellcheck="false" autofocus>
             </div>
           </div>
 
           <div class="field">
-            <label for="pwd">密码</label>
+            <label for="pwd">{{ t('login.password') }}</label>
             <div class="ctrl has-eye">
               <span class="lead">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -192,8 +220,8 @@ async function submit2fa() {
                 </svg>
               </span>
               <input id="pwd" v-model="password" :type="showPwd ? 'text' : 'password'"
-                     placeholder="请输入密码" autocomplete="current-password">
-              <button class="eye" type="button" :aria-pressed="showPwd ? 'true' : 'false'" aria-label="显示密码" @click="showPwd = !showPwd">
+                     :placeholder="t('cl.pwdPh')" autocomplete="current-password">
+              <button class="eye" type="button" :aria-pressed="showPwd ? 'true' : 'false'" :aria-label="t('cl.showPwd')" @click="showPwd = !showPwd">
                 <svg class="on" width="15" height="15" viewBox="0 0 16 16" fill="none">
                   <path d="M1.6 8C3.4 4.9 5.6 3.4 8 3.4C10.4 3.4 12.6 4.9 14.4 8C12.6 11.1 10.4 12.6 8 12.6C5.6 12.6 3.4 11.1 1.6 8Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
                   <circle cx="8" cy="8" r="2.1" fill="currentColor"/>
@@ -207,10 +235,10 @@ async function submit2fa() {
           </div>
 
           <div class="field" v-if="otpStep">
-            <label for="otp">动态验证码（2FA）</label>
+            <label for="otp">{{ t('login.2fa') }}（2FA）</label>
             <div class="ctrl">
               <input id="otp" v-model="otpCode" type="text" inputmode="numeric" maxlength="6"
-                     placeholder="6 位动态验证码" autocomplete="one-time-code">
+                     :placeholder="t('cl.otpPh')" autocomplete="one-time-code">
             </div>
           </div>
 
@@ -220,7 +248,7 @@ async function submit2fa() {
               <path d="M8 4.9V8.7" stroke="#FF5F73" stroke-width="1.6" stroke-linecap="round"/>
               <circle cx="8" cy="11.1" r=".95" fill="#FF5F73"/>
             </svg>
-            <span>{{ alertMsg || '账号或密码不正确' }}</span>
+            <span>{{ alertMsg || t('cl.err.cred') }}</span>
           </div>
 
           <div class="success" :class="{ show: successShow }">
@@ -228,14 +256,14 @@ async function submit2fa() {
               <circle cx="8" cy="8" r="6.4" stroke="#3DDC97" stroke-width="1.4"/>
               <path d="M5.2 8.2L7.1 10.1L10.8 6.2" stroke="#3DDC97" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            <span>登录成功</span>
-            <a href="/">进入客户端 →</a>
+            <span>{{ t('cl.ok') }}</span>
+            <a href="/">{{ t('cl.enter') }}</a>
           </div>
 
           <button class="submit" type="submit" :data-state="state" :disabled="state !== 'idle'"
                   @click="otpStep ? submit2fa() : submit()">
             <span class="spinner" aria-hidden="true"></span>
-            <span class="label">{{ state === 'loading' ? '正在验证…' : state === 'done' ? '已登录' : otpStep ? '验证并登录' : '登录' }}</span>
+            <span class="label">{{ state === 'loading' ? t('login.loading') : state === 'done' ? t('login.done') : otpStep ? t('login.verify') : t('login.submit') }}</span>
           </button>
         </form>
 
@@ -245,9 +273,9 @@ async function submit2fa() {
     <div class="foot">
       <span class="ver">v0.1.0</span>
       <span class="sep"></span>
-      <a href="#" @click.prevent="showError('当前已是最新版本 v0.1.0')">检查更新</a>
+      <a href="#" @click.prevent="showError(t('cl.checkLatest'))">{{ t('cl.help.check') }}</a>
       <span class="sep"></span>
-      <a href="/help.html" target="_blank" rel="noopener">帮助与反馈</a>
+      <a href="/help.html" target="_blank" rel="noopener">{{ t('cl.help') }}</a>
     </div>
   </main>
 </template>
