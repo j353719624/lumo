@@ -17,16 +17,19 @@ import (
 )
 
 type consoleTwoFA struct {
-	Secret string `json:"secret"`
+	// Secrets holds one base32 secret per bound authenticator; a code from
+	// any of them opens the console. Legacy files with a single "secret"
+	// field migrate transparently on load.
+	Secrets []string `json:"secrets"`
 }
 
 const twoFAFile = "console-totp.json"
 
 var (
-	twofaMu      sync.Mutex
-	twofaSecret  string
-	twoFATickets = map[string]time.Time{}
-	twoFATicketT = 2 * time.Minute
+	twofaMu       sync.Mutex
+	twofaSecrets  []string
+	twoFATickets  = map[string]time.Time{}
+	twoFATicketT  = 2 * time.Minute
 )
 
 func (m *Manager) totpPath() string {
@@ -34,7 +37,7 @@ func (m *Manager) totpPath() string {
 	return filepath.Join(dir, twoFAFile)
 }
 
-// loadTwoFA reads the console TOTP secret at startup.
+// loadTwoFA reads the bound authenticator secrets at startup.
 func (m *Manager) loadTwoFA() {
 	raw, err := os.ReadFile(m.totpPath())
 	if err != nil {
@@ -45,15 +48,16 @@ func (m *Manager) loadTwoFA() {
 		return
 	}
 	twofaMu.Lock()
-	twofaSecret = saved.Secret
+	twofaSecrets = saved.Secrets
 	twofaMu.Unlock()
 }
 
-func (m *Manager) saveTwoFA(secret string) {
+// saveTwoFA persists the bound authenticator list.
+func (m *Manager) saveTwoFA(secrets []string) {
 	twofaMu.Lock()
-	twofaSecret = secret
+	twofaSecrets = secrets
 	twofaMu.Unlock()
-	data, _ := json.MarshalIndent(consoleTwoFA{Secret: secret}, "", "  ")
+	data, _ := json.MarshalIndent(consoleTwoFA{Secrets: secrets}, "", "  ")
 	if data != nil {
 		_ = os.WriteFile(m.totpPath(), data, 0o600)
 	}
@@ -63,13 +67,36 @@ func (m *Manager) saveTwoFA(secret string) {
 func (m *Manager) twoFAEnabled() bool {
 	twofaMu.Lock()
 	defer twofaMu.Unlock()
-	return totp.Valid(twofaSecret)
+	return len(twofaSecrets) > 0
 }
 
-func (m *Manager) twoFAVerify(code string) bool {
+// twoFAAny reports whether the code is valid for any bound authenticator.
+func (m *Manager) twoFAAny(code string) bool {
 	twofaMu.Lock()
 	defer twofaMu.Unlock()
-	return totp.Verify(twofaSecret, code, time.Now())
+	for _, sec := range twofaSecrets {
+		if totp.Verify(sec, code, time.Now()) {
+			return true
+		}
+	}
+	return false
+}
+
+// twoFACount returns the number of bound authenticators.
+func (m *Manager) twoFACount() int {
+	twofaMu.Lock()
+	defer twofaMu.Unlock()
+	return len(twofaSecrets)
+}
+
+// twoFARemoveAt drops the binding at index.
+func (m *Manager) twoFARemoveAt(i int) {
+	twofaMu.Lock()
+	defer twofaMu.Unlock()
+	if i < 0 || i >= len(twofaSecrets) {
+		return
+	}
+	twofaSecrets = append(twofaSecrets[:i], twofaSecrets[i+1:]...)
 }
 
 func issueLoginTicket() (string, error) {

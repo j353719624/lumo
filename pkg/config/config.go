@@ -11,11 +11,13 @@ import (
 
 // WebServer configures the embedded admin dashboard.
 type WebServer struct {
-	Addr       string
-	Port       int
-	User       string
-	Password   string
-	TOTPSecret string // base32; empty disables two-factor login
+	Addr     string
+	Port     int
+	User     string
+	Password string
+	// TOTPSecrets holds one base32 secret per bound authenticator; a login
+	// code from any of them is accepted. Empty list disables two-factor.
+	TOTPSecrets []string
 }
 
 // ServerConfig is the lumos (server) configuration.
@@ -284,7 +286,20 @@ func loadWeb(root map[string]any, def WebServer) WebServer {
 		w.Port = getInt(t, "port", 0)
 		w.User = getStr(t, "user", "admin")
 		w.Password = getStr(t, "password", "admin")
-		w.TOTPSecret = getStr(t, "totpSecret", "")
+		w.TOTPSecrets = getStrs(t, "totpSecrets")
+		// 旧版单密钥配置透明迁移
+		if legacy := getStr(t, "totpSecret", ""); legacy != "" {
+			dup := false
+			for _, s := range w.TOTPSecrets {
+				if s == legacy {
+					dup = true
+					break
+				}
+			}
+			if !dup {
+				w.TOTPSecrets = append([]string{legacy}, w.TOTPSecrets...)
+			}
+		}
 	}
 	return w
 }
@@ -383,8 +398,12 @@ func SaveServer(path string, c *ServerConfig) error {
 	}
 	b.WriteString(fmt.Sprintf("user = %q\n", c.Web.User))
 	b.WriteString(fmt.Sprintf("password = %q\n", c.Web.Password))
-	if c.Web.TOTPSecret != "" {
-		b.WriteString(fmt.Sprintf("totpSecret = %q\n", c.Web.TOTPSecret))
+	if len(c.Web.TOTPSecrets) > 0 {
+		quoted := make([]string, 0, len(c.Web.TOTPSecrets))
+		for _, sec := range c.Web.TOTPSecrets {
+			quoted = append(quoted, fmt.Sprintf("%q", sec))
+		}
+		b.WriteString(fmt.Sprintf("totpSecrets = [%s]\n", strings.Join(quoted, ", ")))
 	}
 	return os.WriteFile(path, []byte(b.String()), 0600)
 }

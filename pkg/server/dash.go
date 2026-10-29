@@ -182,7 +182,7 @@ func (s *Server) apiLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// 二次验证已启用：先发短期票据，凭票据 + 动态码换会话
-	if totp.Valid(s.cfg.Web.TOTPSecret) {
+	if len(s.cfg.Web.TOTPSecrets) > 0 {
 		ticket, err := issue2FATicket()
 		if err != nil {
 			failJSON(w, http.StatusInternalServerError, "无法创建验证会话")
@@ -215,7 +215,7 @@ func (s *Server) apiLogin2FA(w http.ResponseWriter, r *http.Request) {
 		failJSON(w, http.StatusBadRequest, "bad request body")
 		return
 	}
-	if !consume2FATicket(req.Ticket) || !totp.Verify(s.cfg.Web.TOTPSecret, req.Code, time.Now()) {
+	if !consume2FATicket(req.Ticket) || !s.totpAny(req.Code) {
 		s.limiter.Fail(origin)
 		failJSON(w, http.StatusUnauthorized, "动态验证码不正确或已过期")
 		return
@@ -237,9 +237,20 @@ func (s *Server) apiLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
-// api2FAStatus reports whether two-factor login is enabled.
+// api2FAStatus reports whether two-factor login is enabled and how many
+// authenticators are bound.
 func (s *Server) api2FAStatus(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, map[string]any{"enabled": totp.Valid(s.cfg.Web.TOTPSecret)})
+	writeJSON(w, map[string]any{"enabled": len(s.cfg.Web.TOTPSecrets) > 0, "count": len(s.cfg.Web.TOTPSecrets)})
+}
+
+// totpAny reports whether the code is valid for any bound authenticator.
+func (s *Server) totpAny(code string) bool {
+	for _, sec := range s.cfg.Web.TOTPSecrets {
+		if totp.Verify(sec, code, time.Now()) {
+			return true
+		}
+	}
+	return false
 }
 
 // api2FASetup generates a fresh enrollment secret; nothing is stored until
@@ -250,8 +261,13 @@ func (s *Server) api2FASetup(w http.ResponseWriter, r *http.Request) {
 		failJSON(w, http.StatusInternalServerError, "密钥生成失败")
 		return
 	}
-	// 界面上品牌一律是 LUMO；S/C 只出现在手机 2FA 软件里（LUMO:S / LUMO:C）
-	uri := totp.URI("S", secret)
+	// 界面上品牌一律是 LUMO；S/C 只出现在手机 2FA 软件里。
+	// 多验证器绑定：第二个起加序号，手机上显示 LUMO:S-2、LUMO:S-3 …
+	account := "S"
+	if n := len(s.cfg.Web.TOTPSecrets); n > 0 {
+		account = fmt.Sprintf("S-%d", n+1)
+	}
+	uri := totp.URI(account, secret)
 	svg := qrcode.SVG(uri, qrcode.M, 200)
 	if svg == "" {
 		failJSON(w, http.StatusInternalServerError, "二维码生成失败")
@@ -287,29 +303,42 @@ func (s *Server) api2FAEnable(w http.ResponseWriter, r *http.Request) {
 		failJSON(w, http.StatusInternalServerError, "未找到配置文件，无法保存")
 		return
 	}
-	s.cfg.Web.TOTPSecret = req.Secret
+	for _, sec := range s.cfg.Web.TOTPSecrets {
+		if sec == req.Secret {
+			failJSON(w, http.StatusBadRequest, "该验证器已绑定")
+			return
+		}
+	}
+	s.cfg.Web.TOTPSecrets = append(s.cfg.Web.TOTPSecrets, req.Secret)
 	if err := config.SaveServer(s.cfgPath, s.cfg); err != nil {
-		s.cfg.Web.TOTPSecret = ""
+		s.cfg.Web.TOTPSecrets = s.cfg.Web.TOTPSecrets[:len(s.cfg.Web.TOTPSecrets)-1]
 		failJSON(w, http.StatusInternalServerError, "保存配置失败："+err.Error())
 		return
 	}
 	writeOK(w)
 }
 
-// api2FADisable clears the binding after confirming a current code.
+// api2FADisable removes one bound authenticator (by index) after a code
+// from any currently bound device verifies.
 func (s *Server) api2FADisable(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Code string `json:"code"`
+		Code  string `json:"code"`
+		Index int    `json:"index"`
 	}
 	if err := jsonDecodeBody(r, &req); err != nil {
 		failJSON(w, http.StatusBadRequest, "bad request body")
 		return
 	}
-	if !totp.Valid(s.cfg.Web.TOTPSecret) {
+	n := len(s.cfg.Web.TOTPSecrets)
+	if n == 0 {
 		failJSON(w, http.StatusBadRequest, "尚未启用二次验证")
 		return
 	}
-	if !totp.Verify(s.cfg.Web.TOTPSecret, req.Code, time.Now()) {
+	if req.Index < 0 || req.Index >= n {
+		failJSON(w, http.StatusBadRequest, "验证器序号无效")
+		return
+	}
+	if !s.totpAny(req.Code) {
 		failJSON(w, http.StatusUnauthorized, "动态验证码不正确")
 		return
 	}
@@ -317,8 +346,10 @@ func (s *Server) api2FADisable(w http.ResponseWriter, r *http.Request) {
 		failJSON(w, http.StatusInternalServerError, "未找到配置文件，无法保存")
 		return
 	}
-	s.cfg.Web.TOTPSecret = ""
+	removed := s.cfg.Web.TOTPSecrets[req.Index]
+	s.cfg.Web.TOTPSecrets = append(s.cfg.Web.TOTPSecrets[:req.Index], s.cfg.Web.TOTPSecrets[req.Index+1:]...)
 	if err := config.SaveServer(s.cfgPath, s.cfg); err != nil {
+		s.cfg.Web.TOTPSecrets = append(s.cfg.Web.TOTPSecrets[:req.Index], append([]string{removed}, s.cfg.Web.TOTPSecrets[req.Index:]...)...)
 		failJSON(w, http.StatusInternalServerError, "保存配置失败："+err.Error())
 		return
 	}

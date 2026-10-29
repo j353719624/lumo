@@ -308,7 +308,8 @@ function pickLang(l: 'zh' | 'en') {
 
 /* ---------------- 两步验证（2FA） ---------------- */
 const tfaOpen = ref(false)
-const tfaEnabled = ref(false)
+const tfaCount = ref(0)
+const tfaView = ref<'list' | 'add'>('list')
 const tfaBusy = ref(false)
 const tfaSecret = ref('')
 const tfaUri = ref('')
@@ -327,11 +328,37 @@ async function open2FA() {
   try {
     const res = await fetch('/api/profile/2fa')
     const d = await res.json()
-    tfaEnabled.value = !!d.enabled
-    if (res.ok && !d.enabled) await loadSetup()
+    tfaCount.value = Number(d.count) || 0
+    if (res.ok && !d.enabled) {
+      tfaView.value = 'add'
+      await loadSetup()
+    } else {
+      tfaView.value = 'list'
+    }
   } catch {
     tfaMsg.value = { ok: false, text: 'Network error' }
   }
+}
+
+async function refreshTfaCount() {
+  try {
+    const res = await fetch('/api/profile/2fa')
+    const d = await res.json()
+    tfaCount.value = Number(d.count) || 0
+    return tfaCount.value
+  } catch { return tfaCount.value }
+}
+
+async function startAdd() {
+  tfaMsg.value = null
+  tfaCode.value = ''
+  tfaView.value = 'add'
+  await loadSetup()
+}
+
+function backFromAdd() {
+  tfaView.value = tfaCount.value > 0 ? 'list' : 'add'
+  if (tfaCount.value === 0) tfaOpen.value = false
 }
 
 async function loadSetup() {
@@ -365,10 +392,15 @@ async function bind2FA() {
     })
     const d = await res.json()
     if (res.ok) {
-      tfaEnabled.value = true
       tfaCode.value = ''
-      tfaOpen.value = false
-      showToast(t('tfa.bound'))
+      const wasFirst = tfaCount.value === 0
+      const n = await refreshTfaCount()
+      if (n > 0) {
+        tfaView.value = 'list'
+        showToast(wasFirst ? t('tfa.bound') : t('tfa.added'))
+      } else {
+        showToast(t('tfa.added'))
+      }
     } else {
       tfaMsg.value = { ok: false, text: d.error || 'failed' }
     }
@@ -379,7 +411,7 @@ async function bind2FA() {
   }
 }
 
-async function unbind2FA() {
+async function unbindEntry(index: number) {
   if (tfaBusy.value) return
   if (!/^\d{6}$/.test(tfaCode.value.trim())) {
     tfaMsg.value = { ok: false, text: t('tfa.codePh') }
@@ -390,14 +422,17 @@ async function unbind2FA() {
     const res = await fetch('/api/profile/2fa/disable', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: tfaCode.value.trim() }),
+      body: JSON.stringify({ code: tfaCode.value.trim(), index }),
     })
     const d = await res.json()
     if (res.ok) {
-      tfaEnabled.value = false
       tfaCode.value = ''
-      tfaOpen.value = false
-      showToast(t('tfa.unbound'))
+      const n = await refreshTfaCount()
+      showToast(t('tfa.removed'))
+      if (n === 0) {
+        tfaView.value = 'add'
+        await loadSetup()
+      }
     } else {
       tfaMsg.value = { ok: false, text: d.error || 'failed' }
     }
@@ -777,19 +812,29 @@ function closeMenu(e: MouseEvent) {
         <button class="x" type="button" @click="tfaOpen = false">✕</button>
       </header>
 
-      <template v-if="tfaEnabled">
-        <p class="tnote">{{ t('c.tfa.onNote') }}</p>
+      <!-- 已绑定：列表管理 -->
+      <template v-if="tfaCount > 0 && tfaView === 'list'">
+        <p class="tnote">{{ t('tfa.count', tfaCount) }}</p>
+        <div class="tlist">
+          <div class="trow" v-for="i in tfaCount" :key="i">
+            <span class="trow-name">{{ t('tfa.entry', i) }}</span>
+            <button class="tunlink" type="button" :disabled="tfaBusy || !/\d{6}$/.test(tfaCode.trim())"
+                    @click="unbindEntry(i - 1)">{{ t('tfa.removeOne') }}</button>
+          </div>
+        </div>
         <div class="tfield">
-          <label>{{ t('tfa.code') }}</label>
+          <label>{{ t('tfa.codeFor') }}</label>
           <input v-model="tfaCode" type="text" inputmode="numeric" maxlength="6"
                  :placeholder="t('login.2faPlaceholder')" autocomplete="one-time-code">
         </div>
+        <p class="tmsg" v-if="tfaMsg" :class="{ ok: tfaMsg.ok }">{{ tfaMsg.text }}</p>
         <div class="tactions">
           <button class="btn ghost" type="button" @click="tfaOpen = false">{{ t('c.n.cancel') }}</button>
-          <button class="btn danger" type="button" :disabled="tfaBusy" @click="unbind2FA">{{ t('c.tfa.disable') }}</button>
+          <button class="btn" type="button" :disabled="tfaBusy" @click="startAdd">{{ t('tfa.addOne') }}</button>
         </div>
       </template>
 
+      <!-- 绑定新验证器 -->
       <template v-else>
         <div class="tqr" v-if="tfaQr">
           <img :src="tfaQr" alt="TOTP QR" width="184" height="184">
@@ -802,8 +847,10 @@ function closeMenu(e: MouseEvent) {
         </div>
         <p class="tmsg" v-if="tfaMsg" :class="{ ok: tfaMsg.ok }">{{ tfaMsg.text }}</p>
         <div class="tactions">
-          <button class="btn ghost sm" type="button" @click="tfaOpen = false">{{ t('c.n.cancel') }}</button>
-          <button class="btn" type="button" :disabled="tfaBusy" @click="bind2FA">{{ tfaBusy ? '…' : t('c.tfa.enable') }}</button>
+          <button class="btn ghost" type="button" @click="tfaCount > 0 ? backFromAdd() : (tfaOpen = false)">
+            {{ t('c.n.cancel') }}
+          </button>
+          <button class="btn danger" type="button" :disabled="tfaBusy || !/^\d{6}$/.test(tfaCode.trim())" @click="bind2FA">{{ tfaBusy ? '…' : t('c.tfa.enable') }}</button>
         </div>
       </template>
     </div>

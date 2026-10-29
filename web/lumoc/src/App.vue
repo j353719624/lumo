@@ -43,7 +43,8 @@ function levelRank(level: string): number {
   return 0
 }
 
-const twofaEnabled = ref(false)
+const twofaCount = ref(0)
+const twofaView = ref<'list' | 'add'>('add')
 const twofaSecret = ref('')
 const twofaQr = ref('')
 const twofaCode = ref('')
@@ -52,31 +53,70 @@ async function open2fa() {
   twofaCode.value = ''
   try {
     const st = await api.auth2faStatus()
-    twofaEnabled.value = !!st.enabled
+    twofaCount.value = Number(st.count) || 0
     if (!st.enabled) {
+      twofaView.value = 'add'
       const s = await api.auth2faSetup()
       twofaSecret.value = s.secret
       twofaQr.value = s.qr
+    } else {
+      twofaView.value = 'list'
     }
   } catch (e: any) { toast(t('c.toast.readFail', e?.message || e), true) }
   openModal('modal2fa')
 }
 
+async function refreshTwofaCount(): Promise<number> {
+  try {
+    const st = await api.auth2faStatus()
+    twofaCount.value = Number(st.count) || 0
+  } catch { /* 保留当前值 */ }
+  return twofaCount.value
+}
+
+async function startAdd2fa() {
+  twofaMsgClear()
+  twofaCode.value = ''
+  twofaView.value = 'add'
+  try {
+    const s = await api.auth2faSetup()
+    twofaSecret.value = s.secret
+    twofaQr.value = s.qr
+  } catch (e: any) { toast(t('c.toast.readFail', e?.message || e), true) }
+}
+
+function backFromAdd2fa() {
+  twofaView.value = twofaCount.value > 0 ? 'list' : 'add'
+  if (twofaCount.value === 0) closeModal('modal2fa')
+}
+
 async function enable2fa() {
   try {
     await api.auth2faEnable(twofaSecret.value, twofaCode.value.trim())
-    twofaEnabled.value = true
-    closeModal('modal2fa')
-    toast(t('c.toast.tfaOn'))
+    twofaCode.value = ''
+    const wasFirst = twofaCount.value === 0
+    const n = await refreshTwofaCount()
+    if (n > 0) {
+      twofaView.value = 'list'
+      toast(wasFirst ? t('c.toast.tfaOn') : t('tfa.added'))
+    } else {
+      toast(t('tfa.added'))
+    }
   } catch (e: any) { toast(t('c.toast.tfaOnFail', e?.message || e), true) }
 }
 
-async function disable2fa() {
+function twofaMsgClear() { /* 预留：列表视图无内联消息 */ }
+
+async function unbindEntry(index: number) {
   try {
-    await api.auth2faDisable(twofaCode.value.trim())
-    twofaEnabled.value = false
-    closeModal('modal2fa')
-    toast(t('c.toast.tfaOff'))
+    await api.auth2faDisable(index, twofaCode.value.trim())
+    twofaCode.value = ''
+    const n = await refreshTwofaCount()
+    toast(t('tfa.removed'))
+    if (n === 0) {
+      twofaView.value = 'add'
+      await startAdd2fa()
+    }
   } catch (e: any) { toast(t('c.toast.tfaOffFail', e?.message || e), true) }
 }
 
@@ -966,12 +1006,20 @@ setInterval(() => refresh(true), 2500)
         <div class="txt"><h3>{{ t('tfa.title') }}</h3><p>{{ t('c.tfa.sub') }}</p></div>
         <button class="mclose" @click="closeModal('modal2fa')">✕</button>
       </div>
-      <template v-if="twofaEnabled">
-        <p class="setnote">{{ t('c.tfa.onNote') }}</p>
-        <div class="field"><label>{{ t('tfa.code') }}</label><input v-model="twofaCode" class="mono" maxlength="6" :placeholder="t('login.2faPlaceholder')"></div>
+      <!-- 已绑定：列表管理 -->
+      <template v-if="twofaCount > 0 && twofaView === 'list'">
+        <p class="setnote">{{ t('tfa.count', twofaCount) }}</p>
+        <div class="tlist">
+          <div class="trow" v-for="i in twofaCount" :key="i">
+            <span class="trow-name">{{ t('tfa.entry', i) }}</span>
+            <button class="tunlink" type="button" :disabled="!/\d{6}$/.test(twofaCode.trim())"
+                    @click="unbindEntry(i - 1)">{{ t('tfa.removeOne') }}</button>
+          </div>
+        </div>
+        <div class="field"><label>{{ t('tfa.codeFor') }}</label><input v-model="twofaCode" class="mono" maxlength="6" :placeholder="t('login.2faPlaceholder')"></div>
         <div class="mfoot"><span class="spacer"></span>
           <button class="btn ghost" @click="closeModal('modal2fa')">{{ t('c.n.cancel') }}</button>
-          <button class="btn danger" @click="disable2fa">{{ t('c.tfa.disable') }}</button>
+          <button class="btn" @click="startAdd2fa">{{ t('tfa.addOne') }}</button>
         </div>
       </template>
       <template v-else>
@@ -981,7 +1029,7 @@ setInterval(() => refresh(true), 2500)
           <input v-model="twofaCode" class="mono" maxlength="6" :placeholder="t('login.2faPlaceholder')">
         </div>
         <div class="mfoot"><span class="spacer"></span>
-          <button class="btn ghost" @click="closeModal('modal2fa')">{{ t('c.n.cancel') }}</button>
+          <button class="btn ghost" @click="twofaCount > 0 ? backFromAdd2fa() : closeModal('modal2fa')">{{ t('c.n.cancel') }}</button>
           <button class="btn" :disabled="!twofaCode" @click="enable2fa">{{ t('c.tfa.enable') }}</button>
         </div>
       </template>

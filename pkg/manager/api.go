@@ -2,6 +2,7 @@ package manager
 
 import (
 	"crypto/subtle"
+	"fmt"
 	"io/fs"
 	"net"
 	"net/http"
@@ -601,7 +602,7 @@ func (m *Manager) apiLogin2FA(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, "bad request body")
 		return
 	}
-	if !consumeLoginTicket(req.Ticket) || !m.twoFAVerify(req.Code) {
+	if !consumeLoginTicket(req.Ticket) || !m.twoFAAny(req.Code) {
 		m.limiter.Fail(origin)
 		fail(w, http.StatusUnauthorized, "动态验证码不正确或已过期")
 		return
@@ -614,9 +615,10 @@ func (m *Manager) apiLogin2FA(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
-// api2FAStatus reports whether the console 2FA is enabled.
+// api2FAStatus reports whether the console 2FA is enabled and how many
+// authenticators are bound.
 func (m *Manager) api2FAStatus(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"enabled": m.twoFAEnabled()})
+	writeJSON(w, http.StatusOK, map[string]any{"enabled": m.twoFAEnabled(), "count": m.twoFACount()})
 }
 
 // api2FASetup mints an enrollment secret; nothing is stored until enable.
@@ -626,7 +628,12 @@ func (m *Manager) api2FASetup(w http.ResponseWriter, _ *http.Request) {
 		fail(w, http.StatusInternalServerError, "密钥生成失败")
 		return
 	}
-	uri := totp.URI("C", secret) // 手机令牌 App 中显示为 LUMO:C，与服务端 LUMO:S 区分
+	// 手机令牌 App 中显示为 LUMO:C，与服务端 LUMO:S 区分；多绑定加序号
+	account := "C"
+	if n := m.twoFACount(); n > 0 {
+		account = fmt.Sprintf("C-%d", n+1)
+	}
+	uri := totp.URI(account, secret)
 	svg := qrcode.SVG(uri, qrcode.M, 200)
 	if svg == "" {
 		fail(w, http.StatusInternalServerError, "二维码生成失败")
@@ -640,7 +647,8 @@ func (m *Manager) api2FASetup(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-// api2FAEnable verifies a code and turns the console 2FA on.
+// api2FAEnable verifies a code against the new secret and appends the
+// binding (duplicates rejected).
 func (m *Manager) api2FAEnable(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Secret string `json:"secret"`
@@ -658,23 +666,60 @@ func (m *Manager) api2FAEnable(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnauthorized, "动态验证码不正确，请输入令牌 App 当前显示的 6 位数字")
 		return
 	}
-	m.saveTwoFA(req.Secret)
+	if m.hasBinding(req.Secret) {
+		fail(w, http.StatusBadRequest, "该验证器已绑定")
+		return
+	}
+	secrets := m.currentSecrets()
+	secrets = append(secrets, req.Secret)
+	m.saveTwoFA(secrets)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
-// api2FADisable turns the console 2FA off after verifying a current code.
+// hasBinding reports whether the secret is already bound.
+func (m *Manager) hasBinding(secret string) bool {
+	twofaMu.Lock()
+	defer twofaMu.Unlock()
+	for _, sec := range twofaSecrets {
+		if sec == secret {
+			return true
+		}
+	}
+	return false
+}
+
+// currentSecrets returns a copy of the bound list.
+func (m *Manager) currentSecrets() []string {
+	twofaMu.Lock()
+	defer twofaMu.Unlock()
+	return append([]string(nil), twofaSecrets...)
+}
+
+// api2FADisable removes one bound authenticator (by index) after a code
+// from any currently bound device verifies.
 func (m *Manager) api2FADisable(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Code string `json:"code"`
+		Code  string `json:"code"`
+		Index int    `json:"index"`
 	}
 	if err := jsonDecode(r.Body, &req); err != nil {
 		fail(w, http.StatusBadRequest, "bad request body")
 		return
 	}
-	if !m.twoFAVerify(req.Code) {
+	if m.twoFACount() == 0 {
+		fail(w, http.StatusBadRequest, "尚未启用二次验证")
+		return
+	}
+	if req.Index < 0 || req.Index >= m.twoFACount() {
+		fail(w, http.StatusBadRequest, "验证器序号无效")
+		return
+	}
+	if !m.twoFAAny(req.Code) {
 		fail(w, http.StatusUnauthorized, "动态验证码不正确")
 		return
 	}
-	m.saveTwoFA("")
+	secrets := m.currentSecrets()
+	secrets = append(secrets[:req.Index], secrets[req.Index+1:]...)
+	m.saveTwoFA(secrets)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }

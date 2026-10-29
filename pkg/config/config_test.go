@@ -120,7 +120,7 @@ func TestSaveServerRoundTripKeepsAllFields(t *testing.T) {
 		ConfigPath: p, BindPort: 58619, KCPPort: 47011,
 		VhostHTTPPort: 18080, SubdomainHost: "tunnel.example.com",
 		AllowPorts: "1000-2000,3000", AuthPubKey: "pubkey-b64", Revision: 7,
-		Web: WebServer{Addr: "0.0.0.0", Port: 46351, User: "u", Password: "p", TOTPSecret: "SECRET234"},
+		Web: WebServer{Addr: "0.0.0.0", Port: 46351, User: "u", Password: "p", TOTPSecrets: []string{"SECRET234", "SECRET567"}},
 	}
 	if err := SaveServer(p, c); err != nil {
 		t.Fatal(err)
@@ -132,12 +132,12 @@ func TestSaveServerRoundTripKeepsAllFields(t *testing.T) {
 	if got.BindPort != 58619 || got.KCPPort != 47011 || got.VhostHTTPPort != 18080 ||
 		got.SubdomainHost != "tunnel.example.com" || got.AllowPorts != "1000-2000,3000" ||
 		got.AuthPubKey != "pubkey-b64" || got.Revision != 7 ||
-		got.Web.Port != 46351 || got.Web.TOTPSecret != "SECRET234" {
+		got.Web.Port != 46351 || len(got.Web.TOTPSecrets) != 2 || got.Web.TOTPSecrets[0] != "SECRET234" || got.Web.TOTPSecrets[1] != "SECRET567" {
 		t.Fatalf("fields lost on save: %+v", got)
 	}
 
-	// 解绑 2FA = 清空 TOTPSecret 再保存：pubKey/kcpPort/revision 必须原样保留
-	c.Web.TOTPSecret = ""
+	// 解绑全部 2FA = 清空 TOTPSecrets 再保存：pubKey/kcpPort/revision 必须原样保留
+	c.Web.TOTPSecrets = nil
 	if err := SaveServer(p, c); err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +145,7 @@ func TestSaveServerRoundTripKeepsAllFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reload after 2FA unbind failed: %v", err)
 	}
-	if got.AuthPubKey != "pubkey-b64" || got.KCPPort != 47011 || got.Revision != 7 || got.Web.TOTPSecret != "" {
+	if got.AuthPubKey != "pubkey-b64" || got.KCPPort != 47011 || got.Revision != 7 || len(got.Web.TOTPSecrets) != 0 {
 		t.Fatalf("2FA unbind lost or resurrected fields: %+v", got)
 	}
 
@@ -167,5 +167,32 @@ func TestSaveServerRoundTripKeepsAllFields(t *testing.T) {
 	}
 	if _, err := os.Stat(p3); err == nil {
 		t.Fatal("no file must be written when auth is missing")
+	}
+}
+
+// 旧版单密钥 totpSecret 配置加载后进入 TOTPSecrets 列表。
+func TestLoadServerMigratesLegacyTotpSecret(t *testing.T) {
+	dir := t.TempDir()
+	p := dir + "/lumos.toml"
+	content := "bindPort = 7000\n[auth]\ntoken = \"t\"\n[webServer]\naddr = \"127.0.0.1\"\nport = 7500\nuser = \"admin\"\npassword = \"pw\"\ntotpSecret = \"OLDSECRET\"\n"
+	if err := os.WriteFile(p, []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadServer(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Web.TOTPSecrets) != 1 || got.Web.TOTPSecrets[0] != "OLDSECRET" {
+		t.Fatalf("legacy totpSecret not migrated: %+v", got.Web.TOTPSecrets)
+	}
+	if err := SaveServer(p, got); err != nil {
+		t.Fatal(err)
+	}
+	got2, err := LoadServer(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got2.Web.TOTPSecrets) != 1 || got2.Web.TOTPSecrets[0] != "OLDSECRET" {
+		t.Fatalf("migrated secret lost after save: %+v", got2.Web.TOTPSecrets)
 	}
 }

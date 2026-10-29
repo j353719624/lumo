@@ -103,9 +103,9 @@ export const api = {
     const r = await fetch('/api/info')
     return json<EngineInfo>(r)
   },
-  async auth2faStatus(): Promise<{ enabled: boolean }> {
+  async auth2faStatus(): Promise<{ enabled: boolean; count: number }> {
     const r = await fetch('/api/profile/2fa')
-    return json<{ enabled: boolean }>(r)
+    return json<{ enabled: boolean; count: number }>(r)
   },
   async auth2faSetup(): Promise<{ secret: string; uri: string; qr: string }> {
     const r = await fetch('/api/profile/2fa/setup', { method: 'POST' })
@@ -117,9 +117,9 @@ export const api = {
     })
     return json<{ ok: boolean }>(r)
   },
-  async auth2faDisable(code: string): Promise<{ ok: boolean }> {
+  async auth2faDisable(index: number, code: string): Promise<{ ok: boolean }> {
     const r = await fetch('/api/profile/2fa/disable', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ index, code }),
     })
     return json<{ ok: boolean }>(r)
   },

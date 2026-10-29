@@ -222,6 +222,14 @@ html[data-theme="light"] .exitbtn:hover{background:#FBE7E9}
   font:700 9.5px/16px var(--sans);text-align:center;flex:0 0 auto}
 .grp b{font-size:12px;font-weight:600;color:#C7D2E4}
 .grp em{font-style:normal;font-size:10px;color:var(--tx-5);margin-left:auto}
+.tlist{display:flex;flex-direction:column;gap:6px}
+.trow{display:flex;align-items:center;height:34px;padding:0 12px;border-radius:10px;
+  background:var(--panel-2);border:1px solid var(--line)}
+.trow-name{font-size:12px;color:var(--tx-2)}
+.tunlink{margin-left:auto;height:26px;padding:0 12px;border-radius:7px;cursor:pointer;
+  background:none;border:1px solid rgba(255,95,115,.35);color:#FF5F73;font-size:11px}
+.tunlink:hover{background:#2A1418}
+.tunlink:disabled{opacity:.45;cursor:not-allowed}
 .mfoot{display:flex;align-items:center;gap:10px;padding-top:10px;border-top:1px solid var(--line)}
 .tplrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .tplrow .lb{font-size:11px;color:var(--tx-4)}
