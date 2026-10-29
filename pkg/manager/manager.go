@@ -72,7 +72,9 @@ func (m *Manager) Run(addr, user, pass string) error {
 	mux.HandleFunc("GET /login", m.loginPage)
 	mux.Handle("POST /api/login", http.HandlerFunc(m.apiLogin))
 	mux.Handle("GET /logout", http.HandlerFunc(m.apiLogout))
-	mux.Handle("POST /api/login/2fa", m.guard(http.HandlerFunc(m.apiLogin2FA)))
+	// 换会话的端点必须免 guard：调用者此刻只有短期票据，还没有会话；
+	// 票据本身一次性且 2 分钟过期，外加登录限流兜底
+	mux.Handle("POST /api/login/2fa", http.HandlerFunc(m.apiLogin2FA))
 	mux.Handle("GET /api/profile/2fa", m.guard(http.HandlerFunc(m.api2FAStatus)))
 	mux.Handle("POST /api/profile/2fa/setup", m.guard(http.HandlerFunc(m.api2FASetup)))
 	mux.Handle("POST /api/profile/2fa/enable", m.guard(http.HandlerFunc(m.api2FAEnable)))
