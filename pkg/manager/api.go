@@ -346,7 +346,7 @@ func (m *Manager) apiStatus(w http.ResponseWriter, _ *http.Request) {
 	for _, cfg := range m.store.List() {
 		entry := map[string]any{"id": cfg.ID, "running": false, "proxies": []any{}, "log": []string{}}
 		if r, ok := m.running(cfg.ID); ok {
-			running, lastErr, proxies := r.client.State()
+			running, lastErr, proxies := r.queryStatus()
 			entry["running"] = running
 			if lastErr != "" {
 				entry["error"] = lastErr
@@ -366,7 +366,7 @@ func (m *Manager) apiStatus(w http.ResponseWriter, _ *http.Request) {
 func (m *Manager) apiInfo(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"version":   version.Version,
-		"engineBin": "内置引擎（单进程托管全部连接）",
+		"engineBin": "独立引擎进程（每配置一个）",
 		"dataDir":   m.store.path,
 		"port":      m.consolePort,
 	})

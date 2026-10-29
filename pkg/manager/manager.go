@@ -6,12 +6,13 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/j353719624/lumo/pkg/auth"
-	"github.com/j353719624/lumo/pkg/client"
 	"github.com/j353719624/lumo/pkg/log"
 )
 
@@ -31,11 +32,17 @@ type Manager struct {
 	runs map[string]*run
 }
 
+// run is one supervised engine subprocess (one per connection config).
 type run struct {
-	cfg    *ConnConfig
-	client *client.Client
-	cancel context.CancelFunc
-	logi   *log.Instance
+	cfg      *ConnConfig
+	cancel   context.CancelFunc
+	logi     *log.Instance
+	tomlPath string
+	admin    string
+
+	mu      sync.Mutex
+	cmd     *exec.Cmd
+	stopped bool
 }
 
 // New creates a Manager over the given store.
@@ -105,54 +112,63 @@ func (m *Manager) Run(addr, user, pass string) error {
 	return nil
 }
 
-// Stop cancels every running connection.
+// Stop terminates every engine subprocess.
 func (m *Manager) Stop() {
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	runs := make([]*run, 0, len(m.runs))
 	for id, r := range m.runs {
-		r.cancel()
+		runs = append(runs, r)
 		delete(m.runs, id)
+	}
+	m.mu.Unlock()
+	for _, r := range runs {
+		r.cancel()
+		r.terminate()
+		_ = os.Remove(r.tomlPath)
 	}
 }
 
-// start launches the engine for one config. The connection keeps running
-// across failures (reconnect loop) until stopped.
+// start launches the engine subprocess for one config. The supervisor keeps
+// it running across crashes until explicitly stopped.
 func (m *Manager) start(id string) error {
 	cfg, ok := m.store.Get(id)
 	if !ok {
 		return fmt.Errorf("config %s not found", id)
-	}
-	engCfg, err := cfg.toClientConfig()
-	if err != nil {
-		return err
 	}
 	m.mu.Lock()
 	if _, exists := m.runs[id]; exists {
 		m.mu.Unlock()
 		return nil
 	}
+	m.mu.Unlock()
+
+	// 渲染独立配置文件；引擎进程从这里读取自己的连接参数
+	tomlPath := filepath.Join(filepath.Dir(m.store.path), "engine-"+id+".toml")
+	if err := os.WriteFile(tomlPath, []byte(renderToml(cfg)), 0600); err != nil {
+		return err
+	}
+	// 本地状态端口：探测空闲端口后让给引擎
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		_ = os.Remove(tomlPath)
+		return err
+	}
+	admin := ln.Addr().String()
+	_ = ln.Close()
+
 	logi := log.NewInstance("[" + cfg.Name + "]")
-	cl := client.New(engCfg, "")
-	cl.Log = logi
 	ctx, cancel := context.WithCancel(context.Background())
-	r := &run{cfg: &cfg, client: cl, cancel: cancel, logi: logi}
+	r := &run{cfg: &cfg, cancel: cancel, logi: logi, tomlPath: tomlPath, admin: admin}
+	m.mu.Lock()
 	m.runs[id] = r
 	m.mu.Unlock()
 
-	go func() {
-		_ = cl.Run(ctx)
-		// 只有仍是当前实例时才删除登记；否则会误删重启后新实例的条目，
-		// 导致旧实例永远无法被停止（重复连接、名称冲突）
-		m.mu.Lock()
-		if cur, ok := m.runs[id]; ok && cur == r {
-			delete(m.runs, id)
-		}
-		m.mu.Unlock()
-	}()
+	r.logi.Infof("引擎进程启动（独立进程，admin %s）", admin)
+	go r.supervise(ctx)
 	return nil
 }
 
-// stop halts the engine for one config, leaving it in the store.
+// stop halts the engine subprocess for one config, leaving it in the store.
 func (m *Manager) stop(id string) {
 	m.mu.Lock()
 	r, ok := m.runs[id]
@@ -160,9 +176,15 @@ func (m *Manager) stop(id string) {
 		delete(m.runs, id)
 	}
 	m.mu.Unlock()
-	if ok {
-		r.cancel()
+	if !ok {
+		return
 	}
+	r.mu.Lock()
+	r.stopped = true
+	r.mu.Unlock()
+	r.cancel()
+	r.terminate()
+	_ = os.Remove(r.tomlPath)
 }
 
 // restart applies a new config to a running connection.
@@ -181,3 +203,4 @@ func (m *Manager) running(id string) (*run, bool) {
 	r, ok := m.runs[id]
 	return r, ok
 }
+
