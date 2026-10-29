@@ -315,6 +315,7 @@ const tfaSecret = ref('')
 const tfaUri = ref('')
 const tfaQr = ref('')
 const tfaCode = ref('')
+const tfaCodeEl = ref<HTMLInputElement | null>(null)
 const tfaMsg = ref<{ ok: boolean; text: string } | null>(null)
 
 async function open2FA() {
@@ -415,6 +416,7 @@ async function unbindEntry(index: number) {
   if (tfaBusy.value) return
   if (!/^\d{6}$/.test(tfaCode.value.trim())) {
     tfaMsg.value = { ok: false, text: t('tfa.codePh') }
+    tfaCodeEl.value?.focus()
     return
   }
   tfaBusy.value = true
@@ -815,17 +817,17 @@ function closeMenu(e: MouseEvent) {
       <!-- 已绑定：列表管理 -->
       <template v-if="tfaCount > 0 && tfaView === 'list'">
         <p class="tnote">{{ t('tfa.count', tfaCount) }}</p>
+        <div class="tfield">
+          <label>{{ t('tfa.codeFor') }}</label>
+          <input v-model="tfaCode" ref="tfaCodeEl" type="text" inputmode="numeric" maxlength="6"
+                 :placeholder="t('login.2faPlaceholder')" autocomplete="one-time-code">
+        </div>
         <div class="tlist">
           <div class="trow" v-for="i in tfaCount" :key="i">
             <span class="trow-name">{{ t('tfa.entry', i) }}</span>
-            <button class="tunlink" type="button" :disabled="tfaBusy || !/\d{6}$/.test(tfaCode.trim())"
+            <button class="tunlink" type="button" :disabled="tfaBusy"
                     @click="unbindEntry(i - 1)">{{ t('tfa.removeOne') }}</button>
           </div>
-        </div>
-        <div class="tfield">
-          <label>{{ t('tfa.codeFor') }}</label>
-          <input v-model="tfaCode" type="text" inputmode="numeric" maxlength="6"
-                 :placeholder="t('login.2faPlaceholder')" autocomplete="one-time-code">
         </div>
         <p class="tmsg" v-if="tfaMsg" :class="{ ok: tfaMsg.ok }">{{ tfaMsg.text }}</p>
         <div class="tactions">

@@ -1009,14 +1009,13 @@ setInterval(() => refresh(true), 2500)
       <!-- 已绑定：列表管理 -->
       <template v-if="twofaCount > 0 && twofaView === 'list'">
         <p class="setnote">{{ t('tfa.count', twofaCount) }}</p>
+        <div class="field"><label>{{ t('tfa.codeFor') }}</label><input v-model="twofaCode" class="mono" maxlength="6" :placeholder="t('login.2faPlaceholder')"></div>
         <div class="tlist">
           <div class="trow" v-for="i in twofaCount" :key="i">
             <span class="trow-name">{{ t('tfa.entry', i) }}</span>
-            <button class="tunlink" type="button" :disabled="!/\d{6}$/.test(twofaCode.trim())"
-                    @click="unbindEntry(i - 1)">{{ t('tfa.removeOne') }}</button>
+            <button class="tunlink" type="button" @click="unbindEntry(i - 1)">{{ t('tfa.removeOne') }}</button>
           </div>
         </div>
-        <div class="field"><label>{{ t('tfa.codeFor') }}</label><input v-model="twofaCode" class="mono" maxlength="6" :placeholder="t('login.2faPlaceholder')"></div>
         <div class="mfoot"><span class="spacer"></span>
           <button class="btn ghost" @click="closeModal('modal2fa')">{{ t('c.n.cancel') }}</button>
           <button class="btn" @click="startAdd2fa">{{ t('tfa.addOne') }}</button>
