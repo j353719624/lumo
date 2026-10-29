@@ -250,7 +250,8 @@ func (s *Server) api2FASetup(w http.ResponseWriter, r *http.Request) {
 		failJSON(w, http.StatusInternalServerError, "密钥生成失败")
 		return
 	}
-	uri := totp.URI(s.cfg.Web.User, secret)
+	// 界面上品牌一律是 LUMO；S/C 只出现在手机 2FA 软件里（LUMO:S / LUMO:C）
+	uri := totp.URI("S", secret)
 	svg := qrcode.SVG(uri, qrcode.M, 200)
 	if svg == "" {
 		failJSON(w, http.StatusInternalServerError, "二维码生成失败")

@@ -125,7 +125,7 @@ try {
           <circle cx="10" cy="42" r="3.8" fill="#35E0C8"/>
           <circle cx="62" cy="42" r="3.8" fill="#35E0C8"/>
         </svg>
-        <div class="brandname">LUMO·C</div>
+        <div class="brandname">LUMO</div>
         <div class="brandcn">隧光</div>
         <span class="hairline"></span>
         <div class="brandtag">把内网服务带在身边</div>

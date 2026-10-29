@@ -30,6 +30,7 @@ input,select,textarea{font:inherit;color:inherit}
 .sbrand{display:flex;align-items:center;gap:10px;padding:0 6px 16px}
 .sbrand .wm{font-weight:700;font-size:14px;letter-spacing:1px}
 .sbrand .cn{font-size:10px;letter-spacing:1.6px;color:var(--tx-4);margin-left:6px;padding-left:8px;border-left:1px solid var(--line-3)}
+.sbrand .badge{height:18px;padding:0 6px;border-radius:5px;background:#1B2540;color:var(--accent-soft);font:700 8.5px/18px var(--mono);letter-spacing:1.1px}
 .nav-label{font-size:10px;letter-spacing:1.6px;color:var(--tx-5);padding:10px 8px 6px;font-weight:500}
 .nav{display:flex;align-items:center;gap:10px;height:40px;padding:0 12px;border-radius:10px;
   color:var(--tx-3);font-size:13px;width:100%;text-align:left}
@@ -69,13 +70,35 @@ html[data-theme="light"] .nav.sub.cur{background:#E4EAFC}
 .search input{flex:1;min-width:0;background:none;border:0;outline:none;font-size:12px}
 .search input::placeholder{color:var(--tx-4)}
 
-.topuser{display:flex;align-items:center;gap:8px}
-.topav{width:28px;height:28px;border-radius:14px;background:var(--grad);color:#0B0E14;
-  font:700 12px/28px var(--sans);text-align:center;flex:0 0 auto}
-.topnm{font-size:12px;color:var(--tx-2)}
-.exitbtn{height:30px;padding:0 11px;border-radius:8px;display:inline-flex;align-items:center;
-  border:1px solid rgba(217,63,74,.3);color:#E5707E;font-size:11.5px;cursor:pointer}
-.exitbtn:hover{color:var(--bad);border-color:rgba(217,63,74,.55);background:#FBE7E9}
+
+/* 服务端同款头部控件：欢迎语 / 语言下拉 / 账号安全 / 退出 */
+.welcome{font-size:12px;color:var(--tx-3)}
+.welcome b{color:var(--tx);font-weight:700}
+.langsel{position:relative}
+.langbtn{
+  height:28px;padding:0 10px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;
+  background:var(--grad);border:0;color:#0B0E14;font-size:11.5px;font-weight:600;cursor:pointer;
+}
+.langbtn .caret{opacity:.8}
+.langmenu{
+  position:absolute;right:0;top:calc(100% + 6px);min-width:132px;z-index:60;
+  background:#141B29;border:1px solid var(--line-3);border-radius:8px;padding:4px;
+}
+.langmenu button{
+  width:100%;height:30px;padding:0 10px;border-radius:6px;display:flex;align-items:center;gap:8px;
+  background:none;border:0;color:var(--tx-2);font-size:11.5px;cursor:pointer;text-align:left;
+}
+.langmenu button:hover{background:#1B2540;color:var(--tx)}
+.langmenu button.cur{color:var(--ok)}
+.langmenu button span{font-size:13px}
+.acctbtn,.exitbtn{
+  height:28px;padding:0 11px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;
+  background:#141B29;border:1px solid var(--line-3);color:var(--tx-2);font-size:11.5px;cursor:pointer;
+  transition:color .15s,border-color .15s,background .15s;
+}
+.acctbtn:hover{color:var(--accent-soft);border-color:#39455C}
+.exitbtn{color:#E5707E;border-color:rgba(255,95,115,.25)}
+.exitbtn:hover{color:#FF5F73;border-color:rgba(255,95,115,.5);background:#2A1418}
 html[data-theme="light"] .exitbtn:hover{background:#FBE7E9}
 .btn{height:34px;padding:0 14px;border-radius:10px;display:inline-flex;align-items:center;gap:6px;
   font-size:12.5px;font-weight:600;color:#0B1117;background:var(--grad);white-space:nowrap}
@@ -310,6 +333,11 @@ html[data-theme="light"] ::selection{background:rgba(90,123,255,.22)}
 html[data-theme="light"] *::-webkit-scrollbar-thumb{background:#C6CFDD}
 html[data-theme="light"] *::-webkit-scrollbar-thumb:hover{background:#AEB9CB}
 html[data-theme="light"] .themebtn:hover{background:#E9EEF6}
+html[data-theme="light"] .langmenu{background:#FFFFFF}
+html[data-theme="light"] .langmenu button:hover{background:#EEF2FB}
+html[data-theme="light"] .acctbtn,html[data-theme="light"] .exitbtn{background:#FFFFFF}
+html[data-theme="light"] .acctbtn:hover{border-color:#B8C4D6}
+
 html[data-theme="light"] .nav:hover{background:#EEF2F8}
 html[data-theme="light"] .nav[aria-current]{background:#E4EAFC}
 html[data-theme="light"] .nav .nbadge{background:#E4EAFC}
@@ -345,6 +373,7 @@ html[data-theme="light"] .warnbox{background:#F7F9FC}
 html[data-theme="light"] .logline{color:#4C586B}
 html[data-theme="light"] .logline.err{color:#C0394B}
 html[data-theme="light"] .setcard .kv b{color:#2B3A50}
+html[data-theme="light"] .badge{background:#E4EAFC}
 html[data-theme="light"] .seg{background:#F2F5FA}
 html[data-theme="light"] .seg button[aria-pressed="true"]{background:#FFFFFF}
 html[data-theme="light"] .toast{background:#FFFFFF}

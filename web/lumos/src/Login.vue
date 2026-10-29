@@ -137,7 +137,7 @@ try {
           <path d="M10 42H62" stroke="#35E0C8" stroke-width="4.4" stroke-linecap="round"/>
           <circle cx="10" cy="42" r="3.9" fill="#35E0C8"/><circle cx="62" cy="42" r="3.9" fill="#35E0C8"/>
         </svg>
-        <span class="wm">LUMO·S</span>
+        <span class="wm">LUMO</span>
         <span class="divider"></span>
         <span class="cn">隧光</span>
       </div>
