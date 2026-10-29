@@ -5,11 +5,13 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"os"
 	"path"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/j353719624/lumo/pkg/config"
 	"github.com/j353719624/lumo/pkg/proto"
 	"github.com/j353719624/lumo/pkg/version"
 	lumocweb "github.com/j353719624/lumo/web/lumoc"
@@ -384,8 +386,10 @@ func renderToml(cfg ConnConfig) string {
 		if mp.Name != "" {
 			L = append(L, `label = "`+esc(mp.Name)+`"`)
 		}
-		if mp.Type == "http" || mp.Type == "https" {
+		if mp.Type == "http" || mp.Type == "https" || mp.Type == "mux" {
 			L = append(L, `customDomains = ["`+esc(mp.Domain)+`"]`)
+		} else if mp.Type == "sealed-tcp" || mp.Type == "sealed-udp" {
+			L = append(L, `sk = "`+esc(mp.SK)+`"`)
 		} else {
 			L = append(L, "remotePort = "+strconv.Itoa(mp.RemotePort))
 		}
@@ -418,4 +422,83 @@ func serveConsole(fsys http.FileSystem) http.Handler {
 		}
 		fsrv.ServeHTTP(w, r)
 	})
+}
+
+// apiTomlSave parses an edited lumoc.toml back into the stored config,
+// validates it, persists it and restarts the instance when it is running.
+func (m *Manager) apiTomlSave(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	cur, ok := m.store.Get(id)
+	if !ok {
+		fail(w, http.StatusNotFound, "config not found")
+		return
+	}
+	var req struct {
+		Toml string `json:"toml"`
+	}
+	if err := jsonDecode(r.Body, &req); err != nil {
+		fail(w, http.StatusBadRequest, "bad request body")
+		return
+	}
+	tmp, err := os.CreateTemp("", "lumoc-*.toml")
+	if err != nil {
+		fail(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+	_, _ = tmp.WriteString(req.Toml)
+	_ = tmp.Close()
+	parsed, err := config.LoadClient(tmpName)
+	if err != nil {
+		fail(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if len(parsed.Proxies) == 0 {
+		fail(w, http.StatusBadRequest, "至少保留一条端口映射")
+		return
+	}
+	next := cur
+	next.ServerAddr = parsed.ServerAddr
+	next.ServerPort = parsed.ServerPort
+	next.Protocol = parsed.Protocol
+	next.KCPPort = parsed.KCPPort
+	next.Token = parsed.AuthToken
+	next.Mappings = nil
+	for _, p := range parsed.Proxies {
+		mid := strings.TrimPrefix(p.Name, cur.ID+"-")
+		if mid == p.Name || mid == "" {
+			mid = proto.RandomHex(4)
+		}
+		mp := Mapping{
+			ID: mid, Name: p.Label, Type: p.Type,
+			LocalIP: p.LocalIP, LocalPort: p.LocalPort,
+			RemotePort: p.RemotePort, SK: p.SK,
+		}
+		if len(p.CustomDomains) > 0 {
+			mp.Domain = p.CustomDomains[0]
+		}
+		next.Mappings = append(next.Mappings, mp)
+	}
+	normalize(&next)
+	if _, err := next.toClientConfig(); err != nil {
+		fail(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	_, wasRunning := m.running(id)
+	if err := m.store.Upsert(&next); err != nil {
+		fail(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	restarted := false
+	if next.Enabled {
+		if err := m.restart(id); err != nil {
+			fail(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		restarted = wasRunning
+	} else if wasRunning {
+		m.stop(id)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "restarted": restarted, "config": next})
 }

@@ -77,6 +77,7 @@ func (m *Manager) Run(addr, user, pass string) error {
 	mux.Handle("POST /api/configs/{id}/start", m.guard(http.HandlerFunc(m.apiStart)))
 	mux.Handle("POST /api/configs/{id}/stop", m.guard(http.HandlerFunc(m.apiStop)))
 	mux.Handle("GET /api/configs/{id}/toml", m.guard(http.HandlerFunc(m.apiToml)))
+	mux.Handle("POST /api/configs/{id}/toml", m.guard(http.HandlerFunc(m.apiTomlSave)))
 	mux.Handle("GET /api/status", m.guard(http.HandlerFunc(m.apiStatus)))
 	mux.Handle("GET /api/info", m.guard(http.HandlerFunc(m.apiInfo)))
 	mux.Handle("/", m.guardUI(serveConsole(consoleFS)))

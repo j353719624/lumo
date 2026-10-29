@@ -345,3 +345,28 @@ html[data-theme="light"] .testbtn{background:#E4EAFC}
 html[data-theme="light"] .testbtn:hover{background:#D8E2FB}
 html[data-theme="light"] .sechint{color:#6E7A8C}
 html[data-theme="light"] .secadd:hover{background:#E4EAFC}
+
+/* ---------------- 日志视图 / TOML 编辑器 ---------------- */
+.loggroup{display:flex;flex-direction:column;gap:2px;margin-bottom:16px}
+.loghead{display:flex;align-items:center;gap:8px;padding:2px 0 6px;position:sticky;top:0;background:var(--bg);z-index:1}
+.lg-name{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600}
+.lg-name .dot{width:7px;height:7px;border-radius:4px;background:var(--tx-5)}
+.lg-name .dot.on{background:var(--ok)}
+.lg-count{font:10px/1 var(--mono);color:var(--tx-5)}
+.logrow{display:grid;grid-template-columns:62px 44px minmax(0,1fr);gap:10px;font:10.5px/1.5 var(--mono)}
+.logrow .lt{color:var(--tx-5)}
+.logrow .lv{font-weight:700;color:var(--tx-4);letter-spacing:.4px}
+.logrow.info .lv{color:var(--tx-3)}
+.logrow.warn .lv{color:var(--warn)}
+.logrow.err .lv{color:var(--bad)}
+.logrow .lm{color:#9AA6B8;white-space:pre-wrap;word-break:break-all}
+.logrow.warn .lm{color:#B6C1D4}
+.logrow.err .lm{color:#E3A3AA}
+.tomledit{width:100%;min-height:340px;max-height:56vh;resize:vertical;background:var(--panel-2);
+  border:1px solid var(--line);border-radius:10px;padding:12px;font:11px/1.6 var(--mono);color:var(--tx);outline:none}
+.tomledit:focus{border-color:rgba(90,123,255,.6)}
+.map input.msk{flex:0 0 110px}
+html[data-theme="light"] .logrow .lm{color:#4C586B}
+html[data-theme="light"] .logrow.warn .lm{color:#8A5B00}
+html[data-theme="light"] .logrow.err .lm{color:#C0394B}
+html[data-theme="light"] .tomledit{background:#FFFFFF}

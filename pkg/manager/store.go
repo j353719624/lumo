@@ -22,6 +22,7 @@ type Mapping struct {
 	LocalPort  int    `json:"localPort"`
 	RemotePort int    `json:"remotePort,omitempty"`
 	Domain     string `json:"domain,omitempty"`
+	SK         string `json:"sk,omitempty"`
 }
 
 func (m Mapping) active() bool { return m.Enabled == nil || *m.Enabled }
@@ -75,9 +76,10 @@ func (c *ConnConfig) toClientConfig() (*config.ClientConfig, error) {
 			LocalPort:  m.LocalPort,
 			RemotePort: m.RemotePort,
 		}
-		if m.Type == "http" || m.Type == "https" {
+		if m.Type == "http" || m.Type == "https" || m.Type == "mux" {
 			p.CustomDomains = []string{m.Domain}
 		}
+		p.SK = m.SK
 		out.Proxies = append(out.Proxies, p)
 	}
 	if err := out.Validate(); err != nil {

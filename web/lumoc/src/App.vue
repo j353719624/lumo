@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { api, type ConnConfig, type ConnStatus, type EngineInfo, type Mapping } from './api'
 import { applyThemePref, getThemePref, type Theme, type ThemePref } from './theme'
 
@@ -20,6 +20,12 @@ function setThemePref(p: ThemePref) {
 function toggleTheme() {
   setThemePref(theme.value === 'dark' ? 'light' : 'dark')
 }
+
+const nType = ref('tcp')
+const tomlText = ref('')
+const tomlId = ref('')
+const tomlSaving = ref(false)
+const logView = ref<HTMLElement | null>(null)
 
 const q = ref('')
 const view = ref<'list' | 'logs' | 'settings'>('list')
@@ -76,6 +82,20 @@ function statusOf(c: ConnConfig): { cls: string; label: string } {
   return { cls: 'wait', label: '启动中' }
 }
 
+function copyLogs(lines: string[]) {
+  copyText(lines.join('\n'), '日志已复制')
+}
+
+function parseLogs(lines: string[]) {
+  return lines.map((l) => {
+    const m = l.match(/^(\d{2}:\d{2}:\d{2})\s+\[(\w+)\]\s*(.*)$/)
+    if (!m) return { time: '', level: '', msg: l, cls: '' }
+    const lv = m[2].toUpperCase()
+    const cls = lv.startsWith('WARN') ? 'warn' : lv.startsWith('ERR') ? 'err' : lv === 'INFO' ? 'info' : ''
+    return { time: m[1], level: lv, msg: m[3], cls }
+  })
+}
+
 function mappingSummary(c: ConnConfig): string {
   const m = (c.mappings || [])[0]
   if (!m) return '未配置映射'
@@ -85,6 +105,9 @@ function mappingSummary(c: ConnConfig): string {
   const tag = m.name ? `[${m.name}] ` : ''
   return `${c.serverAddr}:${c.serverPort}  →  ${tag}${local}  ⇒  ${remote}${more}`
 }
+
+watch(() => runningConfigs.value.map((rc) => rc.status.log.length).join(','), () => scrollLogsToEnd())
+watch(() => view.value, (v) => { if (v === 'logs') scrollLogsToEnd() })
 
 const runningConfigs = computed(() => {
   const out: { name: string; status: ConnStatus }[] = []
@@ -168,8 +191,8 @@ function updateLocal(m: Mapping, raw: string) {
 }
 
 function updateRemote(m: Mapping, raw: string) {
-  if (m.type === 'http' || m.type === 'https') m.domain = raw.trim()
-  else m.remotePort = Number(raw.trim()) || 0
+  if (m.type === 'http' || m.type === 'https' || m.type === 'mux') m.domain = raw.trim()
+  else if (m.type !== 'sealed-tcp' && m.type !== 'sealed-udp') m.remotePort = Number(raw.trim()) || 0
 }
 
 async function save() {
@@ -227,7 +250,8 @@ async function createAndConnect() {
   }
   const mapName = (document.querySelector('#nMap .mname') as HTMLInputElement)?.value.trim() || ''
   if (mapName) mapping.name = mapName
-  if (type === 'http' || type === 'https') mapping.domain = remoteRaw
+  if (type === 'http' || type === 'https' || type === 'mux') mapping.domain = remoteRaw
+  else if (type === 'sealed-tcp' || type === 'sealed-udp') mapping.sk = ((document.querySelector('#nMap .msk') as HTMLInputElement)?.value || '').trim()
   else mapping.remotePort = Number(remoteRaw) || 0
 
   const startNowVal = startNow.value
@@ -290,6 +314,21 @@ function useTemplate(t: string) {
   if (remote) remote.value = tpl.remote
 }
 
+async function saveToml() {
+  if (!tomlId.value || tomlSaving.value) return
+  tomlSaving.value = true
+  try {
+    const r = await api.saveToml(tomlId.value, tomlText.value)
+    closeModal('modalToml')
+    await refresh()
+    toast(r?.restarted ? '已保存，连接已按新配置重启' : '已保存')
+  } catch (e: any) {
+    toast('保存失败：' + (e?.message || e), true)
+  } finally {
+    tomlSaving.value = false
+  }
+}
+
 async function copyText(text: string, msg: string) {
   try {
     // HTTP（非安全上下文）下 navigator.clipboard 不存在，退回 execCommand
@@ -310,6 +349,13 @@ async function copyText(text: string, msg: string) {
   } catch {
     toast('复制失败，请手动选择', true)
   }
+}
+
+function scrollLogsToEnd() {
+  nextTick(() => {
+    const el = logView.value
+    if (el) el.scrollTop = el.scrollHeight
+  })
 }
 
 function setView(v: 'list' | 'logs' | 'settings') {
@@ -522,15 +568,19 @@ setInterval(() => refresh(true), 2500)
               <div v-for="(m, idx) in draft.mappings" :key="m.id" class="map">
                 <input class="mname" v-model="m.name" placeholder="名称" aria-label="映射名称">
                 <select :value="m.type" @change="setMappingType(m, ($event.target as HTMLSelectElement).value)">
-                  <option value="tcp">TCP</option><option value="http">HTTP</option>
-                  <option value="udp">UDP</option><option value="sealed-tcp">sealed-tcp</option>
+                  <option value="tcp">TCP</option><option value="udp">UDP</option>
+                  <option value="http">HTTP</option><option value="https">HTTPS</option>
+                  <option value="sealed-tcp">sealed-tcp</option><option value="sealed-udp">sealed-udp</option>
+                  <option value="mux">MUX</option>
                 </select>
                 <input class="local" :value="(m.localIP || '127.0.0.1') + ':' + (m.localPort || '')" aria-label="本地地址" @input="updateLocal(m, ($event.target as HTMLInputElement).value)">
                 <div class="mapto">
                   <span style="color:#5A7BFF">→</span>
-                  <input class="remote" :value="(m.type === 'http' || m.type === 'https') ? (m.domain || '') : (m.remotePort || '')"
-                         :placeholder="(m.type === 'http' || m.type === 'https') ? '域名' : '公网端口'" aria-label="公网入口"
+                  <input class="remote" :value="(m.type === 'http' || m.type === 'https' || m.type === 'mux') ? (m.domain || '') : (m.remotePort || '')"
+                         :placeholder="(m.type === 'http' || m.type === 'https' || m.type === 'mux') ? '域名' : (m.type === 'sealed-tcp' || m.type === 'sealed-udp') ? '无需公网端口' : '公网端口'"
+                         :disabled="m.type === 'sealed-tcp' || m.type === 'sealed-udp'" aria-label="公网入口"
                          @input="updateRemote(m, ($event.target as HTMLInputElement).value)">
+                  <input v-if="m.type === 'sealed-tcp' || m.type === 'sealed-udp'" class="msk" v-model="m.sk" placeholder="密钥 sk" aria-label="密钥">
                   <button class="del" aria-label="删除这条映射" @click="removeMapping(idx)">
                     <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3.5 4.5H12.5M6.5 4.5V3.2H9.5V4.5M5 4.5L5.6 12.6H10.4L11 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   </button>
@@ -561,12 +611,21 @@ setInterval(() => refresh(true), 2500)
       </div>
 
       <!-- 运行日志视图 -->
-      <div class="logview" v-show="view === 'logs'">
+      <div class="logview" v-show="view === 'logs'" ref="logView" @scroll="0">
         <template v-if="runningConfigs.length">
-          <div v-for="rc in runningConfigs" :key="rc.status.id">
-            <div class="logline"><span class="tag">── {{ rc.name }} ──</span></div>
-            <div v-if="rc.status.error" class="logline err">{{ rc.status.error }}</div>
-            <div v-for="(l, i) in rc.status.log" :key="i" class="logline">{{ l }}</div>
+          <div v-for="rc in runningConfigs" :key="rc.status.id" class="loggroup">
+            <div class="loghead">
+              <span class="lg-name"><i class="dot" :class="{ on: rc.status.running }"></i>{{ rc.name }}</span>
+              <span class="lg-count">{{ rc.status.log.length }} 行</span>
+              <span class="spacer"></span>
+              <button class="btn ghost sm" @click="copyLogs(rc.status.log)">复制日志</button>
+            </div>
+            <div v-if="rc.status.error" class="logrow err"><span class="lt"></span><span class="lv">ERR</span><span class="lm">{{ rc.status.error }}</span></div>
+            <div v-for="(l, i) in parseLogs(rc.status.log)" :key="i" class="logrow" :class="l.cls">
+              <span class="lt">{{ l.time }}</span>
+              <span class="lv">{{ l.level }}</span>
+              <span class="lm">{{ l.msg }}</span>
+            </div>
           </div>
         </template>
         <div v-else class="hint" style="margin:16px">没有正在运行的连接。启用一个配置后，这里会显示 lumoc 的实时事件。</div>
@@ -640,9 +699,17 @@ setInterval(() => refresh(true), 2500)
       <div class="grp"><span class="gnum">2</span><b>配置端口映射</b><em>内网端口 → 公网端口</em></div>
       <div class="map" id="nMap">
         <input class="mname" placeholder="名称" aria-label="映射名称">
-        <select class="mtype"><option value="tcp">TCP</option><option value="http">HTTP</option><option value="udp">UDP</option><option value="sealed-tcp">sealed-tcp</option></select>
+        <select class="mtype" v-model="nType">
+          <option value="tcp">TCP</option><option value="udp">UDP</option>
+          <option value="http">HTTP</option><option value="https">HTTPS</option>
+          <option value="sealed-tcp">sealed-tcp</option><option value="sealed-udp">sealed-udp</option>
+          <option value="mux">MUX</option>
+        </select>
         <input class="local" placeholder="127.0.0.1:5000">
-        <div class="mapto"><span style="color:#5A7BFF">→</span><input class="remote" placeholder="15000"></div>
+        <div class="mapto"><span style="color:#5A7BFF">→</span>
+          <input class="remote" :placeholder="(nType === 'http' || nType === 'https' || nType === 'mux') ? '域名' : (nType === 'sealed-tcp' || nType === 'sealed-udp') ? '无需公网端口' : '15000'" :disabled="nType === 'sealed-tcp' || nType === 'sealed-udp'">
+        </div>
+        <input v-if="nType === 'sealed-tcp' || nType === 'sealed-udp'" class="msk" placeholder="密钥 sk">
       </div>
 
       <div class="grp"><span class="gnum">3</span><b>启动方式</b><em>可随时在列表里开关</em></div>
@@ -681,8 +748,14 @@ setInterval(() => refresh(true), 2500)
         <div class="txt"><h3>lumoc.toml</h3><p>该配置对应的隧道配置</p></div>
         <button class="mclose" @click="closeModal('modalToml')">✕</button>
       </div>
-      <pre class="warnbox" style="white-space:pre-wrap;max-height:50vh;overflow:auto">{{ tomlView }}</pre>
-      <div class="mfoot"><span class="spacer"></span><button class="btn ghost" @click="copyText(tomlView, 'lumoc.toml 已复制')">复制</button></div>
+      <textarea class="tomledit" v-model="tomlText" spellcheck="false" aria-label="lumoc.toml 编辑器"></textarea>
+      <p class="setnote">直接编辑 TOML 后保存：会先校验（地址/端口/令牌/映射），通过后写回配置；运行中的连接会按新配置重启。</p>
+      <div class="mfoot">
+        <button class="btn ghost" @click="copyText(tomlText, 'lumoc.toml 已复制')">复制</button>
+        <span class="spacer"></span>
+        <button class="btn ghost" @click="closeModal('modalToml')">取消</button>
+        <button class="btn" :disabled="tomlSaving" @click="saveToml">{{ tomlSaving ? '保存中…' : '保存并应用' }}</button>
+      </div>
     </div>
   </div>
 

@@ -9,6 +9,7 @@ export interface Mapping {
   localPort: number
   remotePort?: number
   domain?: string
+  sk?: string
 }
 
 export interface ConnConfig {
@@ -88,5 +89,11 @@ export const api = {
     const r = await fetch(`/api/configs/${id}/toml`)
     const d = await json<{ toml: string }>(r)
     return d.toml
+  },
+  async saveToml(id: string, toml: string): Promise<{ restarted: boolean; config: ConnConfig }> {
+    const r = await fetch(`/api/configs/${id}/toml`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ toml }),
+    })
+    return json<{ restarted: boolean; config: ConnConfig }>(r)
   },
 }
