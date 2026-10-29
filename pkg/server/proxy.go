@@ -70,6 +70,11 @@ func (s *Server) handleReg(ses *session, m proto.Msg) {
 	log.Infof("proxy %q (%s) registered by client %q", name, kind, ses.id)
 	reply(true, "")
 
+	// 新实例带来的公网端口自动放行，客户端侧零配置
+	if ent.kind == "tcp" || ent.kind == "udp" {
+		go openFirewallPort(ent.remotePort, ent.kind)
+	}
+
 	switch ent.kind {
 	case "tcp":
 		go s.acceptTCP(ent)

@@ -567,13 +567,29 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"ok": true, "restart": needsRestart})
 }
 
-// persistFirewallPort opens a newly-bound tunnel port in the local firewall
-// layers (firewalld + the persistent nft allowlist) so the change survives
-// reboots. Failures are logged, never fatal.
-func persistFirewallPort(port int) {
-	spec := fmt.Sprintf("%d/tcp", port)
-	if err := exec.Command("firewall-cmd", "--permanent", "--add-port="+spec).Run(); err == nil {
-		_ = exec.Command("firewall-cmd", "--reload").Run()
+// fwMu serializes firewall edits so concurrent proxy registrations cannot
+// race the read-modify-write of the persistent nft allowlist.
+var fwMu sync.Mutex
+
+// persistFirewallPort opens a tunnel port in both firewall layers.
+func persistFirewallPort(port int) { openFirewallPort(port, "tcp") }
+
+// openFirewallPort makes an inbound public port reachable from the internet
+// by adding it to both firewall layers (firewalld and the persistent nft
+// allowlist). Called for the configured tunnel ports at startup and whenever
+// a client registers a tcp/udp proxy, so a new connection instance needs no
+// manual firewall work on the server. Idempotent; failures are ignored.
+func openFirewallPort(port int, proto string) {
+	if port < 1 || port > 65535 || (proto != "tcp" && proto != "udp") {
+		return
+	}
+	fwMu.Lock()
+	defer fwMu.Unlock()
+	spec := fmt.Sprintf("%d/%s", port, proto)
+	if err := exec.Command("firewall-cmd", "--permanent", "--query-port="+spec).Run(); err != nil {
+		if err := exec.Command("firewall-cmd", "--permanent", "--add-port="+spec).Run(); err == nil {
+			_ = exec.Command("firewall-cmd", "--reload").Run()
+		}
 	}
 	const nftPath = "/etc/egress.nft"
 	data, err := os.ReadFile(nftPath)
@@ -582,16 +598,34 @@ func persistFirewallPort(port int) {
 	}
 	text := string(data)
 	ps := strconv.Itoa(port)
-	if strings.Contains(text, ps+",") || strings.Contains(text, ps+" }") {
-		return
+	reSet := regexp.MustCompile(`(?m)^(\s*)tcp dport \{([0-9, ]+)\} accept$`)
+	loc := reSet.FindStringSubmatchIndex(text)
+	haveTCP := false
+	if loc != nil {
+		for _, item := range strings.Split(text[loc[4]:loc[5]], ",") {
+			if strings.TrimSpace(item) == ps {
+				haveTCP = true
+				break
+			}
+		}
 	}
-	re := regexp.MustCompile(`(?m)^(\s*tcp dport \{)([0-9, ]+)(\} accept)$`)
-	loc := re.FindStringSubmatchIndex(text)
-	if loc == nil {
+	switch {
+	case proto == "tcp" && haveTCP:
 		return
+	case proto == "udp":
+		if regexp.MustCompile(`(?m)^\s*udp dport ` + ps + ` accept$`).MatchString(text) {
+			return
+		}
+		if loc == nil {
+			return
+		}
+		text = text[:loc[0]] + "    udp dport " + ps + " accept\n" + text[loc[0]:]
+	case loc == nil:
+		return
+	default:
+		set := strings.TrimSpace(text[loc[4]:loc[5]])
+		text = text[:loc[4]] + set + ", " + ps + text[loc[5]:]
 	}
-	set := strings.TrimSpace(text[loc[4]:loc[5]])
-	text = text[:loc[4]] + set + ", " + ps + text[loc[5]:]
 	if err := os.WriteFile(nftPath, []byte(text), 0o644); err == nil {
 		_ = exec.Command("systemctl", "restart", "egress-filter.service").Run()
 	}

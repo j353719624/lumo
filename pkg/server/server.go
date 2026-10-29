@@ -138,6 +138,22 @@ func (s *Server) Run(ctx context.Context) error {
 	s.usedPort[ln.Addr().(*net.TCPAddr).Port] = true
 	s.mu.Unlock()
 	log.Infof("lumos %s listening on :%d", version.Version, s.cfg.BindPort)
+	// 启动时确保所有配置的公网端口都已放行（热更新端口、机器重启后同样生效）
+	go func() {
+		openFirewallPort(s.cfg.BindPort, "tcp")
+		if s.cfg.KCPPort > 0 {
+			openFirewallPort(s.cfg.KCPPort, "udp")
+		}
+		if s.cfg.VhostHTTPPort > 0 {
+			openFirewallPort(s.cfg.VhostHTTPPort, "tcp")
+		}
+		if s.cfg.VhostHTTPSPort > 0 {
+			openFirewallPort(s.cfg.VhostHTTPSPort, "tcp")
+		}
+		if s.cfg.MuxPort > 0 {
+			openFirewallPort(s.cfg.MuxPort, "tcp")
+		}
+	}()
 
 	if s.cfg.VhostHTTPPort > 0 {
 		go s.runVhost("http")
