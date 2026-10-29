@@ -496,6 +496,23 @@ setInterval(() => refresh(true), 2500)
 
       <div class="nav-label">工作区</div>
 
+      <button class="nav" :aria-current="view === 'list' ? 'page' : undefined" @click="setView('list')">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 5.5L8 2L14 5.5V10.5L8 14L2 10.5V5.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 8.2V14M2 5.5L8 8.2M14 5.5L8 8.2" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        <span>连接配置</span>
+        <span class="nbadge">{{ configs.length }}</span>
+      </button>
+      <template v-if="view === 'list'">
+        <button class="nav sub" :class="{ cur: detailSection === 'overview' }" @click="detailSection = 'overview'"><span>概览</span></button>
+        <button class="nav sub" :class="{ cur: detailSection === 'server' }" @click="detailSection = 'server'"><span>服务器</span></button>
+        <button class="nav sub" :class="{ cur: detailSection === 'mappings' }" @click="detailSection = 'mappings'"><span>端口映射</span></button>
+        <button class="nav sub" :class="{ cur: detailSection === 'visitors' }" @click="detailSection = 'visitors'"><span>访问端</span></button>
+        <button class="nav sub" :class="{ cur: detailSection === 'files' }" @click="detailSection = 'files'"><span>配置文件</span></button>
+      </template>
+      <button class="nav" :aria-current="view === 'logs' ? 'page' : undefined" @click="setView('logs')">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 3H13M3 6.5H13M3 10H9M3 13.5H11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        <span>运行日志</span>
+      </button>
+
       <div class="spacer"></div>
 
       <div class="engine">
