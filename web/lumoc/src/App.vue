@@ -365,16 +365,10 @@ function genToken(): string {
 function openModal(id: string) {
   if (id === 'modalNew') {
     const el = document.getElementById('nToken') as HTMLInputElement | null
-    if (el) el.value = genToken()
+    if (el) el.value = ''
   }
-  document.getElementById(id)?.classList.add('open')
-}
+  document.getElementById(id)?.classList.add('open')}
 function closeModal(id: string) { document.getElementById(id)?.classList.remove('open') }
-
-function regenToken() {
-  const el = document.getElementById('nToken') as HTMLInputElement | null
-  if (el) el.value = genToken()
-}
 
 function useTemplate(t: string) {
   const tpl = TPL[t]
@@ -792,13 +786,8 @@ setInterval(() => refresh(true), 2500)
       <div class="field"><label>配置名称</label><input id="nName" placeholder="例如 家庭 NAS"></div>
       <div class="field"><label>认证令牌（与服务端一致，可自动生成或手动输入）</label>
         <div class="token-wrap">
-          <input id="nToken" class="mono" type="text" autocomplete="off" spellcheck="false" placeholder="auth.token">
-          <button type="button" class="eye-btn" title="重新生成" @click="regenToken()">
-            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-              <path d="M13 6.2A5.3 5.3 0 1 0 13.3 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-              <path d="M9.4 3.4L13.2 6.1L10.4 9.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
+          <input id="nToken" class="mono" type="text" autocomplete="off" spellcheck="false" placeholder="在服务端面板生成后粘贴到这里">
+
         </div>
       </div>
 
