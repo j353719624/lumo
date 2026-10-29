@@ -25,6 +25,7 @@ type Manager struct {
 
 	sessions *auth.Sessions
 	limiter  *auth.Limiter
+	twofaMu  sync.Mutex
 
 	mu   sync.Mutex
 	runs map[string]*run
@@ -39,12 +40,14 @@ type run struct {
 
 // New creates a Manager over the given store.
 func New(store *Store) *Manager {
-	return &Manager{
+	mgr := &Manager{
 		store:    store,
 		runs:     map[string]*run{},
 		sessions: auth.NewSessions(7 * 24 * time.Hour),
 		limiter:  auth.NewLimiter(10 * time.Minute),
 	}
+	mgr.loadTwoFA()
+	return mgr
 }
 
 // Run starts every config marked enabled, serves the console and blocks
@@ -69,6 +72,11 @@ func (m *Manager) Run(addr, user, pass string) error {
 	mux.HandleFunc("GET /login", m.loginPage)
 	mux.Handle("POST /api/login", http.HandlerFunc(m.apiLogin))
 	mux.Handle("GET /logout", http.HandlerFunc(m.apiLogout))
+	mux.Handle("POST /api/login/2fa", m.guard(http.HandlerFunc(m.apiLogin2FA)))
+	mux.Handle("GET /api/profile/2fa", m.guard(http.HandlerFunc(m.api2FAStatus)))
+	mux.Handle("POST /api/profile/2fa/setup", m.guard(http.HandlerFunc(m.api2FASetup)))
+	mux.Handle("POST /api/profile/2fa/enable", m.guard(http.HandlerFunc(m.api2FAEnable)))
+	mux.Handle("POST /api/profile/2fa/disable", m.guard(http.HandlerFunc(m.api2FADisable)))
 	mux.Handle("GET /api/configs", m.guard(http.HandlerFunc(m.apiList)))
 	mux.Handle("POST /api/configs", m.guard(http.HandlerFunc(m.apiCreate)))
 	mux.Handle("GET /api/configs/{id}", m.guard(http.HandlerFunc(m.apiGet)))

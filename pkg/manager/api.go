@@ -11,8 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"encoding/base64"
 	"github.com/j353719624/lumo/pkg/config"
 	"github.com/j353719624/lumo/pkg/proto"
+
+	"github.com/j353719624/lumo/pkg/qrcode"
+	"github.com/j353719624/lumo/pkg/totp"
 	"github.com/j353719624/lumo/pkg/version"
 	lumocweb "github.com/j353719624/lumo/web/lumoc"
 )
@@ -119,6 +123,18 @@ func (m *Manager) apiLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m.limiter.Reset(origin)
+	// 控制台 2FA 已启用：先发短期票据，凭票据 + 动态码换会话（与服务端控制台相互独立）
+	if m.twoFAEnabled() {
+		ticket, err := issueLoginTicket()
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = jsonEncode(w, map[string]string{"error": "无法创建验证会话"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"need2fa": true, "ticket": ticket})
+		return
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name: sessionCookie, Value: m.sessions.Issue(), Path: "/",
 		HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 7 * 24 * 3600,
@@ -566,4 +582,99 @@ func (m *Manager) apiTomlSave(w http.ResponseWriter, r *http.Request) {
 		m.stop(id)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "restarted": restarted, "config": next})
+}
+
+// apiLogin2FA completes a console login whose password step passed.
+func (m *Manager) apiLogin2FA(w http.ResponseWriter, r *http.Request) {
+	origin, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if m.limiter.Locked(origin) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_ = jsonEncode(w, map[string]string{"error": "尝试次数过多，请 10 分钟后再试"})
+		return
+	}
+	var req struct {
+		Ticket string `json:"ticket"`
+		Code   string `json:"code"`
+	}
+	if err := jsonDecode(r.Body, &req); err != nil {
+		fail(w, http.StatusBadRequest, "bad request body")
+		return
+	}
+	if !consumeLoginTicket(req.Ticket) || !m.twoFAVerify(req.Code) {
+		m.limiter.Fail(origin)
+		fail(w, http.StatusUnauthorized, "动态验证码不正确或已过期")
+		return
+	}
+	m.limiter.Reset(origin)
+	http.SetCookie(w, &http.Cookie{
+		Name: sessionCookie, Value: m.sessions.Issue(), Path: "/",
+		HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 7 * 24 * 3600,
+	})
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// api2FAStatus reports whether the console 2FA is enabled.
+func (m *Manager) api2FAStatus(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"enabled": m.twoFAEnabled()})
+}
+
+// api2FASetup mints an enrollment secret; nothing is stored until enable.
+func (m *Manager) api2FASetup(w http.ResponseWriter, _ *http.Request) {
+	secret, err := totp.Generate()
+	if err != nil {
+		fail(w, http.StatusInternalServerError, "密钥生成失败")
+		return
+	}
+	uri := totp.URI("C", secret) // 手机令牌 App 中显示为 LUMO:C，与服务端 LUMO:S 区分
+	svg := qrcode.SVG(uri, qrcode.M, 200)
+	if svg == "" {
+		fail(w, http.StatusInternalServerError, "二维码生成失败")
+		return
+	}
+	svgB64 := base64.StdEncoding.EncodeToString([]byte(svg))
+	writeJSON(w, http.StatusOK, map[string]any{
+		"secret": secret,
+		"uri":    uri,
+		"qr":     "data:image/svg+xml;base64," + svgB64,
+	})
+}
+
+// api2FAEnable verifies a code and turns the console 2FA on.
+func (m *Manager) api2FAEnable(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Secret string `json:"secret"`
+		Code   string `json:"code"`
+	}
+	if err := jsonDecode(r.Body, &req); err != nil {
+		fail(w, http.StatusBadRequest, "bad request body")
+		return
+	}
+	if !totp.Valid(req.Secret) {
+		fail(w, http.StatusBadRequest, "密钥格式不正确")
+		return
+	}
+	if !totp.Verify(req.Secret, req.Code, time.Now()) {
+		fail(w, http.StatusUnauthorized, "动态验证码不正确，请输入令牌 App 当前显示的 6 位数字")
+		return
+	}
+	m.saveTwoFA(req.Secret)
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// api2FADisable turns the console 2FA off after verifying a current code.
+func (m *Manager) api2FADisable(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Code string `json:"code"`
+	}
+	if err := jsonDecode(r.Body, &req); err != nil {
+		fail(w, http.StatusBadRequest, "bad request body")
+		return
+	}
+	if !m.twoFAVerify(req.Code) {
+		fail(w, http.StatusUnauthorized, "动态验证码不正确")
+		return
+	}
+	m.saveTwoFA("")
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }

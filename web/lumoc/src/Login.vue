@@ -17,6 +17,9 @@ const state = ref<'idle' | 'loading' | 'done'>('idle')
 const alertMsg = ref('')
 const alertShow = ref(false)
 const successShow = ref(false)
+const otpStep = ref(false)
+const otpTicket = ref('')
+const otpCode = ref('')
 
 function showError(msg: string) {
   alertMsg.value = msg
@@ -58,9 +61,40 @@ async function submit() {
       state.value = 'done'
       successShow.value = true
       setTimeout(() => { location.href = '/' }, 350)
+    } else if (d.need2fa && d.ticket) {
+      otpTicket.value = d.ticket
+      otpStep.value = true
+      state.value = 'idle'
+      otpCode.value = ''
     } else {
       state.value = 'idle'
       showError(d.error || '账号或密码不正确。连续 5 次失败会锁定 10 分钟')
+    }
+  } catch {
+    state.value = 'idle'
+    showError('无法连接本地服务，请确认进程正在运行')
+  }
+}
+
+async function submit2fa() {
+  if (state.value !== 'idle') return
+  if (!/^d{6}$/.test(otpCode.value.trim())) { showError('请输入 6 位动态验证码'); return }
+  clearError()
+  state.value = 'loading'
+  try {
+    const res = await fetch('/api/login/2fa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticket: otpTicket.value, code: otpCode.value.trim() }),
+    })
+    const d = await res.json()
+    if (res.ok) {
+      state.value = 'done'
+      successShow.value = true
+      setTimeout(() => { location.href = '/' }, 350)
+    } else {
+      state.value = 'idle'
+      showError(d.error || '动态验证码不正确或已过期')
     }
   } catch {
     state.value = 'idle'
@@ -91,8 +125,8 @@ try {
           <circle cx="10" cy="42" r="3.8" fill="#35E0C8"/>
           <circle cx="62" cy="42" r="3.8" fill="#35E0C8"/>
         </svg>
-        <div class="brandname">LUMO</div>
-        <div class="brandcn">隧光 · 客户端</div>
+        <div class="brandname">LUMO·C</div>
+        <div class="brandcn">隧光</div>
         <span class="hairline"></span>
         <div class="brandtag">把内网服务带在身边</div>
 
@@ -183,7 +217,15 @@ try {
             </div>
           </div>
 
-          <div class="opts">
+          <div class="field" v-if="otpStep">
+            <label for="otp">动态验证码（2FA）</label>
+            <div class="ctrl">
+              <input id="otp" v-model="otpCode" type="text" inputmode="numeric" maxlength="6"
+                     placeholder="6 位动态验证码" autocomplete="one-time-code">
+            </div>
+          </div>
+
+          <div class="opts" v-if="!otpStep">
             <label class="opt">
               <input type="checkbox" v-model="remember">
               <span class="sw"></span>
@@ -214,9 +256,10 @@ try {
             <a href="/">进入客户端 →</a>
           </div>
 
-          <button class="submit" type="submit" :data-state="state" :disabled="state !== 'idle'">
+          <button class="submit" type="submit" :data-state="state" :disabled="state !== 'idle'"
+                  @click="otpStep ? submit2fa() : submit()">
             <span class="spinner" aria-hidden="true"></span>
-            <span class="label">{{ state === 'loading' ? '正在验证…' : state === 'done' ? '已登录' : '登录' }}</span>
+            <span class="label">{{ state === 'loading' ? '正在验证…' : state === 'done' ? '已登录' : otpStep ? '验证并登录' : '登录' }}</span>
           </button>
         </form>
 

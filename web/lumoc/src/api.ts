@@ -103,6 +103,32 @@ export const api = {
     const r = await fetch('/api/info')
     return json<EngineInfo>(r)
   },
+  async auth2faStatus(): Promise<{ enabled: boolean }> {
+    const r = await fetch('/api/profile/2fa')
+    return json<{ enabled: boolean }>(r)
+  },
+  async auth2faSetup(): Promise<{ secret: string; uri: string; qr: string }> {
+    const r = await fetch('/api/profile/2fa/setup', { method: 'POST' })
+    return json<{ secret: string; uri: string; qr: string }>(r)
+  },
+  async auth2faEnable(secret: string, code: string): Promise<{ ok: boolean }> {
+    const r = await fetch('/api/profile/2fa/enable', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ secret, code }),
+    })
+    return json<{ ok: boolean }>(r)
+  },
+  async auth2faDisable(code: string): Promise<{ ok: boolean }> {
+    const r = await fetch('/api/profile/2fa/disable', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }),
+    })
+    return json<{ ok: boolean }>(r)
+  },
+  async login2fa(ticket: string, code: string): Promise<{ ok: boolean }> {
+    const r = await fetch('/api/login/2fa', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket, code }),
+    })
+    return json<{ ok: boolean }>(r)
+  },
   async toml(id: string): Promise<string> {
     const r = await fetch(`/api/configs/${id}/toml`)
     const d = await json<{ toml: string }>(r)

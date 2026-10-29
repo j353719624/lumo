@@ -529,7 +529,7 @@ function closeMenu(e: MouseEvent) {
         <path d="M10 42H62" stroke="#35E0C8" stroke-width="4.8" stroke-linecap="round"/>
         <circle cx="10" cy="42" r="4" fill="#35E0C8"/><circle cx="62" cy="42" r="4" fill="#35E0C8"/>
       </svg>
-      <span class="wordmark">LUMO</span>
+      <span class="wordmark">LUMO·S</span>
       <span class="badge">SERVER</span>
       <span class="pagename">{{ t('console.name') }}</span>
     </div>

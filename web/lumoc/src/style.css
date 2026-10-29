@@ -206,6 +206,8 @@ html[data-theme="light"] .exitbtn:hover{background:#FBE7E9}
   color:#B6C1D4;font-size:11px}
 .tpl:hover{border-color:rgba(90,123,255,.5);color:var(--accent-soft)}
 
+.qrwrap{display:grid;place-items:center;padding:8px 0;background:#fff;border-radius:12px;width:200px;margin:0 auto}
+.qrwrap :deep(svg){width:184px;height:184px}
 .warnbox{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:8px;
   background:#0E1320;border:1px solid var(--line);font:10px/1.5 var(--mono);color:var(--tx-3)}
 

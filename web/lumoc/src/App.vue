@@ -30,6 +30,43 @@ function levelRank(level: string): number {
   return 0
 }
 
+const twofaEnabled = ref(false)
+const twofaSecret = ref('')
+const twofaQr = ref('')
+const twofaCode = ref('')
+
+async function open2fa() {
+  twofaCode.value = ''
+  try {
+    const st = await api.auth2faStatus()
+    twofaEnabled.value = !!st.enabled
+    if (!st.enabled) {
+      const s = await api.auth2faSetup()
+      twofaSecret.value = s.secret
+      twofaQr.value = s.qr
+    }
+  } catch (e: any) { toast('加载失败：' + (e?.message || e), true) }
+  openModal('modal2fa')
+}
+
+async function enable2fa() {
+  try {
+    await api.auth2faEnable(twofaSecret.value, twofaCode.value.trim())
+    twofaEnabled.value = true
+    closeModal('modal2fa')
+    toast('两步验证已开启，下次登录需要输入动态码')
+  } catch (e: any) { toast('启用失败：' + (e?.message || e), true) }
+}
+
+async function disable2fa() {
+  try {
+    await api.auth2faDisable(twofaCode.value.trim())
+    twofaEnabled.value = false
+    closeModal('modal2fa')
+    toast('两步验证已关闭')
+  } catch (e: any) { toast('关闭失败：' + (e?.message || e), true) }
+}
+
 const nType = ref('tcp')
 const tomlText = ref('')
 const tomlId = ref('')
@@ -510,7 +547,7 @@ setInterval(() => refresh(true), 2500)
           <path d="M10 42H62" stroke="#35E0C8" stroke-width="4.6" stroke-linecap="round"/>
           <circle cx="10" cy="42" r="3.8" fill="#35E0C8"/><circle cx="62" cy="42" r="3.8" fill="#35E0C8"/>
         </svg>
-        <span class="wm">LUMO</span><span class="cn">客户端</span>
+        <span class="wm">LUMO·C</span><span class="cn">客户端</span>
       </div>
 
       <div class="nav-label">工作区</div>
@@ -642,6 +679,13 @@ setInterval(() => refresh(true), 2500)
                 <div class="kv"><span>版本</span><b>v{{ info?.version || '—' }}</b></div>
               </div>
               <p class="setnote">外观主题在左侧栏底部切换（跟随系统 / 日间 / 黑夜）。</p>
+              <div class="sec" style="padding-top:10px"><span>账号安全</span></div>
+              <div class="setcard">
+                <div class="kv"><span>两步验证（2FA）</span>
+                  <button class="btn ghost sm" @click="open2fa">{{ twofaEnabled ? '管理' : '开启 2FA' }}</button>
+                </div>
+                <p class="setnote" style="margin:0">开启后，控制台登录需要输入令牌 App 的 6 位动态验证码。客户端控制台的 2FA 与服务端相互独立，扫码后手机上显示为 LUMO:C。</p>
+              </div>
             </div>
             <div v-show="detailSection === 'server'">
             <div class="sec"><span>连接信息</span><span class="flex1"></span><span class="sechint">对应 lumoc.toml 基础段</span></div>
@@ -881,6 +925,35 @@ setInterval(() => refresh(true), 2500)
         <button class="btn ghost" @click="closeModal('modalNew')">取消</button>
         <button class="btn" @click="createAndConnect">保存并连接</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 账号安全（2FA） -->
+  <div class="overlay" id="modal2fa">
+    <div class="modal sm">
+      <div class="mhead">
+        <div class="txt"><h3>账号安全 · 两步验证</h3><p>用令牌 App（如 Google Authenticator）扫码绑定，登录时需输入 6 位动态码</p></div>
+        <button class="mclose" @click="closeModal('modal2fa')">✕</button>
+      </div>
+      <template v-if="twofaEnabled">
+        <p class="setnote">两步验证已启用。输入当前动态码即可关闭。</p>
+        <div class="field"><label>动态验证码</label><input v-model="twofaCode" class="mono" maxlength="6" placeholder="6 位数字"></div>
+        <div class="mfoot"><span class="spacer"></span>
+          <button class="btn ghost" @click="closeModal('modal2fa')">取消</button>
+          <button class="btn danger" @click="disable2fa">关闭两步验证</button>
+        </div>
+      </template>
+      <template v-else>
+        <div class="qrwrap" v-html="twofaQr"></div>
+        <p class="setnote" style="text-align:center;margin:0">扫码添加，或手动输入密钥：<b class="mono">{{ twofaSecret }}</b></p>
+        <div class="field" style="margin-top:12px"><label>输入 App 显示的 6 位动态码以启用</label>
+          <input v-model="twofaCode" class="mono" maxlength="6" placeholder="6 位数字">
+        </div>
+        <div class="mfoot"><span class="spacer"></span>
+          <button class="btn ghost" @click="closeModal('modal2fa')">取消</button>
+          <button class="btn" :disabled="!twofaCode" @click="enable2fa">启用两步验证</button>
+        </div>
+      </template>
     </div>
   </div>
 
