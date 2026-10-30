@@ -43,22 +43,24 @@ a{color:inherit;text-decoration:none}
 }
 
 /* ---------------- 容器 ---------------- */
+/* 登录页铺满视口：不再做成居中悬浮卡片，避免四周留出大片底色。 */
 .wrap{
   position:relative;z-index:1;
-  min-height:100vh;min-height:100dvh;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:18px;padding:40px 20px;
+  height:100vh;height:100dvh;
+  display:flex;flex-direction:column;
+  gap:0;padding:0;
+  overflow:hidden;
 }
 
 /* ============================================================
    横屏主体：左品牌 / 右表单
    ============================================================ */
 .window{
-  width:100%;max-width:740px;
-  display:grid;grid-template-columns:300px minmax(0,1fr);
-  background:var(--panel);border:1px solid var(--line);border-radius:22px;
+  flex:1 1 auto;min-height:0;
+  width:100%;max-width:none;
+  display:grid;grid-template-columns:minmax(360px,34%) minmax(0,1fr);
+  background:var(--panel);border:0;border-radius:0;
   overflow:hidden;
-  animation:rise .4s cubic-bezier(.22,.68,.28,1) both;
 }
 @keyframes rise{from{transform:translateY(9px)}to{transform:none}}
 
@@ -95,7 +97,9 @@ a{color:inherit;text-decoration:none}
 .brandtag{font-size:11px;letter-spacing:.6px;color:var(--tx-4);text-align:center}
 
 /* ---------- 右：表单 ---------- */
-.formside{padding:30px 32px;display:flex;flex-direction:column;justify-content:center}
+/* 内容居中并限制宽度：全屏时输入框不会被拉得过长 */
+.formside{padding:30px 32px;display:flex;flex-direction:column;justify-content:center;align-items:center}
+.formside > *{width:100%;max-width:420px}
 .formside h1{
   margin:0 0 20px;font-size:19px;font-weight:700;letter-spacing:.5px;
   text-align:center;
@@ -181,6 +185,7 @@ a{color:inherit;text-decoration:none}
 
 /* ---------------- 页脚 ---------------- */
 .foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;
+  padding:12px 16px;flex:0 0 auto;
   font-size:11px;color:var(--tx-4)}
 .foot a:hover{color:var(--tx-2)}
 .foot .sep{width:1px;height:9px;background:#232C3C}
@@ -192,12 +197,13 @@ a{color:inherit;text-decoration:none}
    竖屏 / 窄屏：左栏收到顶部
    ============================================================ */
 @media (max-width:760px){
-  .wrap{padding:28px 16px;gap:16px}
-  .window{grid-template-columns:1fr;max-width:420px;border-radius:20px}
+  .wrap{padding:0;gap:0}
+  .window{grid-template-columns:1fr;max-width:none;border-radius:0}
   .brandside{
-    flex-direction:row;justify-content:center;align-items:center;gap:10px;
+    flex:0 0 auto;flex-direction:row;justify-content:center;align-items:center;gap:10px;
     padding:20px 18px;border-right:0;border-bottom:1px solid var(--line-2);
   }
+  .brandside .pitch,.brandside .feats,.brandside .brandfoot{display:none}
   .brandside .mark{width:26px;height:26px}
   .brandname{font-size:15px;letter-spacing:2.6px;text-indent:2.6px}
   .brandcn{font-size:11px;letter-spacing:1.6px;text-indent:1.6px}
@@ -209,7 +215,7 @@ a{color:inherit;text-decoration:none}
   .formside{padding:20px 18px 22px}
 }
 @media (max-height:660px) and (min-width:761px){
-  .wrap{padding:20px}
+  .wrap{padding:0}
   .brandside{padding:24px}
   .formside{padding:22px 28px}
   .formside h1{margin-bottom:14px}
