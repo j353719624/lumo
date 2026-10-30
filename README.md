@@ -1,5 +1,12 @@
 # LUMO
 
+**English** | [简体中文](README.zh-CN.md)
+
+<p align="center">
+  <img src="docs/login.png" width="49%" alt="Sign in">
+  <img src="docs/console.png" width="49%" alt="Client console">
+</p>
+
 LUMO is a self-contained reverse-tunneling tool: it exposes services behind NAT or a firewall on the
 public internet. The server `lumos` runs on a host with a public IP, the client `lumoc` runs inside your
 network; they build a control channel over an authenticated handshake and open data connections on demand.
