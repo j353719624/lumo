@@ -189,7 +189,7 @@ LUMO is open for collaboration:
 
 - Bugs and feature requests: [Issues](../../issues)
 - Development setup and PR flow: [CONTRIBUTING.md](CONTRIBUTING.md)
-- fnOS client package: [lumo-fpk](https://github.com/j353719624/lumo-fpk)
+- fnOS packages (client and server): [lumo-fpk](https://github.com/j353719624/lumo-fpk)
 
 ## License
 

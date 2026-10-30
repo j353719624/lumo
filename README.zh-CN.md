@@ -184,7 +184,7 @@ LUMO 开放共创：
 
 - 缺陷与需求：[Issues](../../issues)
 - 开发环境与 PR 流程：[CONTRIBUTING.md](CONTRIBUTING.md)
-- 飞牛 fnOS 客户端安装包：[lumo-fpk](https://github.com/j353719624/lumo-fpk)
+- 飞牛 fnOS 应用包（客户端与服务端）：[lumo-fpk](https://github.com/j353719624/lumo-fpk)
 
 ## 许可
 
