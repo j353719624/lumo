@@ -54,7 +54,7 @@ func New(store *Store) *Manager {
 	mgr := &Manager{
 		store:    store,
 		runs:     map[string]*run{},
-		sessions: auth.NewSessions(7 * 24 * time.Hour),
+		sessions: auth.NewSessions(5 * time.Minute), // 滑动过期：有操作就续期，闲置 5 分钟退出
 		limiter:  auth.NewLimiter(10 * time.Minute),
 	}
 	mgr.loadTwoFA()
@@ -101,6 +101,9 @@ func (m *Manager) Run(addr, user, pass string) error {
 	mux.HandleFunc("GET /login", m.loginPage)
 	mux.Handle("POST /api/login", http.HandlerFunc(m.apiLogin))
 	mux.Handle("GET /logout", http.HandlerFunc(m.apiLogout))
+	// 桌面窗口/浏览器标签关闭时前端 sendBeacon 调用（与服务端控制台一致）：
+	// 会话进入 10s 宽限，期间有请求即恢复（刷新页面无感），无请求则到点失效
+	mux.HandleFunc("POST /api/session/detach", m.apiSessionDetach)
 	// 换会话的端点必须免 guard：调用者此刻只有短期票据，还没有会话；
 	// 票据本身一次性且 2 分钟过期，外加登录限流兜底
 	mux.Handle("POST /api/login/2fa", http.HandlerFunc(m.apiLogin2FA))

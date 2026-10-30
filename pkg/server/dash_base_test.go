@@ -86,3 +86,24 @@ func TestDashWithoutBaseKeepsLegacyBehaviour(t *testing.T) {
 		t.Fatalf("root redirect %d %q, want 302 /login", rec.Code, rec.Header().Get("Location"))
 	}
 }
+
+// 面板数据面必须全部过认证：未登录访问一律 401（此前 serverinfo/proxies/
+// logs/config 四条漏挂 guard，能匿名读取甚至改配置）。
+func TestDashDataEndpointsRequireAuth(t *testing.T) {
+	s := newDashTestServer("")
+	h := dashHandler(s)
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodGet, "/api/serverinfo"},
+		{http.MethodGet, "/api/proxies"},
+		{http.MethodGet, "/api/logs"},
+		{http.MethodPost, "/api/config"},
+		{http.MethodGet, "/api/profile/2fa"},
+	} {
+		req := httptest.NewRequest(tc.method, tc.path, nil)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("%s %s: %d, want 401", tc.method, tc.path, rec.Code)
+		}
+	}
+}

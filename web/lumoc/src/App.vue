@@ -14,6 +14,12 @@ function closeLangMenu(e: MouseEvent) {
   if (!(e.target as HTMLElement).closest('.langsel')) langOpen.value = false
 }
 onMounted(() => document.addEventListener('click', closeLangMenu as EventListener))
+// 关闭窗口即注销：页面卸载时通知服务端把会话置为分离态——10s 内有请求会自动
+// 恢复（刷新页面无感），之后没有请求则到点失效；闲置 5 分钟服务端也会过期
+window.addEventListener('pagehide', () => {
+    try { navigator.sendBeacon('api/session/detach') } catch { /* 忽略 */ }
+})
+
 onBeforeUnmount(() => document.removeEventListener('click', closeLangMenu as EventListener))
 
 /* ---------------- 状态 ---------------- */

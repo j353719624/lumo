@@ -582,6 +582,13 @@ function typeClass(t: string) {
   return ['tcp', 'udp', 'http', 'https', 'mux', 'sealed-tcp', 'sealed-udp'].includes(t) ? 't-' + t : 't-tcp'
 }
 
+
+// 关闭窗口即注销：页面卸载时通知服务端把会话置为分离态——10s 内有请求会自动
+// 恢复（刷新页面无感），之后没有请求则到点失效；闲置 5 分钟服务端也会过期
+window.addEventListener('pagehide', () => {
+    try { navigator.sendBeacon('api/session/detach') } catch { /* 忽略 */ }
+})
+
 onMounted(async () => {
   await maskHost()
   poll()

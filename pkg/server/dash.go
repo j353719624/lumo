@@ -82,15 +82,20 @@ func (s *Server) runDash() {
 	mux.HandleFunc("POST /api/login/2fa", s.apiLogin2FA)
 	mux.Handle("GET /api/token/new", s.guard(http.HandlerFunc(s.apiTokenNew)))
 	mux.HandleFunc("GET /logout", s.apiLogout)
-	mux.HandleFunc("/api/profile/2fa", s.api2FAStatus)
+	// 桌面窗口/浏览器标签关闭时前端 sendBeacon 调用：会话进入 10s 宽限，
+	// 期间有请求即恢复（刷新页面无感），无请求则到点失效
+	mux.HandleFunc("POST /api/session/detach", s.apiSessionDetach)
+	mux.Handle("/api/profile/2fa", s.guard(http.HandlerFunc(s.api2FAStatus)))
 	mux.HandleFunc("POST /api/profile/2fa/setup", s.api2FASetup)
 	mux.HandleFunc("POST /api/profile/2fa/enable", s.api2FAEnable)
 	mux.HandleFunc("POST /api/profile/2fa/disable", s.api2FADisable)
 	mux.Handle("POST /api/test-conn", s.guard(http.HandlerFunc(s.apiTestConn)))
-	mux.HandleFunc("/api/serverinfo", s.apiServerInfo)
-	mux.HandleFunc("POST /api/config", s.apiSaveConfig)
-	mux.HandleFunc("/api/proxies", s.apiProxies)
-	mux.HandleFunc("/api/logs", s.apiLogs)
+	// 这四条是面板的数据面：必须过 guard，否则任何能连到面板端口的人
+	// 都能读流量/日志，甚至 POST /api/config 直接改端口、轮换令牌
+	mux.Handle("/api/serverinfo", s.guard(http.HandlerFunc(s.apiServerInfo)))
+	mux.Handle("POST /api/config", s.guard(http.HandlerFunc(s.apiSaveConfig)))
+	mux.Handle("/api/proxies", s.guard(http.HandlerFunc(s.apiProxies)))
+	mux.Handle("/api/logs", s.guard(http.HandlerFunc(s.apiLogs)))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
@@ -266,6 +271,14 @@ func (s *Server) apiLogout(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Path: "/", MaxAge: -1})
 	http.Redirect(w, r, s.link("/login"), http.StatusFound)
+}
+
+// apiSessionDetach marks the caller's session detached; see auth.Sessions.
+func (s *Server) apiSessionDetach(w http.ResponseWriter, r *http.Request) {
+	if c, err := r.Cookie(sessionCookie); err == nil {
+		s.webSessions.Detach(c.Value)
+	}
+	writeOK(w)
 }
 
 // api2FAStatus reports whether two-factor login is enabled and how many

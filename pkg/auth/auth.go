@@ -9,16 +9,30 @@ import (
 	"time"
 )
 
-// Sessions is a tiny in-memory cookie session store.
+// detachGrace is how long a detached session (desktop window closed, page
+// unloading) stays valid. Within the grace window any request re-attaches
+// the session — that is what makes a page refresh seamless; once the grace
+// passes with no activity the session is dead, which is what makes closing
+// the window a logout.
+const detachGrace = 10 * time.Second
+
+type sessionEntry struct {
+	exp      time.Time
+	detached time.Time // zero while the session is attached
+}
+
+// Sessions is a tiny in-memory cookie session store with a sliding TTL:
+// every validated request pushes the expiry out again.
 type Sessions struct {
 	mu  sync.Mutex
 	ttl time.Duration
-	m   map[string]time.Time
+	m   map[string]*sessionEntry
 }
 
-// NewSessions creates a store whose sessions expire after ttl.
+// NewSessions creates a store whose sessions expire ttl after the last
+// validated request.
 func NewSessions(ttl time.Duration) *Sessions {
-	return &Sessions{ttl: ttl, m: map[string]time.Time{}}
+	return &Sessions{ttl: ttl, m: map[string]*sessionEntry{}}
 }
 
 // Issue creates a new session token.
@@ -27,28 +41,64 @@ func (s *Sessions) Issue() string {
 	_, _ = rand.Read(b)
 	tok := hex.EncodeToString(b)
 	s.mu.Lock()
-	s.m[tok] = time.Now().Add(s.ttl)
+	s.m[tok] = &sessionEntry{exp: time.Now().Add(s.ttl)}
 	s.mu.Unlock()
 	return tok
 }
 
 // Valid reports whether the token exists and has not expired; expired
-// entries are dropped lazily.
+// entries are dropped lazily. A detached session (window closed) is only
+// valid inside the detach grace window, and any validated request
+// re-attaches it — activity keeps the session alive.
 func (s *Sessions) Valid(tok string) bool {
 	if tok == "" {
 		return false
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	exp, ok := s.m[tok]
+	e, ok := s.m[tok]
 	if !ok {
 		return false
 	}
-	if time.Now().After(exp) {
+	now := time.Now()
+	if now.After(e.exp) {
 		delete(s.m, tok)
 		return false
 	}
+	if !e.detached.IsZero() {
+		if now.Sub(e.detached) > detachGrace {
+			delete(s.m, tok)
+			return false
+		}
+		e.detached = time.Time{}
+	}
+	e.exp = now.Add(s.ttl)
 	return true
+}
+
+// Detach marks the session as detached (its window is going away). The
+// session stays valid only for the grace window unless activity re-attaches
+// it, so closing a console window ends the login shortly after.
+func (s *Sessions) Detach(tok string) {
+	if tok == "" {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if e, ok := s.m[tok]; ok {
+		e.detached = time.Now()
+	}
+}
+
+// DetachedAt reports when the session was detached (zero while attached or
+// unknown). Test/introspection helper.
+func (s *Sessions) DetachedAt(tok string) time.Time {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if e, ok := s.m[tok]; ok {
+		return e.detached
+	}
+	return time.Time{}
 }
 
 // Revoke removes one session.

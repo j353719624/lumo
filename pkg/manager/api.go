@@ -169,6 +169,14 @@ func (m *Manager) apiLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, m.link("/login"), http.StatusFound)
 }
 
+// apiSessionDetach marks the caller's session detached; see auth.Sessions.
+func (m *Manager) apiSessionDetach(w http.ResponseWriter, r *http.Request) {
+	if c, err := r.Cookie(sessionCookie); err == nil {
+		m.sessions.Detach(c.Value)
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
 // consoleFS exposes the embedded client console assets.
 var consoleFS = http.FS(lumocweb.EmbedFS)
 
