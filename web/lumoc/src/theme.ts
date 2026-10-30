@@ -1,4 +1,5 @@
-// Theme bootstrap: an explicit choice wins, otherwise follow the OS setting.
+// Theme bootstrap: 已选的偏好优先；默认日间模式（浅色）。
+// 想跟随系统或固定深色，可在侧栏的主题按钮里切换。
 export type Theme = 'dark' | 'light'
 export type ThemePref = Theme | 'auto'
 const KEY = 'lumo-theme'
@@ -12,7 +13,7 @@ export function getThemePref(): ThemePref {
     const v = localStorage.getItem(KEY)
     if (v === 'light' || v === 'dark' || v === 'auto') return v
   } catch { /* private mode */ }
-  return 'auto'
+  return 'light'
 }
 
 export function applyThemePref(pref: ThemePref): Theme {

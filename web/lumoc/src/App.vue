@@ -143,7 +143,9 @@ let toastTimer: number | undefined
 const uid = () => Math.random().toString(36).slice(2, 10)
 const startNow = ref(true)
 const nProto = ref('tcp')
-const consoleHost = location.host || '本机'
+// 侧栏底部显示本机内网地址（后端算好的 内网IP:控制台端口）。
+// 不用 location.host：经网关或反代访问时那是外部地址，对使用者没意义。
+const consoleHost = computed(() => info.value?.addr || location.host || "本机")
 const clone = (o: any) => JSON.parse(JSON.stringify(o))
 
 function toast(msg: string, bad = false) {

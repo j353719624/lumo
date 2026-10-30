@@ -58,6 +58,7 @@ export interface EngineInfo {
   engineBin: string
   dataDir: string
   port: string
+  addr?: string // 本机内网 IP:控制台端口
 }
 
 async function json<T>(res: Response): Promise<T> {

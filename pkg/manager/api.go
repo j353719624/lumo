@@ -386,7 +386,38 @@ func (m *Manager) apiInfo(w http.ResponseWriter, _ *http.Request) {
 		"engineBin": "独立引擎进程（每配置一个）",
 		"dataDir":   m.store.path,
 		"port":      m.consolePort,
+		"addr":      m.consoleAddr(),
 	})
+}
+
+// consoleAddr reports the address this machine itself uses to serve the
+// console: 内网 IP + 控制台端口. The browser may be reaching us through a
+// reverse proxy or the app gateway, so location.host is not what we want to
+// show — this is the address that works from the local network.
+func (m *Manager) consoleAddr() string {
+	if m.consolePort == "" {
+		return ""
+	}
+	return net.JoinHostPort(localIPv4(), m.consolePort)
+}
+
+// localIPv4 returns the first non-loopback IPv4 of this host, or "127.0.0.1"
+// when the machine has none (e.g. IPv6-only or isolated netns).
+func localIPv4() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "127.0.0.1"
+	}
+	for _, a := range addrs {
+		ipn, ok := a.(*net.IPNet)
+		if !ok || ipn.IP.IsLoopback() {
+			continue
+		}
+		if v4 := ipn.IP.To4(); v4 != nil {
+			return v4.String()
+		}
+	}
+	return "127.0.0.1"
 }
 
 // renderToml produces the lumoc.toml equivalent of a stored config.
