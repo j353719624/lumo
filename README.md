@@ -153,4 +153,6 @@ LUMO 是开放源码项目，欢迎一起完善：
 
 ## 许可证
 
-Apache License 2.0，见 [LICENSE](LICENSE)。
+**PolyForm Noncommercial License 1.0.0** —— 可自由学习、使用、修改、分发，**不可用于商业用途**。
+
+商用需取得作者授权，范围与方式见 [LICENSING.md](LICENSING.md)；许可全文见 [LICENSE](LICENSE)。
