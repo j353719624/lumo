@@ -737,6 +737,11 @@ func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.cfg.Revision++
+	// 首次成功保存即锁定面板：此后端口与令牌只能登录服务器改 lumos.toml。
+	// 面板的警告横幅承诺了这个行为，保存路径必须兑现它。
+	if !s.cfg.ConfigLocked {
+		s.cfg.ConfigLocked = true
+	}
 	// 写回 toml（校验失败则跳过，绝不写出无法登录的配置）
 	if s.cfgPath != "" && (s.cfg.AuthPubKey != "" || s.cfg.AuthToken != "") {
 		_ = config.SaveServer(s.cfgPath, s.cfg)

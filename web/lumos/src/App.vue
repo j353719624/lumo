@@ -8,7 +8,6 @@ import {
 } from './api'
 
 /* ---------------- 状态 ---------------- */
-const PAGE_SIZE = 6
 const MAX_EVENTS = 200
 const MAX_SAMPLES = 60
 
@@ -66,10 +65,40 @@ const filteredProxies = computed(() => {
   })
 })
 
-const pageCount = computed(() => Math.max(1, Math.ceil(filteredProxies.value.length / PAGE_SIZE)))
+// 每页行数自适应：量出表格可用高度，按实际行高换算，而不是固定 6 条。
+// 仪表盘模板在首份数据到达前不渲染，因此 observer 在首次成功测量时才挂上。
+const pageSize = ref(6)
+let tableResize: ResizeObserver | null = null
+let observedTable: HTMLElement | null = null
+function recalcPageSize() {
+  const table = document.querySelector('#proxies .table') as HTMLElement | null
+  if (!table) return
+  if (tableResize && observedTable !== table) {
+    tableResize.disconnect()
+    tableResize = null
+  }
+  if (!tableResize) {
+    tableResize = new ResizeObserver(recalcPageSize)
+    tableResize.observe(table)
+    observedTable = table
+  }
+  const head = table.querySelector('.phead-row') as HTMLElement | null
+  const row = table.querySelector('.prow') as HTMLElement | null
+  const rh = Math.max(row ? row.getBoundingClientRect().height : 0, 42)
+  const avail = table.clientHeight - (head ? head.offsetHeight : 0) - 6
+  if (avail <= 0 || rh <= 0) return
+  pageSize.value = Math.min(100, Math.max(4, Math.floor(avail / rh)))
+}
+
+const pageCount = computed(() => Math.max(1, Math.ceil(filteredProxies.value.length / pageSize.value)))
 const page = computed(() => Math.min(filter.value.page, pageCount.value))
 const pageSlice = computed(() =>
-  filteredProxies.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE))
+  filteredProxies.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value))
+// 数据首次到达（0→N 行）时表格才真正渲染出来，flush:'post' 保证量的是更新后的 DOM
+// 首份数据到达与 boot 屏切换到仪表盘时各量一次（booted 在日志请求后才置位，
+// 仅盯数据长度会在模板渲染前触发，量不到东西）；过滤结果变化同理
+watch(() => filteredProxies.value.length, () => recalcPageSize(), { flush: 'post' })
+watch(booted, () => recalcPageSize(), { flush: 'post' })
 const pageInfo = computed(() =>
   t('pager.info', String(filteredProxies.value.length), String(page.value), String(pageCount.value)))
 const pagerPages = computed(() => Array.from({ length: Math.min(pageCount.value, 5) }, (_, i) => i + 1))
@@ -559,11 +588,19 @@ onMounted(async () => {
   pollTimer = window.setInterval(poll, apiCfg.interval)
   window.addEventListener('click', closeMenu as EventListener)
   window.addEventListener('resize', closeMenu as EventListener)
+  window.addEventListener('resize', recalcPageSize)
+  // 表格随视口伸缩（面板高度由 grid 决定），行高也会因换行而变化；
+  // 模板未渲染时挂不上 observer，recalcPageSize 里会自挂载
+  window.addEventListener('resize', recalcPageSize)
+  requestAnimationFrame(() => requestAnimationFrame(recalcPageSize))
 })
 onBeforeUnmount(() => {
   clearInterval(pollTimer)
   window.removeEventListener('click', closeMenu as EventListener)
   window.removeEventListener('resize', closeMenu as EventListener)
+  window.removeEventListener('resize', recalcPageSize)
+  tableResize?.disconnect()
+  tableResize = null
 })
 function closeMenu(e: MouseEvent) {
   const target = e.target as HTMLElement
