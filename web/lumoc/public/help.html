@@ -139,7 +139,7 @@
       <tr><td>NAS 管理页</td><td><code>127.0.0.1:5000</code></td><td><code>15000</code></td><td><code>http://服务器IP:15000</code></td></tr>
       <tr><td>Windows 远程桌面</td><td><code>10.0.0.8:3389</code></td><td><code>15001</code></td><td>远程桌面客户端连 <code>服务器IP:15001</code></td></tr>
       <tr><td>家庭网站</td><td><code>127.0.0.1:8080</code></td><td>域名 <code>home.example.com</code></td><td><code>http://home.example.com</code>（需 HTTP 代理）</td></tr>
-      <tr><td>不想暴露公网的服务</td><td><code>127.0.0.1:5000</code></td><td>sealed-tcp + 密钥</td><td>用「访问端」在本机生成入口，不占公网端口</td></tr>
+      <tr><td>不想暴露公网的服务</td><td><code>127.0.0.1:5000</code></td><td>密钥隧道</td><td>用「访问端」在本机生成入口，不占公网端口</td></tr>
     </table>
   </section>
 
@@ -147,7 +147,7 @@
     <h2>安全建议</h2>
     <ul>
       <li><b>TLS 传输加密</b>保持开启（连接配置里默认开启）。</li>
-      <li>敏感服务不要用普通 TCP 暴露公网，改用 <b>sealed-tcp / sealed-udp</b>：凭密钥连接，公网上没有入口。</li>
+      <li>敏感服务不要用普通 TCP 暴露公网，改用 <b>密钥隧道</b>：凭密钥连接，公网上没有入口。</li>
       <li>给两个控制台都<b>开启 2FA</b>；认证令牌只在生成时显示一次，换设备需重新生成。</li>
       <li>服务端可设置「允许端口段」，限制客户端能占用的公网端口范围。</li>
     </ul>

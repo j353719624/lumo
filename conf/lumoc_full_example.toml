@@ -45,3 +45,27 @@ remotePort = 6022
 # localIP = "127.0.0.1"
 # localPort = 8443
 # customDomains = ["secure.example.com"]
+
+# 密钥隧道（sealed-tcp）：只凭密钥接入，服务端不占公网端口。
+# [[proxies]]
+# name = "nas-admin"
+# type = "sealed-tcp"
+# localIP = "127.0.0.1"
+# localPort = 5666
+# sk = "换成你自己的长密钥"
+
+# 密钥隧道（sealed-udp）：同 sealed-tcp，但走 UDP 通道。
+# [[proxies]]
+# name = "nas-dns"
+# type = "sealed-udp"
+# localIP = "127.0.0.1"
+# localPort = 53
+# sk = "换成你自己的长密钥"
+
+# 打洞直连（punch）：双方先交换公网地址并打洞，失败时自动回落到服务端中继。
+# [[proxies]]
+# name = "p2p"
+# type = "punch"
+# localIP = "127.0.0.1"
+# localPort = 8080
+# sk = "换成你自己的长密钥"

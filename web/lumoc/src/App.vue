@@ -813,9 +813,9 @@ setInterval(() => refresh(true), 2500)
                 <select :value="m.type" @change="setMappingType(m, ($event.target as HTMLSelectElement).value)">
                   <option value="tcp">TCP</option><option value="udp">UDP</option>
                   <option value="http">HTTP</option><option value="https">HTTPS</option>
-                  <option value="sealed-tcp">sealed-tcp</option><option value="sealed-udp">sealed-udp</option>
+                  <option value="sealed-tcp">密钥隧道 TCP</option><option value="sealed-udp">密钥隧道 UDP</option>
                   <option value="punch">{{ t('c.mp.punch') }}</option>
-                  <option value="mux">MUX</option>
+                  <option value="mux">多路复用</option>
                 </select>
                 <input class="local" :value="(m.localIP || '127.0.0.1') + ':' + (m.localPort || '')" :aria-label="t('c.sv.addr')" @input="updateLocal(m, ($event.target as HTMLInputElement).value)">
                 <div class="mapto">
@@ -848,7 +848,7 @@ setInterval(() => refresh(true), 2500)
               <div v-for="(v, idx) in visitorList(draft)" :key="v.id" class="map">
                 <input class="mname" v-model="v.name" :placeholder="t('c.mp.namePh')" :aria-label="t('c.mp.namePh')">
                 <select v-model="v.type" :aria-label="t('c.nav.visitors')">
-                  <option value="sealed-tcp">sealed-tcp</option><option value="sealed-udp">sealed-udp</option><option value="punch">{{ t('c.mp.punch') }}</option>
+                  <option value="sealed-tcp">密钥隧道 TCP</option><option value="sealed-udp">密钥隧道 UDP</option><option value="punch">{{ t('c.mp.punch') }}</option>
                 </select>
                 <input class="local" v-model="v.serverName" :placeholder="t('c.vi.targetPh')" :aria-label="t('c.vi.targetPh')">
                 <input class="msk" v-model="v.sk" :placeholder="t('c.mp.sk')" :aria-label="t('c.mp.sk')">
@@ -971,9 +971,9 @@ setInterval(() => refresh(true), 2500)
         <select class="mtype" v-model="nType">
           <option value="tcp">TCP</option><option value="udp">UDP</option>
           <option value="http">HTTP</option><option value="https">HTTPS</option>
-          <option value="sealed-tcp">sealed-tcp</option><option value="sealed-udp">sealed-udp</option>
+          <option value="sealed-tcp">密钥隧道 TCP</option><option value="sealed-udp">密钥隧道 UDP</option>
           <option value="punch">{{ t('c.mp.punch') }}</option>
-          <option value="mux">MUX</option>
+          <option value="mux">多路复用</option>
         </select>
         <input class="local" placeholder="127.0.0.1:5000">
         <div class="mapto"><span style="color:#5A7BFF">→</span>
