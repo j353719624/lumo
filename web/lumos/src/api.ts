@@ -87,7 +87,8 @@ async function get<T>(path: string): Promise<T> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), cfg.timeout)
   try {
-    const res = await fetch(cfg.base.replace(/\/$/, '') + path, {
+    const p = path.replace(/^\/+/, '')
+    const res = await fetch(cfg.base ? cfg.base.replace(/\/$/, '') + '/' + p : p, {
       headers: headers(),
       credentials: 'include',
       signal: ctrl.signal,
@@ -222,7 +223,7 @@ export async function logs(level: string, limit: number): Promise<LogEntry[]> {
 
 export async function health(): Promise<boolean> {
   try {
-    const res = await fetch(cfg.base.replace(/\/$/, '') + '/healthz', { credentials: 'include' })
+    const res = await fetch(cfg.base ? cfg.base.replace(/\/$/, '') + '/healthz' : 'healthz', { credentials: 'include' })
     return res.ok
   } catch {
     return false

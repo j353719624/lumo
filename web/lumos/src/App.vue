@@ -142,7 +142,7 @@ async function poll() {
     connected.value = true
     healthOk.value = await health()
   } catch (err: any) {
-    if (err?.status === 401) { location.href = '/login'; return }
+    if (err?.status === 401) { location.href = 'login'; return }
     connected.value = false
     healthOk.value = null
     booted.value = true
@@ -204,7 +204,7 @@ const authFp = computed(() => (info.value as any)?.authFp || '')
 
 async function generateToken() {
   try {
-    const r = await fetch('/api/token/new')
+    const r = await fetch('api/token/new')
     const d = await r.json()
     if (d.token) {
       srvCfg.value.authToken = d.token
@@ -281,7 +281,7 @@ async function saveServerConfig() {
   savingCfg.value = true
   savedCfg.value = clone(srvCfg.value)
   try {
-    const res = await fetch('/api/config', {
+    const res = await fetch('api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...srvCfg.value, webPort: undefined, webPassword: undefined }),
@@ -308,7 +308,7 @@ async function saveServerConfig() {
 }
 
 function logout() {
-  fetch('/logout').then(() => { location.href = '/login' })
+  fetch('logout').then(() => { location.href = 'login' })
 }
 
 /* ---------------- 语言切换 ---------------- */
@@ -339,7 +339,7 @@ async function open2FA() {
   tfaUri.value = ''
   tfaQr.value = ''
   try {
-    const res = await fetch('/api/profile/2fa')
+    const res = await fetch('api/profile/2fa')
     const d = await res.json()
     tfaCount.value = Number(d.count) || 0
     if (res.ok && !d.enabled) {
@@ -355,7 +355,7 @@ async function open2FA() {
 
 async function refreshTfaCount() {
   try {
-    const res = await fetch('/api/profile/2fa')
+    const res = await fetch('api/profile/2fa')
     const d = await res.json()
     tfaCount.value = Number(d.count) || 0
     return tfaCount.value
@@ -376,7 +376,7 @@ function backFromAdd() {
 
 async function loadSetup() {
   try {
-    const res = await fetch('/api/profile/2fa/setup', { method: 'POST' })
+    const res = await fetch('api/profile/2fa/setup', { method: 'POST' })
     const d = await res.json()
     if (res.ok) {
       tfaSecret.value = d.secret
@@ -398,7 +398,7 @@ async function bind2FA() {
   }
   tfaBusy.value = true
   try {
-    const res = await fetch('/api/profile/2fa/enable', {
+    const res = await fetch('api/profile/2fa/enable', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ secret: tfaSecret.value, code: tfaCode.value.trim() }),
@@ -433,7 +433,7 @@ async function unbindEntry(index: number) {
   }
   tfaBusy.value = true
   try {
-    const res = await fetch('/api/profile/2fa/disable', {
+    const res = await fetch('api/profile/2fa/disable', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code: tfaCode.value.trim(), index }),

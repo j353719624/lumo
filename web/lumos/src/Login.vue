@@ -65,7 +65,7 @@ async function submit() {
 
   try {
     if (!twoFAStep.value) {
-      const res = await fetch('/api/login', {
+      const res = await fetch('api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ account: acc, password: pass }),
@@ -87,7 +87,7 @@ async function submit() {
       state.value = 'idle'
       showError(d.error || '×')
     } else {
-      const res = await fetch('/api/login/2fa', {
+      const res = await fetch('api/login/2fa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ticket: twoFATicket.value, code: otpCode.value.trim() }),
@@ -110,7 +110,7 @@ async function submit() {
 function finish(acc: string) {
   state.value = 'done'
   successShow.value = true
-  setTimeout(() => { location.href = '/' }, 350)
+  setTimeout(() => { location.href = './' }, 350)
 }
 
 </script>

@@ -35,7 +35,7 @@ type Server struct {
 	cfg   *config.ServerConfig
 	start time.Time
 
-	ln       net.Listener
+	ln    net.Listener
 	muxLn net.Listener
 	// kcpLn hosts KCP (UDP) client sessions when kcpPort is configured.
 	kcpLn   *udpstream.Listener
@@ -62,7 +62,15 @@ type Server struct {
 	limiter     *auth.Limiter
 	tlsCert     *tls.Certificate
 	cfgPath     string
+	webBase     string // URL prefix when deployed behind a gateway (/app/lumo-server)
+	webSocket   string // unix socket for app-gateway desktop entries
 }
+
+// SetWebBase puts the console under a URL prefix (gateway-style deployments).
+func (s *Server) SetWebBase(base string) { s.webBase = strings.TrimSpace(base) }
+
+// SetWebSocket makes the console also listen on a unix socket.
+func (s *Server) SetWebSocket(path string) { s.webSocket = strings.TrimSpace(path) }
 
 type proxyMemEntry struct {
 	name       string

@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	"github.com/j353719624/lumo/pkg/token"
 	"github.com/j353719624/lumo/pkg/totp"
 	"github.com/j353719624/lumo/pkg/version"
+	"github.com/j353719624/lumo/pkg/webbase"
 	lumosweb "github.com/j353719624/lumo/web/lumos"
 )
 
@@ -93,16 +95,44 @@ func (s *Server) runDash() {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
-	mux.Handle("/", s.guard(serveConsole(http.FS(ui))))
+	mux.Handle("/", s.guard(serveConsole(http.FS(ui), s.webBase)))
 
+	// 前缀部署（fnOS 应用网关按 /app/lumo-server 转发）：接受带与不带
+	// 前缀两种形态的请求；外发链接始终带前缀。
+	var handler http.Handler = mux
+	if s.webBase != "" {
+		handler = webbase.New(s.webBase, mux)
+	}
 	addr := s.cfg.Web.Addr + ":" + strconv.Itoa(s.cfg.Web.Port)
-	srv := &http.Server{Addr: addr, Handler: mux}
+	srv := &http.Server{Addr: addr, Handler: handler}
 	s.dashSrv = srv
 	log.Infof("dashboard listening on :%d (user %s)", s.cfg.Web.Port, s.cfg.Web.User)
+
+	// unix socket 与 TCP 同时提供：socket 给应用网关（桌面入口），
+	// TCP 给局域网直连与排障。两者共用同一个 handler。
+	if s.webSocket != "" {
+		_ = os.Remove(s.webSocket)
+		if err := os.MkdirAll(filepath.Dir(s.webSocket), 0o755); err == nil {
+			if ln, err := net.Listen("unix", s.webSocket); err == nil {
+				_ = os.Chmod(s.webSocket, 0o660)
+				log.Infof("dashboard listening on unix://%s", s.webSocket)
+				go func() {
+					if err := srv.Serve(ln); err != nil && !s.closed.Load() {
+						log.Errorf("dashboard socket: %v", err)
+					}
+				}()
+			} else {
+				log.Errorf("dashboard socket: %v", err)
+			}
+		}
+	}
 	if err := srv.ListenAndServe(); err != nil && !s.closed.Load() {
 		log.Errorf("dashboard: %v", err)
 	}
 }
+
+// link builds a console URL that keeps the deployment prefix.
+func (s *Server) link(p string) string { return webbase.Link(s.webBase, p) }
 
 // guard enforces authentication: a session cookie or HTTP basic auth.
 // HTML pages redirect to /login; API calls receive 401.
@@ -123,7 +153,7 @@ func (s *Server) guard(next http.Handler) http.Handler {
 			failJSON(w, http.StatusUnauthorized, "未登录或会话已过期")
 			return
 		}
-		http.Redirect(w, r, "/login", http.StatusFound)
+		http.Redirect(w, r, s.link("/login"), http.StatusFound)
 	})
 }
 
@@ -146,7 +176,7 @@ func (s *Server) authed(r *http.Request, user, pass string) bool {
 // loginPage serves the login form; already-authenticated visitors go to /.
 func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
 	if s.authed(r, s.cfg.Web.User, s.cfg.Web.Password) {
-		http.Redirect(w, r, "/", http.StatusFound)
+		http.Redirect(w, r, s.link("/"), http.StatusFound)
 		return
 	}
 	b, err := fs.ReadFile(lumosweb.EmbedFS, "login.html")
@@ -154,6 +184,7 @@ func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "login page unavailable", http.StatusInternalServerError)
 		return
 	}
+	b = webbase.InjectBase(b, s.webBase)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write(b)
 }
@@ -234,7 +265,7 @@ func (s *Server) apiLogout(w http.ResponseWriter, r *http.Request) {
 		s.webSessions.Revoke(c.Value)
 	}
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Path: "/", MaxAge: -1})
-	http.Redirect(w, r, "/login", http.StatusFound)
+	http.Redirect(w, r, s.link("/login"), http.StatusFound)
 }
 
 // api2FAStatus reports whether two-factor login is enabled and how many
@@ -571,8 +602,13 @@ func writeJSON(w http.ResponseWriter, v any) {
 // HTML is always revalidated (hashed asset names make it safe to cache
 // assets for a year); without this, browsers keep serving a stale index
 // that references old asset hashes after an upgrade.
-func serveConsole(fsys http.FileSystem) http.Handler {
+//
+// When base is set (gateway deployment) HTML gets a <base> element so every
+// relative asset and API reference stays inside the prefixed namespace, and
+// stray links redirect back into the prefix.
+func serveConsole(fsys http.FileSystem, base string) http.Handler {
 	fsrv := http.FileServer(fsys)
+	base = strings.TrimSuffix(base, "/")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := strings.TrimPrefix(r.URL.Path, "/")
 		if strings.HasSuffix(p, ".html") || p == "" || p == "/" {
@@ -583,10 +619,26 @@ func serveConsole(fsys http.FileSystem) http.Handler {
 		if p != "" {
 			f, err := fsys.Open(strings.TrimPrefix(path.Clean("/"+p), "/"))
 			if err != nil {
-				http.Redirect(w, r, "/", http.StatusFound)
+				http.Redirect(w, r, base+"/", http.StatusFound)
 				return
 			}
 			_ = f.Close()
+		}
+		if base != "" && (p == "" || strings.HasSuffix(p, ".html")) {
+			name := "index.html"
+			if p != "" {
+				name = p
+			}
+			body, err := webbase.ReadFile(fsys, name)
+			if err != nil {
+				http.Error(w, "console unavailable", http.StatusInternalServerError)
+				return
+			}
+			body = webbase.InjectBase(body, base)
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+			_, _ = w.Write(body)
+			return
 		}
 		fsrv.ServeHTTP(w, r)
 	})

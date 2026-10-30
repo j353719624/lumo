@@ -33,6 +33,10 @@ func main() {
 
 	fs := flag.NewFlagSet("lumos", flag.ExitOnError)
 	cfgPath := fs.String("c", "lumos.toml", "configuration file")
+	// 网关式部署（fnOS 应用包）：控制台挂在 URL 前缀下，并额外监听
+	// 一个 unix socket 供应用网关转发；不传时行为与直连部署完全一致。
+	webBase := fs.String("web-base", "", "console URL prefix (e.g. /app/lumo-server)")
+	webSocket := fs.String("web-socket", "", "extra unix socket for the console (app gateway)")
 	_ = fs.Parse(os.Args[1:])
 
 	cfg, err := config.LoadServer(*cfgPath)
@@ -43,7 +47,10 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	if err := server.New(cfg).Run(ctx); err != nil {
+	srv := server.New(cfg)
+	srv.SetWebBase(*webBase)
+	srv.SetWebSocket(*webSocket)
+	if err := srv.Run(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
