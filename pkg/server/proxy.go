@@ -33,8 +33,12 @@ func (s *Server) handleReg(ses *session, m proto.Msg) {
 	switch kind {
 	case "tcp", "udp", "http", "https", "mux", "sealed-tcp", "sealed-udp", "punch":
 	default:
-		reply(false, "unsupported proxy kind "+kind)
-		return
+		norm, ok := normalizeKind(kind, m.Str("sk"), m.Int("remote_port"))
+		if !ok {
+			reply(false, "unsupported proxy kind "+kind)
+			return
+		}
+		kind = norm
 	}
 
 	s.mu.Lock()
@@ -52,6 +56,7 @@ func (s *Server) handleReg(ses *session, m proto.Msg) {
 		name:       name,
 		label:      m.Str("label"),
 		kind:       kind,
+		visitor:    kind == "sealed-tcp" || kind == "sealed-udp" || kind == "punch",
 		sk:         m.Str("sk"),
 		remotePort: m.Int("remote_port"),
 		domains:    lowerAll(m.StrList("domains")),

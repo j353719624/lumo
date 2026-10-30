@@ -108,13 +108,14 @@ type proxyEnt struct {
 	name       string
 	label      string // client-provided display name for this mapping
 	kind       string
+	visitor    bool // 访客型隧道：只凭密钥接入，服务端不占公网端口
 	sk         string
 	remotePort int
 	domains    []string
 	subPaths   []string
 	httpUser   string
 	httpPass   string
-	punchAddr   string
+	punchAddr  string
 	localPort  int // 原始服务端口（sealed-tcp 供访客用相同端口）
 	owner      *session
 	since      time.Time
@@ -571,7 +572,7 @@ func (s *Server) handleVisitorData(c net.Conn, name, sk string) {
 		}
 	}
 	s.mu.Unlock()
-	if ent == nil || (ent.kind != "sealed-tcp" && ent.kind != "sealed-udp" && ent.kind != "punch") {
+	if ent == nil || !ent.visitor {
 		log.Warnf("visitor data for unknown proxy %q rejected", name)
 		_ = c.Close()
 		return
