@@ -33,6 +33,10 @@ func main() {
 		runInit(os.Args[2:])
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "server" {
+		runServerInit(os.Args[2:])
+		return
+	}
 	if len(os.Args) > 1 && os.Args[1] == "token" {
 		// 认证令牌由客户端生成；两端填入同一令牌即可互通
 		tok, err := newToken()
@@ -88,6 +92,7 @@ func runConsole(args []string) {
 	user := fs.String("user", "admin", "console user")
 	pass := fs.String("pass", "", "console password (empty: no authentication)")
 	base := fs.String("base", "", "URL prefix the console is served under (e.g. /app/lumo)")
+	socket := fs.String("socket", "", "serve the console on this unix socket instead of TCP")
 	_ = fs.Parse(args)
 
 	store, err := manager.LoadStore(*storePath)
@@ -97,6 +102,7 @@ func runConsole(args []string) {
 	}
 	mgr := manager.New(store)
 	mgr.SetBase(*base)
+	mgr.SetSocket(*socket)
 	if err := mgr.Run(*addr, *user, *pass); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

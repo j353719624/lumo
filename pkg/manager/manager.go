@@ -26,6 +26,7 @@ type Manager struct {
 	consoleUser string
 	consolePass string
 	base        string // URL prefix the console is served under, e.g. /app/lumo
+	socket      string // unix socket path; when set the console serves over it instead of TCP
 
 	sessions *auth.Sessions
 	limiter  *auth.Limiter
@@ -67,6 +68,12 @@ func (m *Manager) SetBase(base string) {
 		base = "/" + base
 	}
 	m.base = base
+}
+
+// SetSocket makes the console listen on a unix socket instead of TCP.
+// The fnOS app gateway forwards /app/<name>/* to that socket.
+func (m *Manager) SetSocket(path string) {
+	m.socket = strings.TrimSpace(path)
 }
 
 // Run starts every config marked enabled, serves the console and blocks
@@ -125,6 +132,23 @@ func (m *Manager) Run(addr, user, pass string) error {
 		_ = srv.Close()
 		m.Stop()
 	}()
+	if m.socket != "" {
+		// unix socket 模式：飞牛桌面网关按 gatewaySocket 把 /app/<name>/* 转过来。
+		_ = os.Remove(m.socket)
+		if err := os.MkdirAll(filepath.Dir(m.socket), 0o755); err != nil {
+			return err
+		}
+		ln, err := net.Listen("unix", m.socket)
+		if err != nil {
+			return err
+		}
+		_ = os.Chmod(m.socket, 0o660)
+		log.Infof("lumoc console listening on unix://%s", m.socket)
+		if err := srv.Serve(ln); err != nil && ctx.Err() == nil {
+			return err
+		}
+		return nil
+	}
 	log.Infof("lumoc console listening on http://%s", addr)
 	if err := srv.ListenAndServe(); err != nil && ctx.Err() == nil {
 		return err
