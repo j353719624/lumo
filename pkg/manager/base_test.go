@@ -58,3 +58,31 @@ func TestServeConsoleInjectsBaseElement(t *testing.T) {
 		t.Fatalf("index.html has no base element: %s", body[:min(len(body), 200)])
 	}
 }
+
+// Logout must delete the session cookie with the same Path it was created
+// with. A prefixed deployment used to clear Path=/app/lumo/ while the cookie
+// lived at Path=/, so the browser kept it and the user stayed logged in.
+func TestLogoutClearsCookieWithCreationPath(t *testing.T) {
+	m := New(&Store{})
+	m.SetBase("/app/lumo")
+
+	rec := httptest.NewRecorder()
+	m.apiLogout(rec, httptest.NewRequest("GET", "/logout", nil))
+
+	cookies := rec.Result().Cookies()
+	var found *http.Cookie
+	for _, c := range cookies {
+		if c.Name == sessionCookie {
+			found = c
+		}
+	}
+	if found == nil {
+		t.Fatal("logout did not emit a session cookie deletion")
+	}
+	if found.Path != "/" {
+		t.Fatalf("logout cleared Path %q, want %q", found.Path, "/")
+	}
+	if found.MaxAge >= 0 {
+		t.Fatalf("logout cookie MaxAge %d, want negative", found.MaxAge)
+	}
+}

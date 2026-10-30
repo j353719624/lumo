@@ -163,7 +163,9 @@ func (m *Manager) apiLogout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(sessionCookie); err == nil {
 		m.sessions.Revoke(c.Value)
 	}
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Path: m.link("/"), MaxAge: -1})
+	// 删除 cookie 必须与创建时用同一个 Path，否则浏览器保留原 cookie，
+	// 退出后仍是登录态（带前缀部署时尤其明显）。
+	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Path: "/", MaxAge: -1})
 	http.Redirect(w, r, m.link("/login"), http.StatusFound)
 }
 

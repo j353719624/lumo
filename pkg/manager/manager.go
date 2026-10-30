@@ -132,8 +132,11 @@ func (m *Manager) Run(addr, user, pass string) error {
 		_ = srv.Close()
 		m.Stop()
 	}()
+
+	// unix socket 与 TCP 同时提供：socket 给应用网关（桌面入口），
+	// TCP 给局域网直连与排障。两者共用同一个 handler。
+	started := false
 	if m.socket != "" {
-		// unix socket 模式：飞牛桌面网关按 gatewaySocket 把 /app/<name>/* 转过来。
 		_ = os.Remove(m.socket)
 		if err := os.MkdirAll(filepath.Dir(m.socket), 0o755); err != nil {
 			return err
@@ -144,15 +147,26 @@ func (m *Manager) Run(addr, user, pass string) error {
 		}
 		_ = os.Chmod(m.socket, 0o660)
 		log.Infof("lumoc console listening on unix://%s", m.socket)
-		if err := srv.Serve(ln); err != nil && ctx.Err() == nil {
-			return err
-		}
-		return nil
+		started = true
+		go func() {
+			if err := srv.Serve(ln); err != nil && ctx.Err() == nil {
+				log.Errorf("console socket: %v", err)
+			}
+		}()
 	}
-	log.Infof("lumoc console listening on http://%s", addr)
-	if err := srv.ListenAndServe(); err != nil && ctx.Err() == nil {
-		return err
+	if addr != "" {
+		log.Infof("lumoc console listening on http://%s", addr)
+		started = true
+		go func() {
+			if err := srv.ListenAndServe(); err != nil && ctx.Err() == nil {
+				log.Errorf("console tcp: %v", err)
+			}
+		}()
 	}
+	if !started {
+		return fmt.Errorf("console: neither --addr nor --socket given")
+	}
+	<-ctx.Done()
 	return nil
 }
 
