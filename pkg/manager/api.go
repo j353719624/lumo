@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"bytes"
 	"crypto/subtle"
 	"fmt"
 	"io/fs"
@@ -57,8 +58,22 @@ func (m *Manager) guardUI(next http.Handler) http.Handler {
 			_ = jsonEncode(w, map[string]string{"error": "未登录或会话已过期"})
 			return
 		}
-		http.Redirect(w, r, "/login", http.StatusFound)
-	})
+		http.Redirect(w, r, m.link("/login"), http.StatusFound)
+		})
+	}
+
+// link builds a URL inside the prefixed console namespace.
+func (m *Manager) link(p string) string {
+	if m.base == "" {
+		return p
+	}
+	if p == "/" {
+		return m.base + "/"
+	}
+	if strings.HasPrefix(p, "/") {
+		return m.base + p
+	}
+	return m.base + "/" + p
 }
 
 // isPublicAsset reports whether the path must be reachable without login.
@@ -83,7 +98,7 @@ func (m *Manager) authed(r *http.Request) bool {
 // loginPage serves the login form when a password is configured.
 func (m *Manager) loginPage(w http.ResponseWriter, r *http.Request) {
 	if m.consolePass == "" || m.authed(r) {
-		http.Redirect(w, r, "/", http.StatusFound)
+		http.Redirect(w, r, m.link("/"), http.StatusFound)
 		return
 	}
 	b, err := fs.ReadFile(lumocweb.EmbedFS, "login.html")
@@ -148,8 +163,8 @@ func (m *Manager) apiLogout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(sessionCookie); err == nil {
 		m.sessions.Revoke(c.Value)
 	}
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Path: "/", MaxAge: -1})
-	http.Redirect(w, r, "/login", http.StatusFound)
+	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Path: m.link("/"), MaxAge: -1})
+	http.Redirect(w, r, m.link("/login"), http.StatusFound)
 }
 
 // consoleFS exposes the embedded client console assets.
@@ -467,7 +482,15 @@ func renderToml(cfg ConnConfig) string {
 // assets for a year); without this, browsers keep serving a stale index
 // that references old asset hashes after an upgrade.
 func serveConsole(fsys http.FileSystem) http.Handler {
+	return serveConsoleAt(fsys, "")
+}
+
+// serveConsoleAt serves the embedded console. When base is set the HTML gets
+// a <base> element so every relative asset and API reference stays inside the
+// prefixed namespace, and redirects point back at the prefix.
+func serveConsoleAt(fsys http.FileSystem, base string) http.Handler {
 	fsrv := http.FileServer(fsys)
+	base = strings.TrimSuffix(base, "/")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := strings.TrimPrefix(r.URL.Path, "/")
 		if p == "" || strings.HasSuffix(p, ".html") {
@@ -478,13 +501,46 @@ func serveConsole(fsys http.FileSystem) http.Handler {
 		if p != "" {
 			f, err := fsys.Open(strings.TrimPrefix(path.Clean("/"+p), "/"))
 			if err != nil {
-				http.Redirect(w, r, "/", http.StatusFound)
+				http.Redirect(w, r, base+"/", http.StatusFound)
 				return
 			}
 			_ = f.Close()
 		}
+		if base != "" && (p == "" || strings.HasSuffix(p, ".html")) {
+			serveHTMLWithBase(w, r, fsys, p, base)
+			return
+		}
 		fsrv.ServeHTTP(w, r)
 	})
+}
+
+// serveHTMLWithBase writes an HTML document with a <base> element inserted
+// right after <head>, so the browser resolves relative URLs against the
+// prefixed namespace.
+func serveHTMLWithBase(w http.ResponseWriter, r *http.Request, fsys http.FileSystem, p, base string) {
+	name := "index.html"
+	if p != "" {
+		name = p
+	}
+	body, err := readFile(fsys, name)
+	if err != nil {
+		http.Error(w, "console unavailable", http.StatusInternalServerError)
+		return
+	}
+	tag := []byte(`<base href="` + base + `/">`)
+	if idx := bytes.Index(bytes.ToLower(body), []byte("<head>")); idx >= 0 {
+		insertAt := idx + len("<head>")
+		out := make([]byte, 0, len(body)+len(tag))
+		out = append(out, body[:insertAt]...)
+		out = append(out, tag...)
+		out = append(out, body[insertAt:]...)
+		body = out
+	} else {
+		body = append(tag, body...)
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+	_, _ = w.Write(body)
 }
 
 // apiTomlSave parses an edited lumoc.toml back into the stored config,

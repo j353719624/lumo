@@ -83,6 +83,7 @@ func runConsole(args []string) {
 	storePath := fs.String("store", "lumo-configs.json", "connection configs data file")
 	user := fs.String("user", "admin", "console user")
 	pass := fs.String("pass", "", "console password (empty: no authentication)")
+	base := fs.String("base", "", "URL prefix the console is served under (e.g. /app/lumo)")
 	_ = fs.Parse(args)
 
 	store, err := manager.LoadStore(*storePath)
@@ -90,7 +91,9 @@ func runConsole(args []string) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := manager.New(store).Run(*addr, *user, *pass); err != nil {
+	mgr := manager.New(store)
+	mgr.SetBase(*base)
+	if err := mgr.Run(*addr, *user, *pass); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

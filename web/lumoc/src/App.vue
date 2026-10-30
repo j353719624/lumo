@@ -233,7 +233,7 @@ async function refresh(keepDetail = false) {
     for (const s of await api.status()) statusMap.value[s.id] = s
     info.value = await api.info()
   } catch (e: any) {
-    if (e?.message?.includes('401')) { location.href = '/login'; return }
+    if (e?.message?.includes('401')) { location.href = 'login'; return }
     toast(t('c.toast.readFail', e?.message || e), true)
   }
   if (keepDetail) return
@@ -536,8 +536,8 @@ function setView(v: 'list' | 'logs') {
 }
 
 async function logout() {
-  try { await fetch('/logout') } catch { /* ignore */ }
-  location.href = '/login'
+  try { await fetch('logout') } catch { /* ignore */ }
+  location.href = 'login'
 }
 
 function openSection(s: 'overview' | 'server' | 'mappings' | 'visitors' | 'files') {
@@ -550,7 +550,7 @@ async function testConnection(addr: string, port: number) {
   if (!addr) { toast(t('c.toast.addrFirst'), true); return }
   testing.value = true
   try {
-    const r = await fetch('/api/test-connection', {
+    const r = await fetch('api/test-connection', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ addr, port }),
     })

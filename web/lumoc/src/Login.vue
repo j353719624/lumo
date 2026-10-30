@@ -57,7 +57,7 @@ async function submit() {
   clearError()
   state.value = 'loading'
   try {
-    const res = await fetch('/api/login', {
+    const res = await fetch('api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ account: acc, password: pass }),
@@ -74,7 +74,7 @@ async function submit() {
     if (res.ok) {
       state.value = 'done'
       successShow.value = true
-      setTimeout(() => { location.href = '/' }, 350)
+      setTimeout(() => { location.href = './' }, 350)
     } else {
       state.value = 'idle'
       showError(d.error || t('cl.err.cred'))
@@ -91,7 +91,7 @@ async function submit2fa() {
   clearError()
   state.value = 'loading'
   try {
-    const res = await fetch('/api/login/2fa', {
+    const res = await fetch('api/login/2fa', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ticket: otpTicket.value, code: otpCode.value.trim() }),
@@ -100,7 +100,7 @@ async function submit2fa() {
     if (res.ok) {
       state.value = 'done'
       successShow.value = true
-      setTimeout(() => { location.href = '/' }, 350)
+      setTimeout(() => { location.href = './' }, 350)
     } else {
       state.value = 'idle'
       showError(d.error || t('cl.err.otp'))

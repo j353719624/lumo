@@ -68,74 +68,74 @@ async function json<T>(res: Response): Promise<T> {
 
 export const api = {
   async list(): Promise<ConnConfig[]> {
-    const r = await fetch('/api/configs')
+    const r = await fetch('api/configs')
     return json<ConnConfig[]>(r)
   },
   async create(data: Partial<ConnConfig>): Promise<ConnConfig> {
-    const r = await fetch('/api/configs', {
+    const r = await fetch('api/configs', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
     })
     return json<ConnConfig>(r)
   },
   async update(id: string, data: Partial<ConnConfig>): Promise<{ restarted: boolean; config: ConnConfig }> {
-    const r = await fetch('/api/configs/' + id, {
+    const r = await fetch('api/configs/' + id, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
     })
     return json<{ restarted: boolean; config: ConnConfig }>(r)
   },
   async remove(id: string): Promise<void> {
-    const r = await fetch('/api/configs/' + id, { method: 'DELETE' })
+    const r = await fetch('api/configs/' + id, { method: 'DELETE' })
     await json<{ ok: boolean }>(r)
   },
   async start(id: string): Promise<{ ok: boolean }> {
-    const r = await fetch(`/api/configs/${id}/start`, { method: 'POST' })
+    const r = await fetch(`api/configs/${id}/start`, { method: 'POST' })
     return json<{ ok: boolean }>(r)
   },
   async stop(id: string): Promise<{ ok: boolean }> {
-    const r = await fetch(`/api/configs/${id}/stop`, { method: 'POST' })
+    const r = await fetch(`api/configs/${id}/stop`, { method: 'POST' })
     return json<{ ok: boolean }>(r)
   },
   async status(): Promise<ConnStatus[]> {
-    const r = await fetch('/api/status')
+    const r = await fetch('api/status')
     return json<ConnStatus[]>(r)
   },
   async info(): Promise<EngineInfo> {
-    const r = await fetch('/api/info')
+    const r = await fetch('api/info')
     return json<EngineInfo>(r)
   },
   async auth2faStatus(): Promise<{ enabled: boolean; count: number }> {
-    const r = await fetch('/api/profile/2fa')
+    const r = await fetch('api/profile/2fa')
     return json<{ enabled: boolean; count: number }>(r)
   },
   async auth2faSetup(): Promise<{ secret: string; uri: string; qr: string }> {
-    const r = await fetch('/api/profile/2fa/setup', { method: 'POST' })
+    const r = await fetch('api/profile/2fa/setup', { method: 'POST' })
     return json<{ secret: string; uri: string; qr: string }>(r)
   },
   async auth2faEnable(secret: string, code: string): Promise<{ ok: boolean }> {
-    const r = await fetch('/api/profile/2fa/enable', {
+    const r = await fetch('api/profile/2fa/enable', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ secret, code }),
     })
     return json<{ ok: boolean }>(r)
   },
   async auth2faDisable(index: number, code: string): Promise<{ ok: boolean }> {
-    const r = await fetch('/api/profile/2fa/disable', {
+    const r = await fetch('api/profile/2fa/disable', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ index, code }),
     })
     return json<{ ok: boolean }>(r)
   },
   async login2fa(ticket: string, code: string): Promise<{ ok: boolean }> {
-    const r = await fetch('/api/login/2fa', {
+    const r = await fetch('api/login/2fa', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket, code }),
     })
     return json<{ ok: boolean }>(r)
   },
   async toml(id: string): Promise<string> {
-    const r = await fetch(`/api/configs/${id}/toml`)
+    const r = await fetch(`api/configs/${id}/toml`)
     const d = await json<{ toml: string }>(r)
     return d.toml
   },
   async saveToml(id: string, toml: string): Promise<{ restarted: boolean; config: ConnConfig }> {
-    const r = await fetch(`/api/configs/${id}/toml`, {
+    const r = await fetch(`api/configs/${id}/toml`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ toml }),
     })
     return json<{ restarted: boolean; config: ConnConfig }>(r)

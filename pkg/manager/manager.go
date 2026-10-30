@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,6 +24,7 @@ type Manager struct {
 	consolePort string
 	consoleUser string
 	consolePass string
+	base        string // URL prefix the console is served under, e.g. /app/lumo
 
 	sessions *auth.Sessions
 	limiter  *auth.Limiter
@@ -55,6 +57,15 @@ func New(store *Store) *Manager {
 	}
 	mgr.loadTwoFA()
 	return mgr
+}
+
+// SetBase sets the URL prefix the console is served under.
+func (m *Manager) SetBase(base string) {
+	base = strings.TrimSuffix(strings.TrimSpace(base), "/")
+	if base != "" && !strings.HasPrefix(base, "/") {
+		base = "/" + base
+	}
+	m.base = base
 }
 
 // Run starts every config marked enabled, serves the console and blocks
@@ -97,9 +108,14 @@ func (m *Manager) Run(addr, user, pass string) error {
 	mux.Handle("POST /api/configs/{id}/toml", m.guard(http.HandlerFunc(m.apiTomlSave)))
 	mux.Handle("GET /api/status", m.guard(http.HandlerFunc(m.apiStatus)))
 	mux.Handle("GET /api/info", m.guard(http.HandlerFunc(m.apiInfo)))
-	mux.Handle("/", m.guardUI(serveConsole(consoleFS)))
+	mux.Handle("/", m.guardUI(serveConsoleAt(consoleFS, m.base)))
 
-	srv := &http.Server{Addr: addr, Handler: mux}
+	var handler http.Handler = mux
+	if m.base != "" {
+		handler = newBaseMiddleware(m.base, mux)
+	}
+
+	srv := &http.Server{Addr: addr, Handler: handler}
 	go func() {
 		<-ctx.Done()
 		_ = srv.Close()
