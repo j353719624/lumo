@@ -1,93 +1,115 @@
 # LUMO
 
-LUMO 是一个自研的内网穿透 / 反向代理工具，把 NAT 或防火墙后面的本地服务安全地暴露到公网。服务端 `lumos` 部署在有公网 IP 的机器上，客户端 `lumoc` 部署在内网机器上，二者通过加密握手建立控制通道，按需建立数据连接转发流量。
+LUMO is a self-contained reverse-tunneling tool: it exposes services behind NAT or a firewall on the
+public internet. The server `lumos` runs on a host with a public IP, the client `lumoc` runs inside your
+network; they build a control channel over an authenticated handshake and open data connections on demand.
 
-- **零第三方依赖**：只用 Go 标准库，二进制干净、供应链面积极小
-- **协议自研**：长度分帧 JSON 控制消息 + HMAC-SHA256 令牌认证，不可与其它同类工具互通
-- **中文控制台**：内置服务端 / 客户端 Web 面板，实时状态、流量与运行事件
+- **Zero third-party dependencies** — Go standard library only, small supply-chain surface
+- **Own protocol** — length-framed JSON control messages with Ed25519 signatures; not interoperable with
+  other tunneling tools
+- **Bilingual consoles** — built-in server and client web panels (English / Chinese), live status,
+  traffic and runtime events
+- **Optional secrets** — sealed tunnels (`sealed-tcp` / `sealed-udp`) expose nothing publicly, and
+  `punch` establishes peer-to-peer links with automatic relay fallback
 
-## 功能（当前版本 0.1.0）
+## Proxy types (v0.1.0)
 
-| 代理类型 | 说明 |
+| Type | Description |
 |---|---|
-| TCP | 远程端口映射，公网直连内网 TCP 服务 |
-| UDP | 远程端口映射，按访客地址回包 |
-| HTTP | 按域名路由的虚拟主机（vhostHTTPPort） |
-| HTTPS | 按 TLS SNI 路由，加密端到端保留在本地服务 |
+| `tcp` | Remote port mapping to an internal TCP service |
+| `udp` | Remote port mapping, replies routed per visitor address |
+| `http` | Virtual host routed by domain (`vhostHTTPPort`) |
+| `https` | Routed by TLS SNI, TLS stays end-to-end at the local service |
+| `sealed-tcp` | Secret-key tunnel, no public port |
+| `sealed-udp` | Secret-key tunnel over UDP, no public port |
+| `punch` | Peer-to-peer after address exchange, relays if punching fails |
+| `mux` | HTTP CONNECT multiplexed entry port |
 
-其他能力：令牌认证（HMAC 挑战）、断线自动重连、配置热重载、`verify` 配置校验、内置控制台、流量统计、运行事件、多连接管理器。
+Also included: token authentication (Ed25519 challenge), automatic reconnect with backoff, config
+hot-reload, `verify` for config files, TOTP two-factor login, traffic accounting, runtime events and a
+multi-connection manager.
 
-## 多连接控制台（推荐）
+## Multi-connection console (recommended)
 
-不想手写配置文件时，用 `lumoc ui` 打开图形控制台：新建 / 编辑 / 启停多条隧道连接，配置保存在本机 JSON 文件里，所有连接由单个进程托管。
+Instead of hand-writing config files, open the GUI console with `lumoc ui`: create, edit, start and stop
+any number of tunnels, all stored in one local JSON file and hosted by a single process.
 
 ```bash
-./bin/lumoc ui                          # 默认 http://127.0.0.1:7400
-./bin/lumoc ui -addr 0.0.0.0:7400 -user admin -pass 强密码 -store D:\data\configs.json
+./bin/lumoc ui                          # default http://127.0.0.1:7400
+./bin/lumoc ui -addr 0.0.0.0:7400 -user admin -pass 'a-strong-one' -store /data/configs.json
 ```
 
-点「新建配置」填服务器地址、令牌和端口映射即可；开关即启用 / 停用，改动即时生效，无需重启进程。
+Click "New connection", fill in the server address, secret and port mappings. The switch starts or stops a
+tunnel immediately — no process restart.
 
-## 构建
-
-依赖：Go 1.26+、Node.js 20+（Go 二进制不会内嵌未构建的前端，面板需要先构建）
+Useful subcommands:
 
 ```bash
-# 1. 构建两个 Vue 3 控制台（web/ 是 npm workspace）
+./bin/lumoc init   --store c.json --server 203.0.113.10 --port 58619 --token <secret>
+./bin/lumoc server --out lumos.toml --bind-port 58619 --kcp-port 47011 --web-port 46351
+./bin/lumoc discover -c lumoc.toml      # list sealed tunnels other clients registered
+```
+
+## Build
+
+Requires Go 1.26+ and Node.js 20+ (the Go binaries do not embed an unbuilt frontend).
+
+```bash
+# 1. build both Vue 3 consoles (web/ is an npm workspace)
 cd web && npm ci && npm run build && cd ..
 
-# 2. 编译二进制（面板经 //go:embed 打入）
-make build        # 或：go build -trimpath -ldflags "-s -w" -o bin/lumos ./cmd/lumos
+# 2. compile the binaries (the panels are embedded via //go:embed)
+make build        # or: go build -trimpath -ldflags "-s -w" -o bin/lumos ./cmd/lumos
 ```
 
-只需要后端、不需要面板时，用 `noweb` 标签跳过前端嵌入：
+Backend only, without embedding the panels:
 
 ```bash
 go build -tags noweb -o bin/lumos ./cmd/lumos
 go build -tags noweb -o bin/lumoc ./cmd/lumoc
 ```
 
-完整开发流程（格式化、构建、测试）：
+Full development flow:
 
 ```bash
 make all      # env + fmt + web + build
-make alltest  # vet + 单测 + e2e
+make alltest  # vet + unit tests + e2e
 ```
 
-## 快速开始
+## Quick start
 
-服务端 `lumos.toml`：
+Server `lumos.toml`:
 
 ```toml
-bindPort = 7000
-vhostHTTPPort = 18090
+bindPort = 58619
+kcpPort = 47011
+vhostHTTPPort = 18080
 
 [auth]
-token = "换成长随机串"
+# derive this from your secret, or keep a plain auth.token during testing
+pubKey = "<Ed25519 public key>"
 
 [webServer]
-addr = "127.0.0.1"
-port = 7500
+addr = "0.0.0.0"
+port = 46351
 user = "admin"
-password = "换掉"
+password = "change-me"
 ```
 
-客户端 `lumoc.toml`：
+`./bin/lumoc server --out lumos.toml ...` generates this file and prints the matching secret.
+
+Client `lumoc.toml`:
 
 ```toml
-serverAddr = "服务器IP"
-serverPort = 7000
+serverAddr = "203.0.113.10"
+serverPort = 58619
+protocol = "kcp"
+kcpPort = 47011
 
 [auth]
-token = "与服务端一致"
+token = "same secret as the server"
 
-[webServer]
-addr = "127.0.0.1"
-port = 7400
-user = "admin"
-password = "换掉"
-
-# TCP 隧道
+# TCP tunnel
 [[proxies]]
 name = "ssh"
 type = "tcp"
@@ -95,64 +117,76 @@ localIP = "127.0.0.1"
 localPort = 22
 remotePort = 6022
 
-# HTTP 隧道（按域名）
+# HTTP tunnel routed by domain
 [[proxies]]
 name = "site"
 type = "http"
 localPort = 8080
 customDomains = ["app.example.com"]
+
+# Secret-key tunnel: no public port at all
+[[proxies]]
+name = "nas-admin"
+type = "sealed-tcp"
+localIP = "127.0.0.1"
+localPort = 5666
+sk = "a-long-secret"
 ```
 
-启动与校验：
+Start and verify:
 
 ```bash
-./bin/lumos verify -c lumos.toml   # 只校验配置
+./bin/lumos verify -c lumos.toml   # validate only
 ./bin/lumos -c lumos.toml
 ./bin/lumoc -c lumoc.toml
 ```
 
-打开 `http://127.0.0.1:7500`（服务端控制台）或 `http://127.0.0.1:7400`（客户端控制台），使用 `webServer` 配置的账号密码登录。客户端控制台里点"重新加载配置"可热更新隧道，无需重启。
+Then open `http://127.0.0.1:46351` (server console) or `http://127.0.0.1:7400` (client console) and sign in
+with the credentials from `webServer`.
 
-## 安全须知
+## Security notes
 
-- `auth.token` 必填，建议 32 位以上随机串；认证使用 HMAC-SHA256，令牌本身不在网络上传输
-- 面板默认只监听 `127.0.0.1`；对外暴露前请更换强密码
-- vhost 端口对公网开放时，请在前置反向代理或防火墙上做好访问控制
+- `auth.pubKey` is derived from the tunnel secret, so the secret itself never has to be stored on the
+  server; keep it 32+ characters
+- Panels listen on `127.0.0.1` by default — change the password before exposing them, and consider TOTP
+- Prefer `sealed-tcp` / `sealed-udp` over public port mappings for anything sensitive
+- Logs mask addresses by default (`log.MaskAddr`), so no raw IPs end up in your journal
 
-## 目录结构
+## Layout
 
 ```
-cmd/lumos            服务端入口
-cmd/lumoc            客户端入口（含 ui / engine / discover / init / server 子命令）
-pkg/config           配置加载、校验与回写
-pkg/toml             TOML 子集解析器
-pkg/proto            线协议：分帧、认证、数据包
-pkg/relay            双向转发、限速与流量统计
-pkg/server           服务端：会话、注册、转发、vhost、控制台
-pkg/client           客户端：控制循环、work 连接、访客隧道、打洞
-pkg/manager          多连接管理器与客户端控制台
-pkg/auth             Web 会话与登录限流
-pkg/token            Ed25519 令牌派生与验签
-pkg/totp             RFC 6238 动态口令
-pkg/qrcode           独立 QR 编码器（绑定 2FA 用）
-pkg/udpstream        KCP 可靠 UDP 传输
-pkg/stun             STUN 反射地址探测（打洞用）
-pkg/log              日志、地址掩码与运行事件环形缓冲
-web/lumos            服务端控制台（Vue 3 + Vite）
-web/lumoc            客户端控制台（Vue 3 + Vite）
-web/shared           两端共用的 i18n 与工具函数
+cmd/lumos            server entrypoint
+cmd/lumoc            client entrypoint (ui / engine / discover / init / server)
+pkg/config           config load, validation and write-back
+pkg/toml             TOML subset parser
+pkg/proto            wire protocol: framing, authentication, packets
+pkg/relay            bidirectional copy, rate limiting, traffic counters
+pkg/server           server: sessions, registration, forwarding, vhost, console
+pkg/client           client: control loop, work connections, visitors, punching
+pkg/manager          multi-connection manager and client console
+pkg/auth             web sessions and login rate limiting
+pkg/token            Ed25519 token derivation and verification
+pkg/totp             RFC 6238 one-time passwords
+pkg/qrcode           standalone QR encoder (for 2FA enrolment)
+pkg/udpstream        KCP reliable UDP transport
+pkg/stun             STUN reflexive address discovery (for punching)
+pkg/log              logging, address masking, runtime event ring buffer
+web/lumos            server console (Vue 3 + Vite)
+web/lumoc            client console (Vue 3 + Vite)
+web/shared           i18n and helpers shared by both consoles
 ```
 
-## 参与共建
+## Contributing
 
-LUMO 是开放源码项目，欢迎一起完善：
+LUMO is open for collaboration:
 
-- 报缺陷 / 提需求：[Issues](../../issues)
-- 开发约定与 PR 流程：[CONTRIBUTING.md](CONTRIBUTING.md)
-- 飞牛 fnOS 客户端安装包：[lumo-fpk](https://github.com/j353719624/lumo-fpk)
+- Bugs and feature requests: [Issues](../../issues)
+- Development setup and PR flow: [CONTRIBUTING.md](CONTRIBUTING.md)
+- fnOS client package: [lumo-fpk](https://github.com/j353719624/lumo-fpk)
 
-## 许可证
+## License
 
-**PolyForm Noncommercial License 1.0.0** —— 可自由学习、使用、修改、分发，**不可用于商业用途**。
+**PolyForm Noncommercial License 1.0.0** — free to use, study, modify and share, **not for commercial use**.
 
-商用需取得作者授权，范围与方式见 [LICENSING.md](LICENSING.md)；许可全文见 [LICENSE](LICENSE)。
+Commercial use requires the author's permission; see [LICENSING.md](LICENSING.md) for what is allowed and
+how to obtain a license. Full text: [LICENSE](LICENSE).

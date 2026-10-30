@@ -1,54 +1,56 @@
-# 授权说明
+# Licensing
 
-LUMO 采用 **PolyForm Noncommercial License 1.0.0**（全文见 [LICENSE](LICENSE)）。
+LUMO is released under the **PolyForm Noncommercial License 1.0.0** (full text: [LICENSE](LICENSE)).
 
-一句话概括：**可以自由学习、使用、修改、分发，但不能用于商业用途；商用需要单独授权。**
+In one line: **use it, study it, modify it and share it freely — but not commercially. Commercial use
+requires a separate license.**
 
-## 可以（无需联系作者）
+## Free of charge (no need to contact the author)
 
-- 个人使用：自建隧道、远程访问自己的设备
-- 学习与研究：阅读源码、做实验、写文章（注明出处）
-- 修改与二次开发：改成你需要的形态
-- 非商业分发：把修改后的版本分享给他人，需保留许可与版权声明
-- 贡献代码：提 Issue、提 PR
-- 非营利组织内部使用（慈善、教育、公共研究、政府机构等，见许可第 9 条）
+- Personal use: your own tunnels, your own devices
+- Study and research: read the source, run experiments, write about it (with attribution)
+- Modification and derivative work
+- Noncommercial distribution: share your modified version, keeping the license and copyright notice
+- Contributions: issues and pull requests
+- Internal use by noncommercial organizations (charities, education, public research, government — see
+  section 9 of the license)
 
-## 需要授权（商用）
+## Requires a commercial license
 
-包括但不限于：
+Including, but not limited to:
 
-- 打包进产品、硬件、镜像或以任何形式对外销售
-- 作为 SaaS / 云服务对外提供（含免费增值、按量计费）
-- 集成进商业系统交付给客户
-- 企业内部以营利为目的的生产使用
-- 以 LUMO 名义提供付费部署、运维、技术支持
+- Bundling into a product, hardware, image, or selling it in any form
+- Offering it as a service (SaaS), including freemium and usage-based pricing
+- Integrating it into a commercial system delivered to customers
+- Production use inside a for-profit company
+- Paid deployment, operations or support offered under the LUMO name
 
-## 如何取得商用授权
+## How to obtain one
 
-请通过以下任一方式联系作者，说明用途、规模与部署形态：
+Contact the author with the intended use, scale and deployment shape:
 
-- GitHub：[j353719624](https://github.com/j353719624)（Issues 或 Discussions 私信）
-- 仓库主页的联系方式
+- GitHub: [j353719624](https://github.com/j353719624) (issues or direct message)
+- Contact details on the repository page
 
-授权范围、期限与费用按实际用途单独约定。
+Scope, term and fee are agreed per case.
 
-## 关于贡献
+## About contributions
 
-你提交的代码会以同一许可（PolyForm Noncommercial 1.0.0）并入本项目。
-提交 PR 即表示你同意这一点，并确认你有权提交该代码。
+Code you submit is merged under the same license (PolyForm Noncommercial 1.0.0). Opening a pull request
+means you agree to this and confirm you have the right to submit that code.
 
-作者保留以其它条款（含商业许可）授权本项目及衍生作品的权利 ——
-这是能够对外提供商业授权的前提。
+The author retains the right to license the project and its derivatives under other terms as well,
+including commercial terms — that is what makes commercial licensing possible at all.
 
-## 注意
+## Note
 
-本许可**不是** OSI 认可的开源许可，属于「源码可用（source-available）」：
-源码公开、可参与共建，但商业使用权保留在作者手中。
+This is **not** an OSI-approved open source license. It is *source-available*: the source is public and
+open to contributions, while commercial rights stay with the author.
 
-已经按旧许可（Apache 2.0）取得的副本，其授权不可撤回；本文件适用于
-本仓库自本许可变更之后的版本。
+Copies obtained under the previous license (Apache 2.0) keep that grant; this file applies to versions of
+this repository from the license change onwards.
 
 ---
 
-> 本文为便于理解的中文说明，不构成对 [LICENSE](LICENSE) 的替代。
-> 两者不一致时，以 [LICENSE](LICENSE) 英文原文为准。
+> This document is a readable summary, not a replacement for [LICENSE](LICENSE).
+> Where the two differ, the English text in [LICENSE](LICENSE) governs.
