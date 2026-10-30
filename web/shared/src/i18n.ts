@@ -581,7 +581,7 @@ const en: Dict = {
   'cl.feat.2t': 'Secure access',
   'cl.feat.2d': 'Key-sealed tunnels / punch direct (key required)',
   'cl.feat.3t': 'Protocols',
-  'cl.feat.3d': 'TCP / UDP / HTTP(S) / 多路复用',
+  'cl.feat.3d': 'TCP / UDP / HTTP(S) / Mux',
   'cl.foot.note': 'Sign in to manage all tunnels',
   'cl.accPh': 'Email or username',
   'cl.pwdPh': 'Enter your password',

@@ -383,7 +383,8 @@ func (m *Manager) apiStatus(w http.ResponseWriter, _ *http.Request) {
 func (m *Manager) apiInfo(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"version":   version.Version,
-		"engineBin": "独立引擎进程（每配置一个）",
+		// 语言中立的值：界面标签由前端 i18n 提供，这里只报二进制名
+		"engineBin": "lumoc engine",
 		"dataDir":   m.store.path,
 		"port":      m.consolePort,
 		"addr":      m.consoleAddr(),
