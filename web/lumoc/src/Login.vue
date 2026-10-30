@@ -273,13 +273,6 @@ async function submit2fa() {
       </div>
     </section>
 
-    <div class="foot">
-      <span class="ver">v0.1.0</span>
-      <span class="sep"></span>
-      <a href="#" @click.prevent="showError(t('cl.checkLatest'))">{{ t('cl.help.check') }}</a>
-      <span class="sep"></span>
-      <a href="/help.html" target="_blank" rel="noopener">{{ t('cl.help') }}</a>
-    </div>
   </main>
 </template>
 
