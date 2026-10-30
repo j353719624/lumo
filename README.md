@@ -123,16 +123,33 @@ customDomains = ["app.example.com"]
 
 ```
 cmd/lumos            服务端入口
-cmd/lumoc            客户端入口
-internal/config      配置加载与校验
-internal/toml        TOML 子集解析器
-internal/proto       线协议：分帧、认证、数据包
-internal/relay       双向转发与流量统计
-internal/server      服务端：会话、注册、转发、vhost、控制台
-internal/client      客户端：控制循环、work 连接、控制台
-internal/dash        内嵌 Web 面板资源
-internal/log         日志与运行事件环形缓冲
+cmd/lumoc            客户端入口（含 ui / engine / discover / init / server 子命令）
+pkg/config           配置加载、校验与回写
+pkg/toml             TOML 子集解析器
+pkg/proto            线协议：分帧、认证、数据包
+pkg/relay            双向转发、限速与流量统计
+pkg/server           服务端：会话、注册、转发、vhost、控制台
+pkg/client           客户端：控制循环、work 连接、访客隧道、打洞
+pkg/manager          多连接管理器与客户端控制台
+pkg/auth             Web 会话与登录限流
+pkg/token            Ed25519 令牌派生与验签
+pkg/totp             RFC 6238 动态口令
+pkg/qrcode           独立 QR 编码器（绑定 2FA 用）
+pkg/udpstream        KCP 可靠 UDP 传输
+pkg/stun             STUN 反射地址探测（打洞用）
+pkg/log              日志、地址掩码与运行事件环形缓冲
+web/lumos            服务端控制台（Vue 3 + Vite）
+web/lumoc            客户端控制台（Vue 3 + Vite）
+web/shared           两端共用的 i18n 与工具函数
 ```
+
+## 参与共建
+
+LUMO 是开放源码项目，欢迎一起完善：
+
+- 报缺陷 / 提需求：[Issues](../../issues)
+- 开发约定与 PR 流程：[CONTRIBUTING.md](CONTRIBUTING.md)
+- 飞牛 fnOS 客户端安装包：[lumo-fpk](https://github.com/j353719624/lumo-fpk)
 
 ## 许可证
 
