@@ -228,7 +228,10 @@ const runningConfigs = computed(() => {
 /* ---------------- 数据加载 ---------------- */
 async function refresh(keepDetail = false) {
   try {
-    configs.value = await api.list()
+    // 只有拿到数组才更新列表：异常结构（例如后端返回错误对象）时保留原数据，
+    // 避免界面突然变成「还没有任何连接配置」的空白态。
+    const list = await api.list()
+    if (Array.isArray(list)) configs.value = list
     statusMap.value = {}
     for (const s of await api.status()) statusMap.value[s.id] = s
     info.value = await api.info()
