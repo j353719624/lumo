@@ -139,10 +139,10 @@ async function submit2fa() {
       <!-- 左：品牌 -->
       <aside class="brandside">
         <svg class="mark" width="46" height="46" viewBox="0 0 72 72" fill="none" aria-hidden="true">
-          <path d="M22 57V38C22 26.9 28.3 18.4 36 18.4C43.7 18.4 50 26.9 50 38V57" stroke="#5A7BFF" stroke-width="6.2" stroke-linecap="round"/>
-          <path d="M10 42H62" stroke="#35E0C8" stroke-width="4.2" stroke-linecap="round"/>
-          <circle cx="10" cy="42" r="3.8" fill="#35E0C8"/>
-          <circle cx="62" cy="42" r="3.8" fill="#35E0C8"/>
+          <path d="M22 61V37C22 26 28.3 16.6 36 16.6C43.7 16.6 50 26 50 37V61" stroke="#4A5CF5" stroke-width="9.4" stroke-linecap="round"/>
+          <path d="M12 41H60" stroke="#35E0C8" stroke-width="5.6" stroke-linecap="round"/>
+          <circle cx="12" cy="41" r="4.6" fill="#35E0C8"/>
+          <circle cx="60" cy="41" r="4.6" fill="#35E0C8"/>
         </svg>
         <div class="brandname">LUMO</div>
         <div class="brandcn">隧光</div>
