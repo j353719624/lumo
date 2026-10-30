@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/j353719624/lumo/pkg/auth"
@@ -79,7 +80,10 @@ func (m *Manager) Run(addr, user, pass string) error {
 			}
 		}
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
+	// SIGTERM 必须一并监听：应用管理器（systemd、fnOS 应用中心）停服务时发的是
+	// SIGTERM，只监听 os.Interrupt 会让进程被默认动作直接杀掉，engine 子进程
+	// 变成孤儿继续占用连接与端口。
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	if _, port, err := net.SplitHostPort(addr); err == nil {
