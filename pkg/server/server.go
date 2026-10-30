@@ -115,6 +115,7 @@ type proxyEnt struct {
 	httpUser   string
 	httpPass   string
 	punchAddr   string
+	localPort  int // 原始服务端口（sealed-tcp 供访客用相同端口）
 	owner      *session
 	since      time.Time
 
@@ -498,7 +499,7 @@ func (s *session) readLoop() {
 					continue
 				}
 				if ent.kind == "sealed-tcp" || ent.kind == "sealed-udp" {
-					items = append(items, map[string]any{"name": n, "sk": ent.sk, "type": ent.kind})
+					items = append(items, map[string]any{"name": n, "label": ent.label, "sk": ent.sk, "type": ent.kind, "port": ent.remotePort})
 				}
 			}
 			s.srv.mu.Unlock()
@@ -560,6 +561,15 @@ func (s *Server) handleData(c net.Conn, m proto.Msg) {
 func (s *Server) handleVisitorData(c net.Conn, name, sk string) {
 	s.mu.Lock()
 	ent := s.proxies[name]
+	if ent == nil {
+		// 显示标签（如 "飞牛"）也能定位：按技术名查不到时回退到 label
+		for _, e := range s.proxies {
+			if e.label == name {
+				ent = e
+				break
+			}
+		}
+	}
 	s.mu.Unlock()
 	if ent == nil || (ent.kind != "sealed-tcp" && ent.kind != "sealed-udp" && ent.kind != "punch") {
 		log.Warnf("visitor data for unknown proxy %q rejected", name)
