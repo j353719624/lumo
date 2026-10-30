@@ -80,10 +80,11 @@ a{color:inherit;text-decoration:none}
 @keyframes rise{from{transform:translateY(9px)}to{transform:none}}
 
 /* ---------- 左：品牌 ---------- */
+/* 整列左对齐：标识、标题、特性、页脚共用同一条左基准线 */
 .brandside{
   position:relative;overflow:hidden;z-index:1;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:14px;padding:34px 32px;
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
+  gap:14px;padding:34px 40px;
   background:transparent;
   border-right:0;
 }
@@ -94,16 +95,16 @@ a{color:inherit;text-decoration:none}
 .mark{display:block}
 .brandname{
   font:700 22px/1 var(--sans);letter-spacing:4px;
-  color:var(--tx);text-indent:4px;   /* 抵消字距造成的右偏，视觉居中 */
+  color:var(--tx);text-indent:0;
 }
-.brandcn{font-size:12px;letter-spacing:2.4px;color:var(--tx-3);text-indent:2.4px}
+.brandcn{font-size:12px;letter-spacing:2.4px;color:var(--tx-3);text-indent:0}
 .hairline{width:34px;height:1px;background:#2A3346;margin:4px 0 2px}
-.brandtag{font-size:11px;letter-spacing:.6px;color:var(--tx-4);text-align:center}
+.brandtag{font-size:11px;letter-spacing:.6px;color:var(--tx-4);text-align:left}
 
 /* ---------- 右：表单 ---------- */
 /* 内容居中并限制宽度：全屏时输入框不会被拉得过长 */
 .formside{position:relative;z-index:1;padding:30px 32px;display:flex;flex-direction:column;justify-content:center;align-items:center}
-.formside > *{width:100%;max-width:420px}
+.formside > *{width:100%;max-width:340px}
 .formside h1{
   margin:0 0 20px;font-size:19px;font-weight:700;letter-spacing:.5px;
   text-align:center;
@@ -271,7 +272,8 @@ html[data-theme="light"] .langmenu button:hover{background:#EEF2FB}
 
 /* ---------------- 品牌侧文案与特性 ---------------- */
 /* 内容块统一收窄并居中：全屏后不要贴着左边缘 */
-.brandside .pitch,.brandside .feats{width:100%;max-width:300px}
+/* 左列已整体左对齐，内容块铺满列宽即可 */
+.brandside .pitch,.brandside .feats{width:100%}
 .pitch h1{margin:0;font-size:24px;line-height:1.35;font-weight:700;letter-spacing:-.4px;text-wrap:balance}
 .pitch h1 em{font-style:normal;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
 .pitch p{margin:12px 0 0;max-width:280px;font-size:11.5px;line-height:1.7;color:var(--tx-3)}
