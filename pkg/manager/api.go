@@ -377,11 +377,23 @@ func (m *Manager) apiStatus(w http.ResponseWriter, _ *http.Request) {
 				entry["error"] = lastErr
 			}
 			entry["proxies"] = proxies
+			// 当日累计流量：引擎内存计数器重启即归零，管理器侧续成真正的
+			// 「今日」账本（基线 + 重启检测 + 跨天清零，落盘 traffic.json）
+			var lin, lout uint64
+			for _, p := range proxies {
+				lin += p.In
+				lout += p.Out
+			}
+			entry["trafficIn"], entry["trafficOut"] = m.trafficAccumulate(cfg.ID, lin, lout)
 			lines := make([]string, 0, 40)
 			for _, e := range r.logi.Recent(40) {
 				lines = append(lines, e.Time.Format("15:04:05")+" ["+e.Level+"] "+e.Msg)
 			}
 			entry["log"] = lines
+		} else {
+			// 停止中的配置没有实时计数：只回当日累计，保持账本连续
+			tin, tout := m.trafficAccumulate(cfg.ID, 0, 0)
+			entry["trafficIn"], entry["trafficOut"] = tin, tout
 		}
 		out = append(out, entry)
 	}

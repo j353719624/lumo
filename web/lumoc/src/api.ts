@@ -50,6 +50,8 @@ export interface ConnStatus {
   running: boolean
   error?: string
   proxies: { name: string; type: string; status: string; err?: string; in: number; out: number }[]
+  trafficIn?: number
+  trafficOut?: number
   log: string[]
 }
 

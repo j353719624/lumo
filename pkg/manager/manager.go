@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -35,6 +36,10 @@ type Manager struct {
 
 	mu   sync.Mutex
 	runs map[string]*run
+
+	trafficMu     sync.Mutex
+	traffic       map[string]*trafficAcc // 按配置 ID 的当日流量账本
+	trafficFlushed time.Time             // 上次落盘时间（30s 去抖）
 }
 
 // run is one supervised engine subprocess (one per connection config).
@@ -63,11 +68,82 @@ func New(store *Store) *Manager {
 	mgr := &Manager{
 		store:    store,
 		runs:     map[string]*run{},
+		traffic:  map[string]*trafficAcc{},
 		sessions: auth.NewSessions(5 * time.Minute), // 滑动过期：有操作就续期，闲置 5 分钟退出
 		limiter:  auth.NewLimiter(10 * time.Minute),
 	}
 	mgr.loadTwoFA()
+	mgr.loadTraffic()
 	return mgr
+}
+
+// trafficAcc 是一条连接配置的当日流量账本。引擎内存计数器随进程重启
+// 归零，这里用「基线 + 重启检测」把它续成真正的当日累计：抓到的实时值
+// 不小于上次快照就累加增量，小于则说明引擎重启过，把上次快照并入累计。
+// 账本按天落盘在数据目录 traffic.json，跨应用重启同样有效。
+type trafficAcc struct {
+	date      string
+	in, out   uint64
+	lastIn    uint64
+	lastOut   uint64
+}
+
+func (m *Manager) trafficPath() string {
+	return filepath.Join(filepath.Dir(m.store.path), "traffic.json")
+}
+
+func (m *Manager) loadTraffic() {
+	b, err := os.ReadFile(m.trafficPath())
+	if err != nil {
+		return
+	}
+	var m2 map[string]*trafficAcc
+	if json.Unmarshal(b, &m2) == nil && m2 != nil {
+		m.traffic = m2
+	}
+}
+
+func (m *Manager) flushTrafficLocked() {
+	b, err := json.Marshal(m.traffic)
+	if err != nil {
+		return
+	}
+	tmp := m.trafficPath() + ".tmp"
+	if os.WriteFile(tmp, b, 0o600) == nil {
+		_ = os.Rename(tmp, m.trafficPath())
+	}
+}
+
+// trafficAccumulate 把引擎刚报上来的实时计数并入当日累计并返回累计值。
+func (m *Manager) trafficAccumulate(id string, lin, lout uint64) (uint64, uint64) {
+	m.trafficMu.Lock()
+	defer m.trafficMu.Unlock()
+	today := time.Now().Format("2006-01-02")
+	a := m.traffic[id]
+	if a == nil {
+		a = &trafficAcc{}
+		m.traffic[id] = a
+	}
+	if a.date != today {
+		// 跨天：当日账本清零
+		a.date, a.in, a.out, a.lastIn, a.lastOut = today, 0, 0, 0, 0
+	}
+	if lin >= a.lastIn {
+		a.in += lin - a.lastIn
+	} else {
+		a.in += lin // 引擎重启过：计数器从零重新计
+	}
+	if lout >= a.lastOut {
+		a.out += lout - a.lastOut
+	} else {
+		a.out += lout
+	}
+	a.lastIn, a.lastOut = lin, lout
+	if now := time.Now(); now.Sub(m.trafficFlushed) >= 30*time.Second {
+		m.trafficFlushed = now
+		m.flushTrafficLocked()
+	}
+	return a.in, a.out
 }
 
 // SetBase sets the URL prefix the console is served under.
@@ -196,6 +272,9 @@ func (m *Manager) Stop() {
 		r.terminate()
 		_ = os.Remove(r.tomlPath)
 	}
+	m.trafficMu.Lock()
+	m.flushTrafficLocked()
+	m.trafficMu.Unlock()
 }
 
 // start launches the engine subprocess for one config. The supervisor keeps

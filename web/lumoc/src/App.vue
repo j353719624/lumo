@@ -179,8 +179,10 @@ const filteredConfigs = computed(() => {
   return list
 })
 
-const totalTrafficIn = computed(() => { let t = 0; for (const s of Object.values(statusMap.value)) { for (const p of (s.proxies||[])) t += (p.in||0) } return t })
-const totalTrafficOut = computed(() => { let t = 0; for (const s of Object.values(statusMap.value)) { for (const p of (s.proxies||[])) t += (p.out||0) } return t })
+// 今日流量用管理器的当日累计账本（跨引擎重启连续），不再加总引擎的
+// 内存实时计数器——那个在引擎重启时归零，会让「今日」掉回 0
+const totalTrafficIn = computed(() => { let t = 0; for (const s of Object.values(statusMap.value)) t += (s.trafficIn||0); return t })
+const totalTrafficOut = computed(() => { let t = 0; for (const s of Object.values(statusMap.value)) t += (s.trafficOut||0); return t })
 function formatB(n: number): string { if (!n) return '0 B'; if (n >= 1073741824) return (n/1073741824).toFixed(1)+' GB'; if (n >= 1048576) return (n/1048576).toFixed(1)+' MB'; if (n >= 1024) return (n/1024).toFixed(0)+' KB'; return n+' B' }
 
 const runningCount = computed(() =>
