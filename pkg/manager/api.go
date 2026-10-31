@@ -59,8 +59,8 @@ func (m *Manager) guardUI(next http.Handler) http.Handler {
 			return
 		}
 		http.Redirect(w, r, m.link("/login"), http.StatusFound)
-		})
-	}
+	})
+}
 
 // link builds a URL inside the prefixed console namespace.
 func (m *Manager) link(p string) string {
@@ -402,7 +402,7 @@ func (m *Manager) apiStatus(w http.ResponseWriter, _ *http.Request) {
 
 func (m *Manager) apiInfo(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
-		"version":   version.Version,
+		"version": version.Version,
 		// 语言中立的值：界面标签由前端 i18n 提供，这里只报二进制名
 		"engineBin": "lumoc engine",
 		"dataDir":   m.store.path,

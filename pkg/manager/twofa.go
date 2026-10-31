@@ -26,10 +26,10 @@ type consoleTwoFA struct {
 const twoFAFile = "console-totp.json"
 
 var (
-	twofaMu       sync.Mutex
-	twofaSecrets  []string
-	twoFATickets  = map[string]time.Time{}
-	twoFATicketT  = 2 * time.Minute
+	twofaMu      sync.Mutex
+	twofaSecrets []string
+	twoFATickets = map[string]time.Time{}
+	twoFATicketT = 2 * time.Minute
 )
 
 func (m *Manager) totpPath() string {

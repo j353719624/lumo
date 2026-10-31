@@ -234,11 +234,11 @@ func (c *ClientConfig) Validate() error {
 		return fmt.Errorf("serverPort %d out of range", c.ServerPort)
 	}
 	switch c.Protocol {
-	case "", "tcp", "kcp":
+	case "", "tcp", "kcp", "auto":
 	default:
-		return fmt.Errorf("protocol %q not supported yet (tcp/kcp)", c.Protocol)
+		return fmt.Errorf("protocol %q not supported yet (tcp/kcp/auto)", c.Protocol)
 	}
-	if c.Protocol == "kcp" && (c.KCPPort < 1 || c.KCPPort > 65535) {
+	if (c.Protocol == "kcp" || c.Protocol == "auto") && c.KCPPort != 0 && (c.KCPPort < 1 || c.KCPPort > 65535) {
 		return fmt.Errorf("kcpPort %d out of range", c.KCPPort)
 	}
 	if c.ProtocolVersion != 0 && (c.ProtocolVersion < 1 || c.ProtocolVersion > 2) {

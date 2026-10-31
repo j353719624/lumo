@@ -2,10 +2,10 @@ package manager
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
-	"encoding/json"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -37,9 +37,9 @@ type Manager struct {
 	mu   sync.Mutex
 	runs map[string]*run
 
-	trafficMu     sync.Mutex
-	traffic       map[string]*trafficAcc // 按配置 ID 的当日流量账本
-	trafficFlushed time.Time             // 上次落盘时间（30s 去抖）
+	trafficMu      sync.Mutex
+	traffic        map[string]*trafficAcc // 按配置 ID 的当日流量账本
+	trafficFlushed time.Time              // 上次落盘时间（30s 去抖）
 }
 
 // run is one supervised engine subprocess (one per connection config).
@@ -82,10 +82,10 @@ func New(store *Store) *Manager {
 // 不小于上次快照就累加增量，小于则说明引擎重启过，把上次快照并入累计。
 // 账本按天落盘在数据目录 traffic.json，跨应用重启同样有效。
 type trafficAcc struct {
-	date      string
-	in, out   uint64
-	lastIn    uint64
-	lastOut   uint64
+	date    string
+	in, out uint64
+	lastIn  uint64
+	lastOut uint64
 }
 
 func (m *Manager) trafficPath() string {

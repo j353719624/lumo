@@ -380,7 +380,7 @@ async function save() {
   try {
     const r = await api.update(c.id, {
       name: c.name, serverAddr: c.serverAddr, serverPort: c.serverPort,
-      protocol: c.protocol || 'tcp', kcpPort: c.protocol === 'kcp' ? Number(c.kcpPort) || 0 : 0,
+      protocol: c.protocol || 'tcp', kcpPort: (c.protocol === 'kcp' || c.protocol === 'auto') ? Number(c.kcpPort) || 0 : 0,
       token: c.token, tls: c.tls, mappings: c.mappings, visitors: c.visitors || [],
     })
     await refresh()
@@ -788,6 +788,7 @@ setInterval(() => refresh(true), 2500)
                 <select v-model="draft.protocol">
                   <option value="tcp">TCP</option>
                   <option value="kcp">KCP（UDP）</option>
+                  <option value="auto">自动（TCP 主 + KCP 备）</option>
                 </select>
               </div>
             </div>
@@ -799,7 +800,7 @@ setInterval(() => refresh(true), 2500)
                 </select>
               </div>
             </div>
-            <div class="field" v-if="draft.protocol === 'kcp'"><label>{{ t('c.sv.kcpPort') }}</label><input v-model.number="draft.kcpPort" class="mono" type="number" min="1" max="65535" :placeholder="t('c.sv.kcpPh')"></div>
+            <div class="field" v-if="draft.protocol === 'kcp' || draft.protocol === 'auto'"><label>{{ t('c.sv.kcpPort') }}</label><input v-model.number="draft.kcpPort" class="mono" type="number" min="1" max="65535" :placeholder="t('c.sv.kcpPh')"></div>
             <div class="sec"><span>{{ t('c.sv.advanced') }}</span></div>
             <div class="optrow"><span class="lbl">{{ t('c.sv.tls') }}</span><span class="switch sm" role="switch" :aria-checked="draft.tls ? 'true' : 'false'" tabindex="0" @click="draft.tls = !draft.tls"></span></div>
             <div class="optrow"><span class="lbl">{{ t('c.sv.autoreconn') }}</span><span class="switch sm on" role="switch" aria-checked="true" tabindex="0"></span></div>
