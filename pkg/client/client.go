@@ -30,6 +30,8 @@ type Client struct {
 	// Log, when set, captures this connection's events in a scoped ring.
 	Log *log.Instance
 
+	legID   string // 本腿的客户端 ID（auto 双腿时每腿独立）
+
 	mu      sync.Mutex
 	proxies map[string]*config.ProxyConfig
 	state   map[string]*ProxyState
@@ -75,6 +77,7 @@ func New(cfg *config.ClientConfig, cfgPath string) *Client {
 		cfg:         cfg,
 		cfgPath:     cfgPath,
 		id:          proto.RandomHex(8),
+		legID:       proto.RandomHex(8),
 		proxies:     map[string]*config.ProxyConfig{},
 		state:       map[string]*ProxyState{},
 		stats:       map[string]*relay.Counters{},
@@ -241,7 +244,7 @@ func (c *Client) serve(ctx context.Context) error {
 	hello := proto.Msg{
 		"type":   "hello",
 		"ver":    proto.Version,
-		"client": c.id,
+		"client": c.legID,
 		"nonce":  hex.EncodeToString(nonce),
 		"auth":   proto.Sign(c.cfg.AuthToken, nonce),
 		"authp":  proto.SignProof(c.cfg.AuthToken, nonce),
