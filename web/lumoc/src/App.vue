@@ -240,8 +240,11 @@ async function refresh(keepDetail = false) {
     // 避免界面突然变成「还没有任何连接配置」的空白态。
     const list = await api.list()
     if (Array.isArray(list)) configs.value = list
-    statusMap.value = {}
-    for (const s of await api.status()) statusMap.value[s.id] = s
+    // 先在局部对象里凑齐新状态，再一次性替换：若先清空 statusMap，
+    // 清空到新数据到达之间的渲染会把所有卡片闪成「连接中」
+    const sm: Record<string, ConnStatus> = {}
+    for (const s of await api.status()) sm[s.id] = s
+    statusMap.value = sm
     info.value = await api.info()
   } catch (e: any) {
     if (e?.message?.includes('401')) { location.href = 'login'; return }
