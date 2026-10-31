@@ -49,6 +49,7 @@ const (
 	cmdPSH
 	cmdACK
 	cmdPING
+	cmdRST
 )
 
 const flagFIN uint8 = 0x80
@@ -56,6 +57,11 @@ const flagFIN uint8 = 0x80
 var (
 	errSessionDead = errors.New("udpstream: session dead")
 	errStreamReset = errors.New("udpstream: stream reset")
+
+	// reclaimCooldown：流被回收后其 ID 的冷却期。冷却期内残余的重复
+	// 传输（网络上还在飞的老包）会因「未知流」被丢弃，之后该 ID 才可
+	// 复用。变量便于测试缩短。
+	reclaimCooldown = 5 * time.Second
 )
 
 // ---------------------------------------------------------------------------
@@ -285,15 +291,53 @@ func (st *stream) closeWrite() {
 	if !already {
 		_ = st.sendChunk(nil, true)
 	}
+	st.sess.tryReclaim(st)
 }
 
-// close 硬重置流。
+// reset 本地硬重置：立即不可读写，停掉自己的重传。对端不发 RST
+// （避免乒乓），对端由发起方的 RST 触发同样的重置。
+func (st *stream) reset() {
+	st.mu.Lock()
+	st.pendErr = errStreamReset
+	st.inflight = map[uint32]*segment{}
+	st.mu.Unlock()
+	st.closed.Store(true)
+	st.signal()
+}
+
+// close 硬重置流：本地立即失效，并向对端发送 RST 让其终止重传、
+// 回收同 ID 流。没有 RST 的话对端会永远重传未确认分片，两边都无法回收。
 func (st *stream) close(err error) {
 	st.closed.Store(true)
 	st.mu.Lock()
 	st.pendErr = err
+	st.inflight = map[uint32]*segment{}
 	st.mu.Unlock()
 	st.signal()
+	_ = st.sess.send(wirePkt{conv: st.sess.conv, cmd: cmdRST, stream: st.id})
+	st.sess.tryReclaim(st)
+}
+
+// tryReclaim 把双向完结的流从会话中摘除，腾出其 ID。优雅收尾要求本侧
+// FIN 已发出、对端 FIN 已按序交付、且全部分片（含 FIN）均获确认；硬重置
+// 的流本地立即回收。回收进入冷却期（见 reclaimCooldown）。
+func (s *Session) tryReclaim(st *stream) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if cur, ok := s.streams[st.id]; !ok || cur != st {
+		return
+	}
+	st.mu.Lock()
+	done := (st.writeDead && st.fin && len(st.inflight) == 0) || st.closed.Load()
+	st.mu.Unlock()
+	if !done {
+		return
+	}
+	delete(s.streams, st.id)
+	if s.cooldown == nil {
+		s.cooldown = map[uint8]time.Time{}
+	}
+	s.cooldown[st.id] = time.Now().Add(reclaimCooldown)
 }
 
 // Conn exposes one stream as a net.Conn.
@@ -323,10 +367,11 @@ type Session struct {
 	isServ  bool
 	onNewFn func(s *Session, id uint8)
 
-	mu      sync.Mutex
-	streams map[uint8]*stream
-	dead    atomic.Bool
-	closed  atomic.Bool
+	mu       sync.Mutex
+	streams  map[uint8]*stream
+	cooldown map[uint8]time.Time // 已回收 ID 的冷却截止时间
+	dead     atomic.Bool
+	closed   atomic.Bool
 
 	lastRx atomic.Int64
 	pkts   chan wirePkt
@@ -355,15 +400,21 @@ func (s *Session) Open() (net.Conn, error) {
 	if s.dead.Load() || s.closed.Load() {
 		return nil, errSessionDead
 	}
+	now := time.Now()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for id := uint8(1); id < 255; id++ {
-		if _, used := s.streams[id]; !used {
-			st := s.newStreamLocked(id)
-			st.acc.Store(true) // 自己打开的流无需 Accept
-			go st.sendChunk(nil, false)
-			return &Conn{s: st}, nil
+		if _, used := s.streams[id]; used {
+			continue
 		}
+		if until, cool := s.cooldown[id]; cool && now.Before(until) {
+			continue // 回收冷却期内不复用，残余重传全部落空
+		}
+		delete(s.cooldown, id)
+		st := s.newStreamLocked(id)
+		st.acc.Store(true) // 自己打开的流无需 Accept
+		go st.sendChunk(nil, false)
+		return &Conn{s: st}, nil
 	}
 	return nil, errors.New("udpstream: no free stream ids")
 }
@@ -480,6 +531,12 @@ func (s *Session) pump() {
 				s.rxACK(p)
 			case cmdPING:
 				// 仅保活
+			case cmdRST:
+				// 对端硬重置了这条流：本地立即失效并回收，停止重传
+				if st := s.streamOf(p.stream); st != nil {
+					st.reset()
+					s.tryReclaim(st)
+				}
 			case cmdSYN:
 				// 打洞模式：服务侧（或已建立会话）收到 SYN 就回 SYNACK
 				if s.isServ {
@@ -515,7 +572,9 @@ func (s *Session) streamOf(id uint8) *stream {
 func (s *Session) rxPSH(p wirePkt) {
 	st := s.streamOf(p.stream)
 	if st == nil {
-		if !s.isServ || p.stream == 0 {
+		// 新流的首包必然 seq==0；seq!=0 的是已回收流在网络里的残余重传，
+		// 直接丢弃（客户端本来就不收新流）
+		if !s.isServ || p.stream == 0 || p.seq != 0 {
 			return
 		}
 		s.mu.Lock()
@@ -537,6 +596,13 @@ func (s *Session) rxPSH(p wirePkt) {
 	fin := p.fin
 	var finErr error
 	st.mu.Lock()
+	if st.closed.Load() {
+		// 流已被重置：确认掉即可，不再堆积数据
+		rxWant := st.rxWant
+		st.mu.Unlock()
+		_ = s.sendACK(p.stream, rxWant, nil)
+		return
+	}
 	if p.seq == st.rxWant {
 		st.pend = append(st.pend, p.payload...)
 		st.rxWant++
@@ -578,6 +644,9 @@ func (s *Session) rxPSH(p wirePkt) {
 
 	st.signal()
 	_ = s.sendACK(p.stream, rxWant, sacks)
+	if fin {
+		s.tryReclaim(st)
+	}
 	_ = finErr
 }
 
@@ -647,6 +716,7 @@ func (s *Session) rxACK(p wirePkt) {
 	}
 	st.mu.Unlock()
 	st.signal() // 窗口腾出，唤醒写侧
+	s.tryReclaim(st)
 }
 
 // retransmit 重发超过 RTO 的分片；连续失败过多则判会话死亡。
@@ -659,6 +729,9 @@ func (s *Session) retransmit() {
 	}
 	s.mu.Unlock()
 	for _, st := range streams {
+		if st.closed.Load() {
+			continue
+		}
 		st.mu.Lock()
 		dead := false
 		for seq, seg := range st.inflight {
