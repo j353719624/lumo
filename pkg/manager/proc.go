@@ -136,22 +136,43 @@ func (r *run) supervise(ctx context.Context) {
 }
 
 // queryStatus reads the engine's localhost status endpoint.
+// statusMissTolerance：连续多少次状态抓取失败才上报「重启中」。
+// 管理口抓取偶发超时很常见（引擎正忙于转发），一次失败就降级会让
+// 界面在「已连接/连接中」之间快速闪烁。
+const statusMissTolerance = 3
+
 func (r *run) queryStatus() (running bool, lastErr string, proxies []client.ProxyStatus) {
-	cl := &http.Client{Timeout: 800 * time.Millisecond}
+	cl := &http.Client{Timeout: 2 * time.Second}
 	resp, err := cl.Get("http://" + r.admin + "/status")
 	if err != nil {
-		return false, "引擎进程重启中", nil
+		return r.noteStatusMiss("引擎进程重启中")
 	}
 	defer resp.Body.Close()
 	var out struct {
-		Running bool                `json:"running"`
-		Error   string              `json:"error"`
+		Running bool                 `json:"running"`
+		Error   string               `json:"error"`
 		Proxies []client.ProxyStatus `json:"proxies"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return false, "引擎状态解析失败", nil
+		return r.noteStatusMiss("引擎状态解析失败")
 	}
+	r.statusMu.Lock()
+	r.statusMiss = 0
+	r.lastRun, r.lastErrS, r.lastProx = out.Running, out.Error, out.Proxies
+	r.statusMu.Unlock()
 	return out.Running, out.Error, out.Proxies
+}
+
+// noteStatusMiss 记一次抓取失败；容忍期内沿用最近一次成功快照，
+// 超过容忍次数才承认失败。
+func (r *run) noteStatusMiss(reason string) (bool, string, []client.ProxyStatus) {
+	r.statusMu.Lock()
+	defer r.statusMu.Unlock()
+	r.statusMiss++
+	if r.statusMiss < statusMissTolerance && r.lastRun {
+		return r.lastRun, r.lastErrS, r.lastProx
+	}
+	return false, reason, nil
 }
 
 // terminate asks the engine process to exit; the supervisor's Wait reaps it.

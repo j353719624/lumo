@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/j353719624/lumo/pkg/auth"
+	"github.com/j353719624/lumo/pkg/client"
 	"github.com/j353719624/lumo/pkg/log"
 )
 
@@ -47,6 +48,14 @@ type run struct {
 	mu      sync.Mutex
 	cmd     *exec.Cmd
 	stopped bool
+
+	// 状态抓取的抖动容忍：管理口偶发超时不立刻上报「重启中」，
+	// 连续 miss 超过容忍次数才降级（详见 proc.go queryStatus）。
+	statusMu   sync.Mutex
+	statusMiss int
+	lastRun    bool
+	lastErrS   string
+	lastProx   []client.ProxyStatus
 }
 
 // New creates a Manager over the given store.
@@ -264,4 +273,3 @@ func (m *Manager) running(id string) (*run, bool) {
 	r, ok := m.runs[id]
 	return r, ok
 }
-
