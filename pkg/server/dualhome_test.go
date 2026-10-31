@@ -34,8 +34,8 @@ func fakeSession(s *Server, id, transport string) (*session, net.Conn) {
 	return ses, c0
 }
 
-func regMsg(name string) proto.Msg {
-	return proto.Msg{"type": "reg", "name": name, "kind": "tcp", "remote_port": 15900}
+func regMsg(name string, port int) proto.Msg {
+	return proto.Msg{"type": "reg", "name": name, "kind": "tcp", "remote_port": port}
 }
 
 func TestDualHomeRegistration(t *testing.T) {
@@ -45,7 +45,7 @@ func TestDualHomeRegistration(t *testing.T) {
 	s2, p2 := fakeSession(s, "cli-kcp", "kcp")
 	go io.Copy(io.Discard, p2)
 
-	s.handleReg(s1, regMsg("web"))
+	s.handleReg(s1, regMsg("web", 15900))
 	ent, ok := s.proxies["web"]
 	if !ok {
 		t.Fatal("first registration missing")
@@ -55,7 +55,7 @@ func TestDualHomeRegistration(t *testing.T) {
 	}
 
 	// 另一条传输注册同名映射：双归属，监听器不重建
-	s.handleReg(s2, regMsg("web"))
+	s.handleReg(s2, regMsg("web", 15900))
 	if len(ent.owners) != 2 || ent.owners["kcp"] != s2 {
 		t.Fatalf("owners after dual-home: %+v", ent.owners)
 	}
@@ -86,9 +86,9 @@ func TestDualHomeRejectsAliveDup(t *testing.T) {
 	s2, p2 := fakeSession(s, "cli-tcp-2", "tcp")
 	go io.Copy(io.Discard, p2) // 排水：拒绝回复的写入不阻塞
 
-	s.handleReg(s1, regMsg("web"))
+	s.handleReg(s1, regMsg("web", 15901))
 	// 同传输活会话重复注册：拒绝
-	s.handleReg(s2, regMsg("web"))
+	s.handleReg(s2, regMsg("web", 15901))
 	ent := s.proxies["web"]
 	if len(ent.owners) != 1 || ent.owners["tcp"] != s1 {
 		t.Fatalf("same-transport dup should be rejected: %+v", ent.owners)
@@ -96,7 +96,7 @@ func TestDualHomeRejectsAliveDup(t *testing.T) {
 
 	// 同传输死会话接管：允许
 	s1.closed.Store(true)
-	s.handleReg(s2, regMsg("web"))
+	s.handleReg(s2, regMsg("web", 15901))
 	if ent.owners["tcp"] != s2 {
 		t.Fatal("dead session should be taken over by the new one")
 	}
@@ -109,9 +109,9 @@ func TestDualHomeRejectsConfigConflict(t *testing.T) {
 	s2, p2 := fakeSession(s, "cli-kcp", "kcp")
 	go io.Copy(io.Discard, p2) // 排水：拒绝回复的写入不阻塞
 
-	s.handleReg(s1, regMsg("web"))
+	s.handleReg(s1, regMsg("web", 15902))
 	// 端口冲突的双归：拒绝
-	m := regMsg("web")
+	m := regMsg("web", 15902)
 	m["remote_port"] = 19999
 	s.handleReg(s2, m)
 	ent := s.proxies["web"]
@@ -136,8 +136,8 @@ func TestGetWorkFailsOverToSecondary(t *testing.T) {
 			ch <- m
 		}
 	}()
-	s.handleReg(s1, regMsg("web"))
-	s.handleReg(s2, regMsg("web"))
+	s.handleReg(s1, regMsg("web", 15903))
+	s.handleReg(s2, regMsg("web", 15903))
 	ent := s.proxies["web"]
 
 	// 主传输（tcp）死：getWork 必须把 work 请求发到 kcp 会话。测试里没有
