@@ -57,11 +57,16 @@ type Client struct {
 	admin  *httpServer
 }
 
-// DualCap 报告服务端是否支持双传输归属（auto 协议的 KCP 腿需要）。
-func (c *Client) DualCap() bool {
+// LoggedIn 报告本腿是否已完成登录（收到 welcome）。
+func (c *Client) LoggedIn() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.dualCap
+	return c.ctrl != nil
+}
+
+// LogInstance 返回本腿的日志实例（engine 的 auto 腿启动日志用）。
+func (c *Client) LogInstance() *log.Instance {
+	return c.Log
 }
 
 // ProxyState is the dashboard-visible state of one proxy.

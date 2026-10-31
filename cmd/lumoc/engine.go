@@ -58,12 +58,12 @@ func runEngine(args []string) {
 		kcpCl := client.New(&kcpCfg, *cfgPath)
 		legs = append(legs, tcpCl, kcpCl)
 		go func() { _ = tcpCl.Run(ctxBg()) }()
-		// KCP 腿等 TCP 腿的 welcome 判定服务器支持双归属后再启动；
+		// KCP 腿等 TCP 腿完成首次登录（确认服务器支持双归属）后启动；
 		// 旧服务端不支持时保持单路 TCP（KCP 注册会被旧服务端拒绝）。
 		go func() {
 			deadline := time.Now().Add(30 * time.Second)
 			for ctxBg().Err() == nil {
-				if tcpCl.DualCap() || time.Now().After(deadline) {
+				if tcpCl.LoggedIn() || time.Now().After(deadline) {
 					break
 				}
 				time.Sleep(200 * time.Millisecond)
@@ -71,10 +71,11 @@ func runEngine(args []string) {
 			if ctxBg().Err() != nil {
 				return
 			}
-			if tcpCl.DualCap() {
+			if tcpCl.LoggedIn() {
+				kcpCl.LogInstance().Infof("auto: starting KCP standby leg")
 				_ = kcpCl.Run(ctxBg())
 			} else {
-				fmt.Fprintln(os.Stderr, "lumoc engine: server lacks dual-transport support; staying on tcp")
+				fmt.Fprintln(os.Stderr, "lumoc engine: server unreachable within 30s; KCP leg not started")
 			}
 		}()
 	} else {
