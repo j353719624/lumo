@@ -131,8 +131,6 @@ type proxyEnt struct {
 	ln    net.Listener // tcp
 	udpLn *net.UDPConn // udp
 
-	workCh chan net.Conn
-
 	dead atomic.Bool
 	wmu  sync.Mutex
 	data net.Conn // current udp data connection
@@ -153,7 +151,7 @@ func New(cfg *config.ServerConfig) *Server {
 		httpsDom:    map[string][]*proxyEnt{},
 		muxDom:      map[string]*proxyEnt{},
 		pending:     map[string]pendEntry{},
-		webSessions: auth.NewSessions(7 * 24 * time.Hour),
+		webSessions: auth.NewSessions(5 * time.Minute), // 滑动过期：有操作就续期，闲置 5 分钟退出
 		limiter:     auth.NewLimiter(10 * time.Minute),
 		cfgPath:     cfg.ConfigPath,
 	}
@@ -699,11 +697,6 @@ func (s *Server) serveMuxConn(c net.Conn) {
 }
 
 func (s *Server) getWork(ent *proxyEnt, timeout time.Duration) (net.Conn, error) {
-	select {
-	case c := <-ent.workCh:
-		return c, nil
-	default:
-	}
 	if ent.dead.Load() || ent.owner.closed.Load() {
 		return nil, fmt.Errorf("proxy %q is offline", ent.name)
 	}

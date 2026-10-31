@@ -337,7 +337,7 @@ func (s *Session) tryReclaim(st *stream) {
 	if s.cooldown == nil {
 		s.cooldown = map[uint8]time.Time{}
 	}
-	s.cooldown[st.id] = time.Now().Add(reclaimCooldown)
+	s.cooldown[st.id] = time.Now().Add(s.cooldownTTL)
 }
 
 // Conn exposes one stream as a net.Conn.
@@ -367,11 +367,12 @@ type Session struct {
 	isServ  bool
 	onNewFn func(s *Session, id uint8)
 
-	mu       sync.Mutex
-	streams  map[uint8]*stream
-	cooldown map[uint8]time.Time // 已回收 ID 的冷却截止时间
-	dead     atomic.Bool
-	closed   atomic.Bool
+	mu          sync.Mutex
+	streams     map[uint8]*stream
+	cooldown    map[uint8]time.Time // 已回收 ID 的冷却截止时间
+	cooldownTTL time.Duration       // 创建会话时捕获；测试可调短
+	dead        atomic.Bool
+	closed      atomic.Bool
 
 	lastRx atomic.Int64
 	pkts   chan wirePkt
@@ -733,7 +734,6 @@ func (s *Session) retransmit() {
 			continue
 		}
 		st.mu.Lock()
-		dead := false
 		for seq, seg := range st.inflight {
 			if now.Sub(seg.sent) < seg.lastRTO {
 				continue
@@ -757,11 +757,6 @@ func (s *Session) retransmit() {
 			st.mu.Lock()
 		}
 		st.mu.Unlock()
-		if dead {
-			s.dead.Store(true)
-			s.closeAll(errSessionDead)
-			return
-		}
 	}
 }
 
@@ -819,13 +814,14 @@ func (l *Listener) readLoop() {
 				continue
 			}
 			sess = &Session{
-				pc:      l.pc,
-				remote:  raddr,
-				conv:    p.conv,
-				isServ:  true,
-				streams: map[uint8]*stream{},
-				pkts:    make(chan wirePkt, 512),
-				onNewFn: func(s *Session, id uint8) {},
+				pc:          l.pc,
+				remote:      raddr,
+				conv:        p.conv,
+				isServ:      true,
+				streams:     map[uint8]*stream{},
+				cooldownTTL: reclaimCooldown,
+				pkts:        make(chan wirePkt, 512),
+				onNewFn:     func(s *Session, id uint8) {},
 			}
 			l.sessions[p.conv] = sess
 			_ = sess.send(wirePkt{conv: p.conv, cmd: cmdSYNACK})
@@ -847,13 +843,14 @@ func (l *Listener) readLoop() {
 // already open (STUN punch). Inbound SYNs are answered from the pump.
 func Adopt(pc *net.UDPConn, remote *net.UDPAddr, conv uint32) *Session {
 	s := &Session{
-		pc:      pc,
-		remote:  remote,
-		conv:    conv,
-		isServ:  true,
-		streams: map[uint8]*stream{},
-		pkts:    make(chan wirePkt, 512),
-		onNewFn: func(s *Session, id uint8) {},
+		pc:          pc,
+		remote:      remote,
+		conv:        conv,
+		isServ:      true,
+		streams:     map[uint8]*stream{},
+		cooldownTTL: reclaimCooldown,
+		pkts:        make(chan wirePkt, 512),
+		onNewFn:     func(s *Session, id uint8) {},
 	}
 	s.start()
 	return s
@@ -863,13 +860,14 @@ func Adopt(pc *net.UDPConn, remote *net.UDPAddr, conv uint32) *Session {
 // SYNs until the peer answers or the timeout expires.
 func DialOn(pc *net.UDPConn, remote *net.UDPAddr, conv uint32, timeout time.Duration) (*Session, error) {
 	s := &Session{
-		pc:      pc,
-		remote:  remote,
-		conv:    conv,
-		streams: map[uint8]*stream{},
-		pkts:    make(chan wirePkt, 512),
-		onNewFn: func(s *Session, id uint8) {},
-		hsDone:  make(chan struct{}),
+		pc:          pc,
+		remote:      remote,
+		conv:        conv,
+		streams:     map[uint8]*stream{},
+		cooldownTTL: reclaimCooldown,
+		pkts:        make(chan wirePkt, 512),
+		onNewFn:     func(s *Session, id uint8) {},
+		hsDone:      make(chan struct{}),
 	}
 	s.start()
 	syn := wirePkt{conv: conv, cmd: cmdSYN}

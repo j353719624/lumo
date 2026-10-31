@@ -65,7 +65,6 @@ func (s *Server) handleReg(ses *session, m proto.Msg) {
 		httpPass:   m.Str("http_pass"),
 		owner:      ses,
 		since:      time.Now(),
-		workCh:     make(chan net.Conn, 64),
 	}
 	if err := s.setupProxyLocked(ent); err != nil {
 		s.mu.Unlock()
