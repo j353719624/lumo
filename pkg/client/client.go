@@ -38,6 +38,7 @@ type Client struct {
 	lastErr string
 
 	muxPort int
+	dualCap bool // 服务端 welcome 声明的双传输归属能力
 	// usess is the multiplexed KCP session when Protocol is "kcp".
 	usess *udpstream.Session
 
@@ -52,6 +53,13 @@ type Client struct {
 	wmu    sync.Mutex
 	closed atomic.Bool
 	admin  *httpServer
+}
+
+// DualCap 报告服务端是否支持双传输归属（auto 协议的 KCP 腿需要）。
+func (c *Client) DualCap() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.dualCap
 }
 
 // ProxyState is the dashboard-visible state of one proxy.
@@ -258,6 +266,9 @@ func (c *Client) serve(ctx context.Context) error {
 	}
 	c.mu.Lock()
 	c.muxPort = welcome.Int("mux_port")
+	if dv, ok := welcome["dual"].(bool); ok {
+		c.dualCap = dv // 服务端支持双传输归属（auto 协议的 KCP 腿依赖它）
+	}
 	if kp := welcome.Int("kcp_port"); kp > 0 && kp != c.cfg.KCPPort {
 		c.cfg.KCPPort = kp // 服务端改了 KCP 端口：下次重连直接用新端口
 		c.logi("server kcp port updated to %d", kp)

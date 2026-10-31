@@ -47,9 +47,36 @@ func (s *Server) handleReg(ses *session, m proto.Msg) {
 		reply(false, "server shutting down")
 		return
 	}
-	if _, exists := s.proxies[name]; exists {
+	if ent, exists := s.proxies[name]; exists {
+		// 名字已存在：按传输分流。auto 协议下另一条传输注册同名映射是
+		// 双归属（合法）；同传输的活会话重复注册才拒绝；同传输的死会话
+		// 由新会话接管。punch 类保持单归属（UDP 打洞不双归）。
+		if old, ok := ent.owners[ses.transport]; ok && !old.closed.Load() {
+			s.mu.Unlock()
+			reply(false, "proxy name already in use")
+			return
+		}
+		if kind == "punch" && len(ent.owners) > 0 {
+			s.mu.Unlock()
+			reply(false, "proxy name already in use")
+			return
+		}
+		if ent.kind != kind || ent.remotePort != m.Int("remote_port") || ent.sk != m.Str("sk") {
+			s.mu.Unlock()
+			reply(false, "proxy config conflicts with the existing transport")
+			return
+		}
+		ent.owners[ses.transport] = ses
+		ses.mu.Lock()
+		ses.names[name] = ent
+		ses.mu.Unlock()
 		s.mu.Unlock()
-		reply(false, "proxy name already in use")
+		if ent.label != "" {
+			log.Infof("proxy %q (%s) dual-homed by client %q over %s", ent.label, kind, ses.display(), ses.transport)
+		} else {
+			log.Infof("proxy %q (%s) dual-homed by client %q over %s", name, kind, ses.display(), ses.transport)
+		}
+		reply(true, "")
 		return
 	}
 	ent := &proxyEnt{
@@ -63,7 +90,8 @@ func (s *Server) handleReg(ses *session, m proto.Msg) {
 		subPaths:   m.StrList("sub_paths"),
 		httpUser:   m.Str("http_user"),
 		httpPass:   m.Str("http_pass"),
-		owner:      ses,
+		owners:     map[string]*session{ses.transport: ses},
+		pref:       ses.transport, // 首注册传输为首选
 		since:      time.Now(),
 	}
 	if err := s.setupProxyLocked(ent); err != nil {
@@ -184,11 +212,16 @@ func (s *Server) handleUnreg(ses *session, m proto.Msg) {
 	name := m.Str("name")
 	s.mu.Lock()
 	ent, ok := s.proxies[name]
-	if ok && ent.owner != ses {
+	if ok && !ent.ownedBy(ses) {
 		ok = false
 	}
 	if ok {
-		s.removeProxyLocked(name, ent)
+		s.mu.Lock()
+		delete(ent.owners, ses.transport)
+		if len(ent.owners) == 0 {
+			s.removeProxyLocked(name, ent)
+		}
+		s.mu.Unlock()
 	}
 	s.mu.Unlock()
 	t := "unreg_ok"

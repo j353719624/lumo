@@ -519,17 +519,18 @@ func (s *Server) apiProxies(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Lock()
 	list := make([]map[string]any, 0, len(s.proxies))
 	for _, ent := range s.proxies {
+		owner := ent.primaryOwner()
 		conf := map[string]any{
 			"type": ent.kind,
-			"user": ent.owner.id,
+			"user": owner.id,
 		}
 		label := ent.name
-		if ent.owner.name != "" {
-			label = ent.owner.name
+		if owner.name != "" {
+			label = owner.name
 		}
 		if ent.label != "" {
-			if ent.owner.name != "" {
-				label = ent.owner.name + " · " + ent.label
+			if owner.name != "" {
+				label = owner.name + " · " + ent.label
 			} else {
 				label = ent.label
 			}
@@ -547,7 +548,7 @@ func (s *Server) apiProxies(w http.ResponseWriter, _ *http.Request) {
 		list = append(list, map[string]any{
 			"name":              ent.name,
 			"label":             label,
-			"clientName":        ent.owner.name,
+			"clientName":        owner.name,
 			"status":            "online",
 			"today_traffic_in":  ent.cnt.In.Load(),
 			"today_traffic_out": ent.cnt.Out.Load(),

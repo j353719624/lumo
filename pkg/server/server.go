@@ -91,6 +91,95 @@ type pendEntry struct {
 	name string
 }
 
+const proxyPrefMissLimit = 3
+
+// transportOrder 返回 getWork 的尝试顺序：首选传输在前。
+func (ent *proxyEnt) transportOrder() []string {
+	ent.pmu.Lock()
+	defer ent.pmu.Unlock()
+	prim := ent.pref
+	if prim == "" {
+		prim = "tcp"
+	}
+	if prim != "tcp" && prim != "kcp" {
+		prim = "tcp"
+	}
+	other := "kcp"
+	if prim == "kcp" {
+		other = "tcp"
+	}
+	return []string{prim, other}
+}
+
+// noteTransportResult 记录一次 getWork 结果：首选连续失败达到阈值就切换
+// 首选；非首选成功不直接抢首选（避免两条都可用时来回横跳）。
+func (ent *proxyEnt) noteTransportResult(tr string, ok bool) {
+	ent.pmu.Lock()
+	defer ent.pmu.Unlock()
+	if ent.pref == "" {
+		ent.pref = "tcp"
+	}
+	if tr == ent.pref {
+		if ok {
+			ent.prefMiss = 0
+		} else {
+			ent.prefMiss++
+			if ent.prefMiss >= proxyPrefMissLimit {
+				if ent.pref == "tcp" {
+					ent.pref = "kcp"
+				} else {
+					ent.pref = "tcp"
+				}
+				ent.prefMiss = 0
+			}
+		}
+	}
+}
+
+// primaryOwner 返回当前首选传输的会话（可能为 nil）。
+func (ent *proxyEnt) primaryOwner() *session {
+	ent.pmu.Lock()
+	defer ent.pmu.Unlock()
+	if ses, ok := ent.owners[ent.pref]; ok {
+		return ses
+	}
+	for _, ses := range ent.owners {
+		return ses
+	}
+	return nil
+}
+
+// markPrimaryDead 首选传输的会话已死：立即切换首选（调用方已确认死亡，
+// 无需等待失败计数累积）。
+func (ent *proxyEnt) markPrimaryDead(tr string) {
+	ent.pmu.Lock()
+	defer ent.pmu.Unlock()
+	pref := ent.pref
+	if pref == "" {
+		pref = "tcp"
+	}
+	if pref == tr {
+		if ent.pref == "tcp" {
+			ent.pref = "kcp"
+		} else {
+			ent.pref = "tcp"
+		}
+		ent.prefMiss = 0
+	}
+}
+
+// ownedBy 报告该会话是否拥有此代理（任意传输）。
+func (ent *proxyEnt) ownedBy(ses *session) bool {
+	ent.pmu.Lock()
+	defer ent.pmu.Unlock()
+	for _, s := range ent.owners {
+		if s == ses {
+			return true
+		}
+	}
+	return false
+}
+
 // display returns the client's display name when it provided one, else the id.
 func (ses *session) display() string {
 	if ses.name != "" {
@@ -100,10 +189,11 @@ func (ses *session) display() string {
 }
 
 type session struct {
-	srv     *Server
-	id      string
-	name    string
-	since   time.Time
+	srv       *Server
+	id        string
+	transport string // "tcp" 或 "kcp"：本会话的承载传输
+	name      string
+	since     time.Time
 	conn    net.Conn
 	wmu     sync.Mutex
 	closed  atomic.Bool
@@ -125,8 +215,13 @@ type proxyEnt struct {
 	httpPass   string
 	punchAddr  string
 	localPort  int // 原始服务端口（sealed-tcp 供访客用相同端口）
-	owner      *session
-	since      time.Time
+	// 双归属主：同一映射可同时由 TCP 与 KCP 两条控制会话注册（auto 协议），
+	// 键 = 传输（"tcp"/"kcp"）。getWork 按择优顺序向其中一条要工作连接。
+	owners   map[string]*session
+	pref     string // 当前首选传输；连续失败自动切换
+	prefMiss int    // 首选传输连续失败次数
+	pmu      sync.Mutex
+	since    time.Time
 
 	ln    net.Listener // tcp
 	udpLn *net.UDPConn // udp
@@ -239,7 +334,7 @@ func (s *Server) acceptLoop() {
 			time.Sleep(150 * time.Millisecond)
 			continue
 		}
-		go s.handleConn(c)
+		go s.handleConn(c, "tcp")
 	}
 }
 
@@ -314,7 +409,7 @@ func (s *Server) kcpAcceptLoop(l *udpstream.Listener) {
 				if err != nil {
 					return
 				}
-				go s.handleConn(st)
+				go s.handleConn(st, "kcp")
 			}
 		}(sess)
 	}
@@ -361,7 +456,7 @@ func (s *Server) DropAllSessions(reason string) {
 	}
 }
 
-func (s *Server) handleConn(c net.Conn) {
+func (s *Server) handleConn(c net.Conn, transport string) {
 	_ = c.SetDeadline(time.Now().Add(15 * time.Second))
 
 	// 自动检测 TLS：首字节 0x16 = TLS ClientHello
@@ -391,7 +486,7 @@ func (s *Server) handleConn(c net.Conn) {
 	}
 	switch first.Str("type") {
 	case "hello":
-		s.newSession(c, first)
+		s.newSession(c, first, transport)
 	case "data":
 		s.handleData(c, first)
 	default:
@@ -401,7 +496,7 @@ func (s *Server) handleConn(c net.Conn) {
 	}
 }
 
-func (s *Server) newSession(c net.Conn, hello proto.Msg) {
+func (s *Server) newSession(c net.Conn, hello proto.Msg, transport string) {
 	nonce, err := hex.DecodeString(hello.Str("nonce"))
 	if err != nil || len(nonce) == 0 {
 		_ = proto.Send(c, proto.Msg{"type": "error", "message": "bad nonce"})
@@ -440,22 +535,26 @@ func (s *Server) newSession(c net.Conn, hello proto.Msg) {
 		sid = proto.RandomHex(8)
 	}
 	ses := &session{
-		srv:     s,
-		id:      sid,
-		name:    hello.Str("name"),
-		since:   time.Now(),
-		conn:    c,
-		names:   map[string]*proxyEnt{},
-		pendReg: map[string]chan proto.Msg{},
+		srv:       s,
+		id:        sid,
+		transport: transport,
+		name:      hello.Str("name"),
+		since:     time.Now(),
+		conn:      c,
+		names:     map[string]*proxyEnt{},
+		pendReg:   map[string]chan proto.Msg{},
 	}
 	s.mu.Lock()
-	if _, dup := s.sessions[sid]; dup {
+	// 会话键 = 客户端 ID + 传输：auto 协议下同一客户端会同时建立 TCP 与
+	// KCP 两条会话；只有同键重复才是真正的 ID 冲突
+	skey := sid + "\x00" + transport
+	if _, dup := s.sessions[skey]; dup {
 		s.mu.Unlock()
 		_ = proto.Send(c, proto.Msg{"type": "error", "message": "client id already connected"})
 		_ = c.Close()
 		return
 	}
-	s.sessions[sid] = ses
+	s.sessions[skey] = ses
 	s.mu.Unlock()
 	name := hello.Str("name")
 	if name == "" {
@@ -463,7 +562,7 @@ func (s *Server) newSession(c net.Conn, hello proto.Msg) {
 	}
 	log.Infof("client %q connected (session %s)", name, sid[:6])
 
-	if err := ses.send(proto.Msg{"type": "welcome", "sid": sid, "version": version.Version, "mux_port": s.cfg.MuxPort, "kcp_port": s.cfg.KCPPort}); err != nil {
+	if err := ses.send(proto.Msg{"type": "welcome", "sid": sid, "version": version.Version, "mux_port": s.cfg.MuxPort, "kcp_port": s.cfg.KCPPort, "dual": true}); err != nil {
 		ses.drop("write welcome: " + err.Error())
 		return
 	}
@@ -502,7 +601,7 @@ func (s *session) readLoop() {
 			items := []map[string]any{}
 			s.srv.mu.Lock()
 			for n, ent := range s.srv.proxies {
-				if ent.owner == s {
+				if ent.ownedBy(s) {
 					continue
 				}
 				if ent.kind == "sealed-tcp" || ent.kind == "sealed-udp" {
@@ -522,7 +621,9 @@ func (s *session) readLoop() {
 	}
 }
 
-// drop tears the session down and releases every proxy it owns.
+// drop tears the session down and releases every proxy it owns. auto 协议下
+// 同一映射可能还有另一条传输的会话持有——只摘除本传输的归属，代理与
+// 监听器保持完整由剩余传输继续服务；两条都断开才整体拆除归档。
 func (s *session) drop(reason string) {
 	if s.closed.Swap(true) {
 		return
@@ -530,9 +631,14 @@ func (s *session) drop(reason string) {
 	log.Infof("client %q disconnected: %s", s.display(), log.StripAddrs(reason))
 	s.srv.mu.Lock()
 	for name, ent := range s.names {
-		s.srv.removeProxyLocked(name, ent)
+		if ent.owners[s.transport] == s {
+			delete(ent.owners, s.transport)
+			if len(ent.owners) == 0 {
+				s.srv.removeProxyLocked(name, ent)
+			}
+		}
 	}
-	delete(s.srv.sessions, s.id)
+	delete(s.srv.sessions, s.id+"\x00"+s.transport)
 	s.srv.mu.Unlock()
 	_ = s.conn.Close()
 }
@@ -696,10 +802,34 @@ func (s *Server) serveMuxConn(c net.Conn) {
 	relay.Pipe(c, owner, &ent.cnt)
 }
 
+// getWork 按择优顺序向双归属的会话请求工作连接：首选失败（超时/发送
+// 失败）立即转备用，两条都不可用才报离线。结果驱动首选的动态切换。
 func (s *Server) getWork(ent *proxyEnt, timeout time.Duration) (net.Conn, error) {
-	if ent.dead.Load() || ent.owner.closed.Load() {
+	if ent.dead.Load() {
 		return nil, fmt.Errorf("proxy %q is offline", ent.name)
 	}
+	var lastErr error = fmt.Errorf("proxy %q is offline", ent.name)
+	for _, tr := range ent.transportOrder() {
+		ses := ent.owners[tr]
+		if ses == nil || ses.closed.Load() {
+			if tr == ent.pref {
+				ent.markPrimaryDead(tr) // 首选会话已死：立即切换首选
+			}
+			continue
+		}
+		c, err := s.requestWork(ses, ent, timeout)
+		if err == nil {
+			ent.noteTransportResult(tr, true)
+			return c, nil
+		}
+		lastErr = err
+		ent.noteTransportResult(tr, false)
+	}
+	return nil, lastErr
+}
+
+// requestWork 向一条会话索要一条工作连接并等待配对。
+func (s *Server) requestWork(ses *session, ent *proxyEnt, timeout time.Duration) (net.Conn, error) {
 	cid := proto.RandomHex(16)
 	ch := make(chan net.Conn, 1)
 	s.pendMu.Lock()
@@ -710,7 +840,7 @@ func (s *Server) getWork(ent *proxyEnt, timeout time.Duration) (net.Conn, error)
 		delete(s.pending, cid)
 		s.pendMu.Unlock()
 	}()
-	if err := ent.owner.send(proto.Msg{"type": "work", "name": ent.name, "cid": cid}); err != nil {
+	if err := ses.send(proto.Msg{"type": "work", "name": ent.name, "cid": cid}); err != nil {
 		return nil, fmt.Errorf("request work connection: %w", err)
 	}
 	select {
@@ -760,15 +890,11 @@ func (s *Server) removeProxyLocked(name string, ent *proxyEnt) {
 	delete(s.proxies, name)
 	if s.proxyMem != nil {
 		label := ent.name
-		if ent.owner != nil && ent.owner.name != "" {
-			label = ent.owner.name
+		if owner := ent.primaryOwner(); owner != nil && owner.name != "" {
+			label = owner.name
 		}
 		if ent.label != "" {
-			if ent.owner != nil && ent.owner.name != "" {
-				label = ent.owner.name + " · " + ent.label
-			} else {
-				label = ent.label
-			}
+			label = ent.label
 		}
 		entry := ""
 		switch ent.kind {
@@ -796,8 +922,8 @@ func (s *Server) removeProxyLocked(name string, ent *proxyEnt) {
 
 // ownerNameSafe returns the client display name, tolerating a nil owner.
 func (e *proxyEnt) ownerNameSafe() string {
-	if e.owner != nil {
-		return e.owner.name
+	if ses := e.primaryOwner(); ses != nil {
+		return ses.name
 	}
 	return ""
 }
@@ -820,7 +946,7 @@ func (s *Server) handlePunchAddr(ses *session, m proto.Msg) {
 	addr := m.Str("addr")
 	s.mu.Lock()
 	ent := s.proxies[name]
-	if ent != nil && ent.owner == ses && ent.kind == "punch" {
+	if ent != nil && ent.ownedBy(ses) && ent.kind == "punch" {
 		ent.punchAddr = addr
 		log.Infof("punch %q: punch address %s", name, log.MaskAddr(addr))
 	}
@@ -838,7 +964,10 @@ func (s *Server) handlePunchPunch(ses *session, m proto.Msg) {
 	ok := ent != nil && ent.kind == "punch" && ent.sk != "" && ent.sk == sk && ent.punchAddr != "" && !ent.dead.Load()
 	var svc *session
 	if ok {
-		svc = ent.owner
+		svc = ent.primaryOwner()
+		if svc == nil {
+			ok = false
+		}
 	}
 	peerAddr := ""
 	if ok {
