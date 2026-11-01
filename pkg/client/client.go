@@ -64,11 +64,6 @@ func (c *Client) LoggedIn() bool {
 	return c.ctrl != nil
 }
 
-// LogInstance 返回本腿的日志实例（engine 的 auto 腿启动日志用）。
-func (c *Client) LogInstance() *log.Instance {
-	return c.Log
-}
-
 // ProxyState is the dashboard-visible state of one proxy.
 type ProxyState struct {
 	Status string

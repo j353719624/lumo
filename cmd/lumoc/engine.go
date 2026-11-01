@@ -73,7 +73,6 @@ func runEngine(args []string) {
 				return
 			}
 			if tcpCl.LoggedIn() {
-				kcpCl.LogInstance().Infof("auto: starting KCP standby leg")
 				_ = kcpCl.Run(ctxBg())
 			} else {
 				fmt.Fprintln(os.Stderr, "lumoc engine: server unreachable within 30s; KCP leg not started")
