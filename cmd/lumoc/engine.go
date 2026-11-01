@@ -56,6 +56,7 @@ func runEngine(args []string) {
 		kcpCfg.Proxies = kcpProxies
 		tcpCl := client.New(&tcpCfg, *cfgPath)
 		kcpCl := client.New(&kcpCfg, *cfgPath)
+		kcpCl.Log = tcpCl.Log // 共享日志实例：KCP 腿的连接尝试进同一个 lumoc.log
 		legs = append(legs, tcpCl, kcpCl)
 		go func() { _ = tcpCl.Run(ctxBg()) }()
 		// KCP 腿等 TCP 腿完成首次登录（确认服务器支持双归属）后启动；
