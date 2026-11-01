@@ -454,6 +454,10 @@ func renderToml(cfg ConnConfig) string {
 	if cfg.Protocol == "kcp" {
 		L = append(L, `protocol = "kcp"`, "kcpPort = "+strconv.Itoa(cfg.KCPPort))
 	}
+	if cfg.Protocol == "auto" {
+		// auto：引擎内跑 TCP 主 + KCP 备双腿，kcpPort 是备腿的拨号端口
+		L = append(L, `protocol = "auto"`, "kcpPort = "+strconv.Itoa(cfg.KCPPort))
+	}
 	if cfg.ProtocolVer > 0 && cfg.ProtocolVer != 2 {
 		L = append(L, "protocolVersion = "+strconv.Itoa(cfg.ProtocolVer))
 	}
