@@ -24,6 +24,8 @@ func runServerInit(args []string) {
 	webAddr := fs.String("web-addr", "0.0.0.0", "dashboard listen address")
 	webUser := fs.String("web-user", "admin", "dashboard user")
 	webPass := fs.String("web-pass", "", "dashboard password (empty: generate)")
+	basicUser := fs.String("web-basic-user", "", "HTTP basic auth user gating the dashboard (empty: layer off)")
+	basicPass := fs.String("web-basic-pass", "", "HTTP basic auth password gating the dashboard")
 	allowPorts := fs.String("allow-ports", "", "comma separated public port allowlist")
 	_ = fs.Parse(args)
 
@@ -69,6 +71,10 @@ func runServerInit(args []string) {
 	b.WriteString(fmt.Sprintf("port = %d\n", *webPort))
 	b.WriteString(fmt.Sprintf("user = %q\n", *webUser))
 	b.WriteString(fmt.Sprintf("password = %q\n", pass))
+	if *basicUser != "" {
+		b.WriteString(fmt.Sprintf("basicUser = %q\n", *basicUser))
+		b.WriteString(fmt.Sprintf("basicPassword = %q\n", *basicPass))
+	}
 	b.WriteString("\n")
 
 	if err := os.WriteFile(*out, []byte(b.String()), 0o600); err != nil {
@@ -80,4 +86,8 @@ func runServerInit(args []string) {
 	fmt.Printf("SECRET=%s\n", sec)
 	fmt.Printf("WEB_USER=%s\n", *webUser)
 	fmt.Printf("WEB_PASS=%s\n", pass)
+	if *basicUser != "" {
+		fmt.Printf("BASIC_USER=%s\n", *basicUser)
+		fmt.Printf("BASIC_PASS=%s\n", *basicPass)
+	}
 }
