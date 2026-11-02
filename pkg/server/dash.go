@@ -22,6 +22,7 @@ import (
 
 	"github.com/j353719624/lumo/pkg/config"
 	"github.com/j353719624/lumo/pkg/log"
+	"github.com/j353719624/lumo/pkg/passhash"
 	"github.com/j353719624/lumo/pkg/qrcode"
 	"github.com/j353719624/lumo/pkg/token"
 	"github.com/j353719624/lumo/pkg/totp"
@@ -191,7 +192,7 @@ func (s *Server) basicGate(next http.Handler) http.Handler {
 		u, p, ok := r.BasicAuth()
 		if !ok ||
 			subtle.ConstantTimeCompare([]byte(u), []byte(user)) != 1 ||
-			subtle.ConstantTimeCompare([]byte(p), []byte(pass)) != 1 {
+			!passhash.Verify(p, pass) {
 			w.Header().Set("WWW-Authenticate", `Basic realm="LUMO"`)
 			if strings.HasPrefix(r.URL.Path, "/api/") {
 				failJSON(w, http.StatusUnauthorized, "Basic 认证失败")
@@ -252,8 +253,9 @@ func (s *Server) apiLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user, pass := s.cfg.Web.User, s.cfg.Web.Password
+	// 口令可能是 PBKDF2 哈希（配置迁移后）；明文兼容走常量时间比较。
 	if subtle.ConstantTimeCompare([]byte(req.Account), []byte(user)) != 1 ||
-		subtle.ConstantTimeCompare([]byte(req.Password), []byte(pass)) != 1 {
+		!passhash.Verify(req.Password, pass) {
 		s.limiter.Fail(origin)
 		failJSON(w, http.StatusUnauthorized, "账号或密码不正确")
 		return

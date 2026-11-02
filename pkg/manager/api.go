@@ -15,6 +15,7 @@ import (
 
 	"encoding/base64"
 	"github.com/j353719624/lumo/pkg/config"
+	"github.com/j353719624/lumo/pkg/passhash"
 	"github.com/j353719624/lumo/pkg/proto"
 
 	"github.com/j353719624/lumo/pkg/qrcode"
@@ -108,7 +109,7 @@ func (m *Manager) basicGate(next http.Handler) http.Handler {
 		u, p, ok := r.BasicAuth()
 		if !ok ||
 			subtle.ConstantTimeCompare([]byte(u), []byte(user)) != 1 ||
-			subtle.ConstantTimeCompare([]byte(p), []byte(pass)) != 1 {
+			!passhash.Verify(p, pass) {
 			w.Header().Set("WWW-Authenticate", `Basic realm="LUMO"`)
 			if strings.HasPrefix(r.URL.Path, "/api/") {
 				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Basic 认证失败"})
@@ -156,7 +157,8 @@ func (m *Manager) apiLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	okU := subtle.ConstantTimeCompare([]byte(req.Account), []byte(m.consoleUser)) == 1
-	okP := subtle.ConstantTimeCompare([]byte(req.Password), []byte(m.consolePass)) == 1
+	// 口令可能是 PBKDF2 哈希（auth-file 迁移后）；明文兼容走常量时间比较。
+	okP := passhash.Verify(req.Password, m.consolePass)
 	if !okU || !okP {
 		m.limiter.Fail(origin)
 		w.Header().Set("Content-Type", "application/json")

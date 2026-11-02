@@ -45,6 +45,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	// 明文口令一次性迁移为 PBKDF2 哈希并回写：配置文件落盘后不再含有
+	// 可直接使用的密码（旧版明文仍可校验，保证升级透明）。
+	if cfg.EnsureWebPasswordsHashed() {
+		if err := config.SaveServer(*cfgPath, cfg); err != nil {
+			fmt.Fprintf(os.Stderr, "lumos: 警告：口令哈希写回失败（明文仍生效）: %v\n", err)
+		} else {
+			fmt.Fprintln(os.Stderr, "lumos: 控制台口令已哈希化写回配置文件")
+		}
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	srv := server.New(cfg)

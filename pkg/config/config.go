@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/j353719624/lumo/pkg/passhash"
 	"github.com/j353719624/lumo/pkg/toml"
 )
 
@@ -370,6 +371,24 @@ func getStrs(m map[string]any, key string) []string {
 		}
 	}
 	return out
+}
+
+// EnsureWebPasswordsHashed replaces plaintext web passwords with PBKDF2
+// hashes in memory. Callers save the config back when this reports a
+// change, so an at-rest config file never keeps a usable password.
+func (c *ServerConfig) EnsureWebPasswordsHashed() (changed bool) {
+	for _, pw := range []*string{&c.Web.Password, &c.Web.BasicPassword} {
+		if *pw == "" || passhash.IsHash(*pw) {
+			continue
+		}
+		h, err := passhash.Hash(*pw)
+		if err != nil {
+			continue // keep the plaintext; verification still works
+		}
+		*pw = h
+		changed = true
+	}
+	return changed
 }
 
 // SaveServer writes a ServerConfig back to a toml file. It persists every
