@@ -18,6 +18,13 @@ type WebServer struct {
 	// TOTPSecrets holds one base32 secret per bound authenticator; a login
 	// code from any of them is accepted. Empty list disables two-factor.
 	TOTPSecrets []string
+	// BasicUser/BasicPassword gate the whole dashboard with HTTP basic
+	// auth before the panel password and TOTP are even considered. They
+	// are a separate credential pair from User/Password: the browser
+	// prompt carries this one, the login form carries the panel one.
+	// Empty BasicUser disables that layer.
+	BasicUser     string
+	BasicPassword string
 }
 
 // ServerConfig is the lumos (server) configuration.
@@ -296,6 +303,8 @@ func loadWeb(root map[string]any, def WebServer) WebServer {
 		w.User = getStr(t, "user", "admin")
 		w.Password = getStr(t, "password", "admin")
 		w.TOTPSecrets = getStrs(t, "totpSecrets")
+		w.BasicUser = getStr(t, "basicUser", "")
+		w.BasicPassword = getStr(t, "basicPassword", "")
 		// 旧版单密钥配置透明迁移
 		if legacy := getStr(t, "totpSecret", ""); legacy != "" {
 			dup := false
@@ -407,6 +416,10 @@ func SaveServer(path string, c *ServerConfig) error {
 	}
 	b.WriteString(fmt.Sprintf("user = %q\n", c.Web.User))
 	b.WriteString(fmt.Sprintf("password = %q\n", c.Web.Password))
+	if c.Web.BasicUser != "" {
+		b.WriteString(fmt.Sprintf("basicUser = %q\n", c.Web.BasicUser))
+		b.WriteString(fmt.Sprintf("basicPassword = %q\n", c.Web.BasicPassword))
+	}
 	if c.ConfigLocked {
 		b.WriteString("configLocked = true\n")
 	}

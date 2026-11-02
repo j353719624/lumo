@@ -27,6 +27,11 @@ type Manager struct {
 	consolePort string
 	consoleUser string
 	consolePass string
+	// basicUser/basicPass gate the console with HTTP basic auth before the
+	// panel password and TOTP; a separate credential pair from the panel
+	// one. Empty basicUser disables that layer.
+	basicUser string
+	basicPass string
 	base        string // URL prefix the console is served under, e.g. /app/lumo
 	socket      string // unix socket path; when set the console serves over it instead of TCP
 
@@ -161,6 +166,12 @@ func (m *Manager) SetSocket(path string) {
 	m.socket = strings.TrimSpace(path)
 }
 
+// SetBasicAuth sets the outer HTTP basic auth credential pair that gates
+// the console before the panel password and TOTP.
+func (m *Manager) SetBasicAuth(user, pass string) {
+	m.basicUser, m.basicPass = strings.TrimSpace(user), pass
+}
+
 // Run starts every config marked enabled, serves the console and blocks
 // until the process is interrupted.
 func (m *Manager) Run(addr, user, pass string) error {
@@ -213,6 +224,8 @@ func (m *Manager) Run(addr, user, pass string) error {
 	if m.base != "" {
 		handler = newBaseMiddleware(m.base, mux)
 	}
+	// 三层防护：Basic Auth（最外层）→ 面板密码会话 → TOTP
+	handler = m.basicGate(handler)
 
 	srv := &http.Server{Addr: addr, Handler: handler}
 	go func() {

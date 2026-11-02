@@ -104,10 +104,15 @@ func (s *Server) runDash() {
 
 	// 前缀部署（fnOS 应用网关按 /app/lumo-server 转发）：接受带与不带
 	// 前缀两种形态的请求；外发链接始终带前缀。
+	//
+	// 三层防护的顺序：Basic Auth（最外层，basicGate）→ 面板密码会话
+	// （guard）→ TOTP（登录时校验，绑定验证器后才签发会话）。
+	// 前缀剥离在最外层之前完成，网关转发的路径先被还原再进入这三层。
 	var handler http.Handler = mux
 	if s.webBase != "" {
 		handler = webbase.New(s.webBase, mux)
 	}
+	handler = s.basicGate(handler)
 	addr := s.cfg.Web.Addr + ":" + strconv.Itoa(s.cfg.Web.Port)
 	srv := &http.Server{Addr: addr, Handler: handler}
 	s.dashSrv = srv
@@ -139,8 +144,9 @@ func (s *Server) runDash() {
 // link builds a console URL that keeps the deployment prefix.
 func (s *Server) link(p string) string { return webbase.Link(s.webBase, p) }
 
-// guard enforces authentication: a session cookie or HTTP basic auth.
-// HTML pages redirect to /login; API calls receive 401.
+// guard enforces the panel-password session: HTML pages redirect to
+// /login; API calls receive 401. The basic-auth layer in front of it
+// (basicGate) must already have passed.
 func (s *Server) guard(next http.Handler) http.Handler {
 	user, pass := s.cfg.Web.User, s.cfg.Web.Password
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -162,20 +168,55 @@ func (s *Server) guard(next http.Handler) http.Handler {
 	})
 }
 
+// basicGate is the outermost layer: HTTP basic auth with its own
+// credential pair (webServer.basicUser / basicPassword). Only after it
+// passes do the panel password and TOTP apply. When no basic user is
+// configured the layer is disabled and the panel keeps working as
+// before.
+//
+// The whole dashboard sits behind it - including the login page and its
+// assets - so an attacker cannot even reach the password prompt without
+// the first credential. /healthz stays open: it returns a constant and
+// is used by monitoring.
+func (s *Server) basicGate(next http.Handler) http.Handler {
+	user, pass := s.cfg.Web.BasicUser, s.cfg.Web.BasicPassword
+	if user == "" {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/healthz" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		u, p, ok := r.BasicAuth()
+		if !ok ||
+			subtle.ConstantTimeCompare([]byte(u), []byte(user)) != 1 ||
+			subtle.ConstantTimeCompare([]byte(p), []byte(pass)) != 1 {
+			w.Header().Set("WWW-Authenticate", `Basic realm="LUMO"`)
+			if strings.HasPrefix(r.URL.Path, "/api/") {
+				failJSON(w, http.StatusUnauthorized, "Basic 认证失败")
+				return
+			}
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // isPublicAsset reports whether the path must be reachable without login.
 func isPublicAsset(p string) bool {
 	return p == "/login" || p == "/login.html" || strings.HasPrefix(p, "/assets/")
 }
 
-// authed checks the session cookie, then basic auth credentials.
+// authed checks the panel session cookie. The panel password itself is
+// verified when the session is issued (apiLogin); basic auth is a
+// separate, outer layer handled by basicGate.
 func (s *Server) authed(r *http.Request, user, pass string) bool {
 	if c, err := r.Cookie(sessionCookie); err == nil && s.webSessions.Valid(c.Value) {
 		return true
 	}
-	u, p, ok := r.BasicAuth()
-	return ok &&
-		subtle.ConstantTimeCompare([]byte(u), []byte(user)) == 1 &&
-		subtle.ConstantTimeCompare([]byte(p), []byte(pass)) == 1
+	return false
 }
 
 // loginPage serves the login form; already-authenticated visitors go to /.

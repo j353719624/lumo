@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -34,10 +33,11 @@ func dashHandler(s *Server) http.Handler {
 func TestDashBaseMiddlewareAcceptsBothPrefixedAndBarePaths(t *testing.T) {
 	s := newDashTestServer("/app/lumo-server")
 	h := dashHandler(s)
-	auth := "Basic " + base64.StdEncoding.EncodeToString([]byte("admin:pw"))
+	// 面板访问现在必须带会话（Basic Auth 是外层门，不能单独进面板）
+	tok := s.webSessions.Issue()
 
 	req := httptest.NewRequest(http.MethodGet, "/app/lumo-server/", nil)
-	req.Header.Set("Authorization", auth)
+	req.AddCookie(&http.Cookie{Name: sessionCookie, Value: tok})
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {

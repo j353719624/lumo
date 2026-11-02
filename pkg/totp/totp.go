@@ -76,6 +76,12 @@ func hmacEqual(a, b string) bool {
 	return hmac.Equal([]byte(a), []byte(b))
 }
 
+// Code returns the current one-time password for the secret. Useful for
+// verification scripts and tests; production code should only Verify.
+func Code(secret string, now time.Time) (string, error) {
+	return code(secret, uint64(now.Unix())/stepSeconds)
+}
+
 // URI builds the otpauth:// enrollment link authenticator apps scan.
 func URI(account, secret string) string {
 	return fmt.Sprintf("otpauth://totp/%s?secret=%s&issuer=%s&digits=%d&period=%d",

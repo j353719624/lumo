@@ -81,7 +81,9 @@ func isPublicAsset(p string) bool {
 	return p == "/login" || p == "/login.html" || p == "/help.html" || strings.HasPrefix(p, "/assets/")
 }
 
-// authed checks the session cookie, then basic auth credentials.
+// authed checks the panel session cookie. The panel password itself is
+// verified when the session is issued (apiLogin); basic auth is a
+// separate, outer layer handled by basicGate.
 func (m *Manager) authed(r *http.Request) bool {
 	if m.consolePass == "" {
 		return true
@@ -89,10 +91,34 @@ func (m *Manager) authed(r *http.Request) bool {
 	if c, err := r.Cookie(sessionCookie); err == nil && m.sessions.Valid(c.Value) {
 		return true
 	}
-	u, p, ok := r.BasicAuth()
-	return ok &&
-		subtle.ConstantTimeCompare([]byte(u), []byte(m.consoleUser)) == 1 &&
-		subtle.ConstantTimeCompare([]byte(p), []byte(m.consolePass)) == 1
+	return false
+}
+
+// basicGate is the outermost layer of the console: HTTP basic auth with
+// its own credential pair, in front of the panel password and TOTP.
+// The whole console (login page and assets included) sits behind it, so
+// an attacker cannot reach the password prompt without it. Disabled
+// when no basic user is configured.
+func (m *Manager) basicGate(next http.Handler) http.Handler {
+	user, pass := m.basicUser, m.basicPass
+	if user == "" {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u, p, ok := r.BasicAuth()
+		if !ok ||
+			subtle.ConstantTimeCompare([]byte(u), []byte(user)) != 1 ||
+			subtle.ConstantTimeCompare([]byte(p), []byte(pass)) != 1 {
+			w.Header().Set("WWW-Authenticate", `Basic realm="LUMO"`)
+			if strings.HasPrefix(r.URL.Path, "/api/") {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Basic 认证失败"})
+				return
+			}
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // loginPage serves the login form when a password is configured.
