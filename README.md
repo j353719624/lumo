@@ -16,10 +16,14 @@ network; they build a control channel over an authenticated handshake and open d
   other tunneling tools
 - **Bilingual consoles** — built-in server and client web panels (English / Chinese), live status,
   traffic and runtime events
+- **Three-layer console protection** — HTTP basic auth in front of the panel password and TOTP;
+  login passwords are stored only as salted PBKDF2 hashes, never in plaintext
+- **Dual-transport hot standby** — `auto` protocol runs a TCP primary leg and a KCP standby leg at
+  the same time; mappings are dual-homed and traffic fails over in seconds
 - **Optional secrets** — sealed tunnels (`sealed-tcp` / `sealed-udp`) expose nothing publicly, and
   `punch` establishes peer-to-peer links with automatic relay fallback
 
-## Proxy types (v0.1.0)
+## Proxy types
 
 | Type | Description |
 |---|---|
@@ -33,8 +37,9 @@ network; they build a control channel over an authenticated handshake and open d
 | `mux` | HTTP CONNECT multiplexed entry port |
 
 Also included: token authentication (Ed25519 challenge), automatic reconnect with backoff, config
-hot-reload, `verify` for config files, TOTP two-factor login, traffic accounting, runtime events and a
-multi-connection manager.
+hot-reload, `verify` for config files, three-layer console login (basic auth / panel password /
+TOTP), at-rest password hashing (PBKDF2), traffic accounting, runtime events and a multi-connection
+manager.
 
 ## Multi-connection console (recommended)
 
